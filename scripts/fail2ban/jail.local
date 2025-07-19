@@ -1,7 +1,40 @@
+[DEFAULT]
+# Ban timing and retry logic
+bantime  = 1h
+findtime = 10m
+maxretry = 5
+
+# Incremental banning (optional)
+bantime.increment = true
+bantime.factor = 1
+bantime.rndtime = 10m
+bantime.formula = bantime * (1<<(n-1))
+
+# Logging
+loglevel = INFO
+logtarget = /var/log/fail2ban.log
+
+# Exclude localhost (edit to include your LAN if needed)
+ignoreip = 127.0.0.1/8 ::1
+
+# Default ban action
+banaction = iptables-multiport
+backend = systemd
+
+# Customized SSH jail
 [sshd]
-enabled = true
-port = __SSH_PORT__
-filter = sshd
-logpath = /var/log/auth.log
+enabled  = true
+port     = __SSH_PORT__
+filter   = sshd
+logpath  = /var/log/auth.log
 maxretry = 3
-bantime = 3600
+bantime  = 3600
+
+# Optional: Catch repeat offenders across multiple jails
+[recidive]
+enabled  = true
+logpath  = /var/log/fail2ban.log
+banaction = iptables-allports
+findtime = 1d
+bantime  = 1w
+maxretry = 5

@@ -22,7 +22,9 @@ WANTED_BY=$6
 AUTO_START=${7:-true}  # Defaults to true if not provided
 
 # --- Unit File Creation ---
-UNIT_FILE="/etc/systemd/system/$SERVICE_NAME.service"
+OKASTR8_DIR="/etc/systemd/system/okastr8"
+mkdir -p "$OKASTR8_DIR"
+UNIT_FILE="$OKASTR8_DIR/$SERVICE_NAME.service"
 
 cat > "$UNIT_FILE" << EOL
 [Unit]
