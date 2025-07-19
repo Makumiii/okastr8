@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Changes the SSH port in /etc/ssh/sshd_config
 
 if [ -z "$1" ]; then

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Shows the last login time for a given user
 
 if [ -z "$1" ]; then

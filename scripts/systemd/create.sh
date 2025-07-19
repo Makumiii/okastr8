@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Creates a systemd unit file from command-line arguments, with optional auto-start.
 
 # --- Root Check ---

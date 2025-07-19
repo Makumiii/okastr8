@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Locks a user account
 
 if [ -z "$1" ]; then
