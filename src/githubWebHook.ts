@@ -1,7 +1,12 @@
 import { Hono } from 'hono';
-import { Context } from 'hono';
 
-const app = new Hono();
+interface Env {
+  Variables: {
+    rawBody: string;
+  };
+}
+
+const app = new Hono<Env>();
 
 // Middleware to get raw body for signature verification
 app.use('/webhook', async (c, next) => {
@@ -12,7 +17,7 @@ app.use('/webhook', async (c, next) => {
   await next();
 });
 
-app.post('/webhook', async (c: Context) => {
+app.post('/webhook', async (c) => {
   const signature = c.req.header('x-hub-signature-256');
   const secret = process.env.GITHUB_WEBHOOK_SECRET;
   const rawBody = c.get('rawBody');
