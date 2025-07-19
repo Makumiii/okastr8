@@ -13,10 +13,15 @@ echo "Stopping ${SERVICE_NAME}..."
 systemctl stop "${SERVICE_NAME}"
 
 echo "Disabling ${SERVICE_NAME}..."
-systemctl disable "${SERVICE_FILE}"
+systemctl disable "${SERVICE_NAME}"
+
+echo "Unlinking ${SERVICE_NAME}..."
+systemctl reset-failed "${SERVICE_NAME}"  # Optional: clears failed state
+systemctl disable --now "${SERVICE_NAME}" 2>/dev/null  # Just in case
+systemctl reenable "${SERVICE_FILE}" 2>/dev/null       # Force cleanup
 
 echo "Removing service file: ${SERVICE_FILE}..."
-rm "${SERVICE_FILE}"
+rm -f "${SERVICE_FILE}"
 
 echo "Reloading systemd daemon..."
 systemctl daemon-reload

@@ -51,9 +51,10 @@ systemctl daemon-reload
 
 # --- Auto-start Logic ---
 if [[ "$AUTO_START" == "true" ]]; then
-  systemctl enable "$UNIT_FILE"
+  systemctl link "$UNIT_FILE"
+  systemctl enable "$SERVICE_NAME.service"
   systemctl start "$SERVICE_NAME.service"
-  echo "Service '$SERVICE_NAME' enabled and started."
+  echo "Service '$SERVICE_NAME' linked, enabled, and started."
 else
   echo "Service '$SERVICE_NAME' created but not started (auto_start=$AUTO_START)."
 fi
