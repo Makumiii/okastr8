@@ -49,10 +49,19 @@ app.post('/webhook', async (c) => {
     console.log(`Received push to repository: ${repoName}, branch: ${branch}`);
   }
 
+  import { runCommand } from '../utils/command';
+
   // Run deploy script
-  Bun.spawn(['/bin/bash', './scripts/deploy.sh'], {
-    stdio: ['inherit', 'inherit', 'inherit'],
-  });
+  runCommand('./scripts/deploy.sh')
+    .then(({ stdout, stderr }) => {
+      console.log('Deployment script stdout:', stdout);
+      if (stderr) {
+        console.error('Deployment script stderr:', stderr);
+      }
+    })
+    .catch(error => {
+      console.error('Error running deployment script:', error);
+    });
 
   return c.text('Webhook received and deployment initiated!', 200);
 });
