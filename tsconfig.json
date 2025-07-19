@@ -19,8 +19,7 @@
     "skipLibCheck": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    "types": ["node"]
+    "noImplicitOverride": true
 
     // Some stricter flags (disabled by default)
     "noUnusedLocals": false,

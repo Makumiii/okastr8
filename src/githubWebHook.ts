@@ -15,7 +15,8 @@ app.use('/webhook', async (c, next) => {
     c.set('rawBody', rawBody);
   }
   await next();
-});
+})
+
 
 app.post('/webhook', async (c) => {
   const signature = c.req.header('x-hub-signature-256');
@@ -49,19 +50,10 @@ app.post('/webhook', async (c) => {
     console.log(`Received push to repository: ${repoName}, branch: ${branch}`);
   }
 
-  import { runCommand } from '../utils/command';
-
   // Run deploy script
-  runCommand('./scripts/deploy.sh')
-    .then(({ stdout, stderr }) => {
-      console.log('Deployment script stdout:', stdout);
-      if (stderr) {
-        console.error('Deployment script stderr:', stderr);
-      }
-    })
-    .catch(error => {
-      console.error('Error running deployment script:', error);
-    });
+  Bun.spawn(['/bin/bash', './scripts/deploy.sh'], {
+    stdio: ['inherit', 'inherit', 'inherit'],
+  });
 
   return c.text('Webhook received and deployment initiated!', 200);
 });
