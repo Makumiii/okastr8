@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { createHmac } from 'node:crypto';
 
 interface Env {
   Variables: {
@@ -8,7 +9,6 @@ interface Env {
 
 const app = new Hono<Env>();
 
-// Middleware to get raw body for signature verification
 app.use('/webhook', async (c, next) => {
   if (c.req.method === 'POST') {
     const rawBody = await c.req.text();
@@ -27,19 +27,8 @@ app.post('/webhook', async (c) => {
     return c.text('Bad Request', 400);
   }
 
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-
-  const mac = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody));
-  const expectedSignature = `sha256=${Array.from(new Uint8Array(mac))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('')}`;
+  const expectedSignature = 'sha256=' +
+    createHmac('sha256', secret).update(rawBody).digest('hex');
 
   if (signature !== expectedSignature) {
     console.error('Invalid signature.');
@@ -60,7 +49,7 @@ app.post('/webhook', async (c) => {
     console.log(`Received push to repository: ${repoName}, branch: ${branch}`);
   }
 
-  // Run the deploy script non-blocking
+  // Run deploy script
   Bun.spawn(['/bin/bash', './scripts/deploy.sh'], {
     stdio: ['inherit', 'inherit', 'inherit'],
   });
