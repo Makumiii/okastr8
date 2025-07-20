@@ -65,35 +65,109 @@ else
   sudo apt install -y caddy
 fi
 
-# --- Ngrok Installation (Direct Download) ---
+# --- Ngrok Installation ---
 echo "🌍 Installing Ngrok CLI..."
 
+# Diagnostic: Find out which ngrok is being used
+if command -v ngrok &> /dev/null; then
+  echo "Diagnostic: ngrok found at: $(which ngrok)"
+  echo "Diagnostic: ngrok version: $(ngrok version)"
+  echo "Diagnostic: Removing existing ngrok binary from $(which ngrok)..."
+  sudo rm -f "$(which ngrok)" || true # Remove the found binary
+else
+  echo "Diagnostic: No ngrok found in PATH initially."
+fi
+
+# Now proceed with installation
 if ! command -v ngrok &> /dev/null; then
-  NGROK_ARCH="amd64"
-  if [[ "$(uname -m)" == "aarch64" ]]; then
-    NGROK_ARCH="arm64"
+  # Method 1: Try official package repositories first (recommended)
+  echo "Attempting to install ngrok via official repositories..."
+  
+  if [[ "$USE_FEDORA" == true ]]; then
+    # For Fedora/RHEL - use snap or try direct download
+    if command -v snap &> /dev/null; then
+      sudo snap install ngrok
+      echo "Ngrok installed via snap"
+    else
+      echo "Snap not available, falling back to direct download..."
+    fi
+  else
+    # For Debian/Ubuntu - use official apt repository
+    curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | \
+      sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null && \
+      echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | \
+      sudo tee /etc/apt/sources.list.d/ngrok.list && \
+      sudo apt update && sudo apt install ngrok
+    
+    if command -v ngrok &> /dev/null; then
+      echo "Ngrok installed via official apt repository"
+    else
+      echo "Official repository installation failed, falling back to direct download..."
+    fi
   fi
-
-  NGRK_ZIP="ngrok-stable-linux-${NGROK_ARCH}.zip"
-  NGRK_URL="https://bin.equinox.io/c/4VmDzA7iaHb/${NGRK_ZIP}"
-
-  echo "Downloading Ngrok from ${NGRK_URL}"
-  if ! curl -L "${NGRK_URL}" -o "/tmp/${NGRK_ZIP}"; then
-    echo "Error: Failed to download Ngrok." >&2
-    exit 1
+  
+  # Method 2: Direct download fallback (if repository method didn't work)
+  if ! command -v ngrok &> /dev/null; then
+    echo "Using direct download method..."
+    
+    NGROK_ARCH="amd64"
+    NGROK_OS="linux"
+    
+    if [[ "$(uname -m)" == "aarch64" ]]; then
+      NGROK_ARCH="arm64"
+    fi
+    
+    # Use the newer download.ngrok.com URL structure
+    NGROK_ZIP="ngrok-v3-stable-${NGROK_OS}-${NGROK_ARCH}.tgz"
+    NGROK_URL="https://bin.equinox.io/c/bNyj1mQVY4c/${NGROK_ZIP}"
+    
+    echo "Downloading Ngrok from ${NGROK_URL}"
+    if ! curl -L "${NGROK_URL}" -o "/tmp/${NGROK_ZIP}"; then
+      echo "Primary URL failed, trying alternative..."
+      # Alternative: Try the github releases or different URL structure
+      NGROK_URL="https://github.com/ngrok/ngrok/releases/latest/download/ngrok-v3-stable-${NGROK_OS}-${NGROK_ARCH}.tgz"
+      if ! curl -L "${NGROK_URL}" -o "/tmp/${NGROK_ZIP}"; then
+        echo "Error: Failed to download Ngrok from all sources." >&2
+        echo "Please visit https://ngrok.com/download to download manually." >&2
+        exit 1
+      fi
+    fi
+    
+    # Check if file is actually downloaded and not empty
+    if [ ! -s "/tmp/${NGROK_ZIP}" ]; then
+      echo "Error: Downloaded file is empty or corrupted." >&2
+      echo "Please visit https://ngrok.com/download to download manually." >&2
+      exit 1
+    fi
+    
+    # Check file type and extract accordingly
+    file_type=$(file "/tmp/${NGROK_ZIP}")
+    if [[ "$file_type" == *"gzip"* ]] || [[ "$file_type" == *"tar"* ]]; then
+      echo "Extracting tar.gz archive..."
+      sudo tar -xzf "/tmp/${NGROK_ZIP}" -C /usr/local/bin
+    elif [[ "$file_type" == *"Zip"* ]]; then
+      echo "Extracting zip archive..."
+      sudo unzip -o "/tmp/${NGROK_ZIP}" -d /usr/local/bin
+    else
+      echo "Error: Unknown file format: $file_type" >&2
+      echo "Downloaded file might be corrupted or an error page." >&2
+      exit 1
+    fi
+    
+    sudo chmod +x /usr/local/bin/ngrok
+    rm "/tmp/${NGROK_ZIP}"
+    echo "Ngrok installed to /usr/local/bin/ngrok"
   fi
-
-  echo "Unzipping Ngrok..."
-  if ! sudo unzip -o "/tmp/${NGRK_ZIP}" -d /usr/local/bin; then
-    echo "Error: Failed to unzip Ngrok." >&2
-    exit 1
-  fi
-
-  sudo chmod +x /usr/local/bin/ngrok
-  rm "/tmp/${NGRK_ZIP}"
-  echo "Ngrok installed to /usr/local/bin/ngrok"
 else
   echo "Ngrok is already installed."
+fi
+
+# Verify installation
+if command -v ngrok &> /dev/null; then
+  echo "✅ Ngrok installation verified: $(ngrok version)"
+else
+  echo "❌ Ngrok installation failed" >&2
+  exit 1
 fi
 
 # Configure Ngrok authtoken from config.json

@@ -136,7 +136,12 @@ mkdir -p "$CONFIG_DIR"
 info "Creating default config.json..."
 cat <<EOF > "$CONFIG_FILE"
 {
-  "services": []
+  "services": [],
+  "networking": {
+    "ngrok": {
+      "authToken": ""
+    }
+  }
 }
 EOF
 
