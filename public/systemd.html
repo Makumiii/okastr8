@@ -1,0 +1,80 @@
+<h2>Systemd Management</h2>
+<div class="form-grid">
+    <div class="form-container full-width">
+        <h3>Create Service</h3>
+        <form id="create-service-form">
+            <input type="text" name="service_name" placeholder="Service Name" required>
+            <input type="text" name="description" placeholder="Description" required>
+            <input type="text" name="exec_start" placeholder="ExecStart" required>
+            <input type="text" name="working_directory" placeholder="Working Directory" required>
+            <input type="text" name="user" placeholder="User" required>
+            <input type="text" name="wanted_by" placeholder="WantedBy" value="multi-user.target" required>
+            <label><input type="checkbox" name="auto_start" checked> Auto-start</label>
+            <button type="submit">Create Service</button>
+        </form>
+    </div>
+    <div class="form-container">
+        <h3>Delete Service</h3>
+        <form id="delete-service-form">
+            <input type="text" name="service_name" placeholder="Service Name" required>
+            <button type="submit">Delete Service</button>
+        </form>
+    </div>
+    <div class="form-container">
+        <h3>Start Service</h3>
+        <form id="start-service-form">
+            <input type="text" name="service_name" placeholder="Service Name" required>
+            <button type="submit">Start Service</button>
+        </form>
+    </div>
+    <div class="form-container">
+        <h3>Stop Service</h3>
+        <form id="stop-service-form">
+            <input type="text" name="service_name" placeholder="Service Name" required>
+            <button type="submit">Stop Service</button>
+        </form>
+    </div>
+    <div class="form-container">
+        <h3>Restart Service</h3>
+        <form id="restart-service-form">
+            <input type="text" name="service_name" placeholder="Service Name" required>
+            <button type="submit">Restart Service</button>
+        </form>
+    </div>
+    <div class="form-container">
+        <h3>Service Status</h3>
+        <form id="status-service-form">
+            <input type="text" name="service_name" placeholder="Service Name" required>
+            <button type="submit">Show Status</button>
+        </form>
+    </div>
+    <div class="form-container">
+        <h3>Service Logs</h3>
+        <form id="logs-service-form">
+            <input type="text" name="service_name" placeholder="Service Name" required>
+            <button type="submit">Show Logs</button>
+        </form>
+    </div>
+    <div class="form-container">
+        <h3>Enable Service</h3>
+        <form id="enable-service-form">
+            <input type="text" name="service_name" placeholder="Service Name" required>
+            <button type="submit">Enable Service</button>
+        </form>
+    </div>
+    <div class="form-container">
+        <h3>Disable Service</h3>
+        <form id="disable-service-form">
+            <input type="text" name="service_name" placeholder="Service Name" required>
+            <button type="submit">Disable Service</button>
+        </form>
+    </div>
+    <div class="form-container">
+        <h3>Reload Daemon</h3>
+        <button id="reload-daemon-button">Reload systemd</button>
+    </div>
+    <div class="form-container">
+        <h3>List Services</h3>
+        <button id="list-services-button">List Services</button>
+    </div>
+</div>

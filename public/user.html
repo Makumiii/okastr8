@@ -1,0 +1,55 @@
+<h2>User Management</h2>
+<div class="form-grid">
+    <div class="form-container">
+        <h3>Create User</h3>
+        <form id="create-user-form">
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="password" name="password" placeholder="Password">
+            <select name="distro">
+                <option value="">Auto-detect Distro</option>
+                <option value="debian">Debian</option>
+                <option value="fedora">Fedora</option>
+            </select>
+            <button type="submit">Create User</button>
+        </form>
+    </div>
+    <div class="form-container">
+        <h3>Delete User</h3>
+        <form id="delete-user-form">
+            <input type="text" name="username" placeholder="Username" required>
+            <button type="submit">Delete User</button>
+        </form>
+    </div>
+    <div class="form-container">
+        <h3>Last Login</h3>
+        <form id="last-login-form">
+            <input type="text" name="username" placeholder="Username" required>
+            <button type="submit">Show Last Login</button>
+        </form>
+    </div>
+    <div class="form-container">
+        <h3>List Groups</h3>
+        <form id="list-groups-form">
+            <input type="text" name="username" placeholder="Username" required>
+            <button type="submit">List Groups</button>
+        </form>
+    </div>
+    <div class="form-container">
+        <h3>Lock User</h3>
+        <form id="lock-user-form">
+            <input type="text" name="username" placeholder="Username" required>
+            <button type="submit">Lock User</button>
+        </form>
+    </div>
+    <div class="form-container">
+        <h3>Switch User</h3>
+        <form id="switch-user-form">
+            <input type="text" name="username" placeholder="Username" required>
+            <button type="submit">Switch User</button>
+        </form>
+    </div>
+    <div class="form-container full-width">
+        <h3>List Users</h3>
+        <button id="list-users-button">List All Users</button>
+    </div>
+</div>
