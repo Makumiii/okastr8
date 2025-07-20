@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { runCommand } from '../utils/command';
 import * as path from 'path';
 
-const SCRIPT_BASE_PATH = path.join(process.cwd(), 'scripts', 'user');
+const SCRIPT_BASE_PATH = path.join(process.cwd(), '..', '..', 'scripts', 'user');
 
 export function addUserCommands(program: Command) {
   const user = program.command('user').description('Manage system users');

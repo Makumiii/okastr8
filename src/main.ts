@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { addSystemdCommands } from './commands/systemd';
 import { addUserCommands } from './commands/user';
+import { addOrchestrateCommand } from './commands/orchestrate';
 
 const program = new Command();
 
@@ -11,5 +12,6 @@ program
 
 addSystemdCommands(program);
 addUserCommands(program);
+addOrchestrateCommand(program);
 
 program.parse(process.argv);

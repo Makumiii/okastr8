@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { runCommand } from '../utils/command';
 import * as path from 'path';
 
-const SCRIPT_BASE_PATH = path.join(process.cwd(), 'scripts', 'systemd');
+const SCRIPT_BASE_PATH = path.join(process.cwd(),'..','..', 'scripts', 'systemd');
 
 export function addSystemdCommands(program: Command) {
   const systemd = program.command('systemd').description('Manage systemd services');
