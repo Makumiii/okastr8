@@ -1,4 +1,6 @@
+import { join } from "path";
 import type { Okastr8Config } from "./types";
+import { runCommand } from "./utils/command";
 import { readFile, writeFile } from "./utils/fs";
 import { homedir } from "os";
 
@@ -20,6 +22,8 @@ export async function genCaddyFile() {
     const caddyFile = caddyEntries.join("\n\n") + "\n"; 
 
     await writeFile(caddyFilePath, caddyFile);
+    const pathToReloadCaddy = join(process.cwd(), '..', 'scripts', 'systemd', 'reloadCaddy.sh');
+    await runCommand(pathToReloadCaddy, []);
     console.log(`Caddyfile generated at ${caddyFilePath}`);
   } catch (e) {
     console.error("Error generating Caddyfile:", e);
