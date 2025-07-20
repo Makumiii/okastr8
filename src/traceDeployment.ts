@@ -22,6 +22,7 @@ export async function saveDeployment(deployment: DeploysMetadata, serviceId:{ se
             throw new Error(`No deployment found for service ${serviceId.serviceName} with remote ${serviceId.gitRemoteName}`);
         }
         entry.deploys.push(deployment);
+        entry.lastSuccessfulDeploy = deployment
 
         await writeFile(pathToDeployment, JSON.stringify(existingDeployments, null, 2));
         console.log(`Deployment saved to ${pathToDeployment}`);
@@ -50,10 +51,13 @@ export async function rollbackDeployment(hash:string, serviceId:{ serviceName: s
         if(!foundDeployment){
             throw new Error(`No deployment found with hash ${hash} for service ${serviceId.serviceName}`);
         }
-        const {gitRemoteName,serviceName} = entry
+        const {serviceName} = entry
         const {ssh_url } = foundDeployment
         const pathToScript = join(process.cwd(),'..','scripts','systemd', 'rollback.sh')
         await runCommand(pathToScript, [ssh_url, hash, projectsFolder]);
+        const pathToRestartScript = join(process.cwd(),'..','scripts','systemd', 'restart.sh')
+        await runCommand(pathToRestartScript, [serviceName]);
+
 
         console.log(`Rollback script executed successfully for ${hash}`);
 
@@ -61,4 +65,32 @@ export async function rollbackDeployment(hash:string, serviceId:{ serviceName: s
         console.error(`Error rolling back deployment for ${hash}:`, e);
         process.exit(1);
     }
+}
+
+export default async function autoRollbackDeployment(serviceId:string){
+    try{
+        const content = await readFile(pathToDeployment)
+        const existingDeployments = JSON.parse(content) as DeploymentRecord;
+        if(existingDeployments.deployments.length === 0){
+            console.log(`No deployments found in ${pathToDeployment}`);
+            return;
+        }
+        const entry = existingDeployments.deployments.find((d) => d.serviceName === serviceId);
+        if(!entry){
+            console.log(`No deployment found for service ${serviceId}`);
+            return;
+        }
+        const lastSuccess = entry.lastSuccessfulDeploy
+        if(!lastSuccess){
+            console.log(`No successful deployment found for service ${serviceId}`);
+            return;
+        }
+
+        await rollbackDeployment(lastSuccess.gitHash, { serviceName: entry.serviceName, gitRemoteName: entry.gitRemoteName });
+
+    }catch(e){
+        console.error(`Error during auto rollback deployment:`, e);
+        process.exit(1);
+    }
+
 }

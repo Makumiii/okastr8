@@ -17,6 +17,8 @@ export type ServiceConfig = {
 
 export type GitWebhookPayload = {
     ref:string,
+    before:string,
+    
     repository:{
         name:string,
         ssh_url:string,
@@ -39,6 +41,7 @@ export type Deployment = {
     serviceName:string,
     gitRemoteName:string,
     deploys:DeploysMetadata[]
+    lastSuccessfulDeploy:DeploysMetadata | null 
 
 }
 

@@ -77,7 +77,8 @@ app.post('/webhook', async (c) => {
   }
 
   const buildCommands = service.buildSteps
-  await deploy(service.systemd.serviceName, buildCommands)
+  await deploy({serviceName:service.systemd.serviceName, gitRemoteName:service.git.remoteName}, buildCommands, {ssh_url:payload.repository.ssh_url, gitHash:payload.before
+  })
 
 
 

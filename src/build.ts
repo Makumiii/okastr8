@@ -1,6 +1,6 @@
 import { runCommand } from "./utils/command";
 
-export default async function build(buildSteps:string[]){
+export default async function build(buildSteps:string[], serviceName:string){
     try{
         for(const step of buildSteps){
             await runCommand(step);
