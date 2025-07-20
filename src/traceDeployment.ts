@@ -1,7 +1,10 @@
 import { homedir } from 'os';
 import type { Deployment, DeploymentRecord, DeploysMetadata } from './types';
 import { readFile, writeFile } from './utils/fs';
+import path, { join } from 'path';
+import { runCommand } from './utils/command';
 const pathToDeployment = `${homedir()}/.okastr8/deployment.json`;
+const projectsFolder = `${homedir()}/.okastr8/projects`;
 
 export async function saveDeployment(deployment: DeploysMetadata, serviceId:{ serviceName: string, gitRemoteName: string }) {
     try{
@@ -49,8 +52,10 @@ export async function rollbackDeployment(hash:string, serviceId:{ serviceName: s
         }
         const {gitRemoteName,serviceName} = entry
         const {ssh_url } = foundDeployment
+        const pathToScript = join(process.cwd(),'..','scripts','systemd', 'rollback.sh')
+        await runCommand(pathToScript, [ssh_url, hash, projectsFolder]);
 
-        
+        console.log(`Rollback script executed successfully for ${hash}`);
 
     }catch(e){
         console.error(`Error rolling back deployment for ${hash}:`, e);
