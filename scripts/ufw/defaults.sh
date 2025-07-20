@@ -10,6 +10,7 @@ fi
 # Get the desired port from argument or default to 2222
 NEW_SSH_PORT=${1:-2222}
 
+"$SCRIPT_DIR/../ssh/change-ssh-port.sh" "$NEW_SSH_PORT"
 # --- UFW Configuration ---
 ufw --force reset
 
@@ -26,4 +27,3 @@ echo "✅ UFW configured. Allowed ports: $NEW_SSH_PORT (SSH), 80, 443"
 
 # --- SSH Port Configuration ---
 SCRIPT_DIR=$(dirname -- "$(readlink -f -- "$0")")
-"$SCRIPT_DIR/../ssh/change-ssh-port.sh" "$NEW_SSH_PORT"

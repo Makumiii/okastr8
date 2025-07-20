@@ -48,3 +48,16 @@ export type Deployment = {
 export type DeploymentRecord = {
     deployments: Deployment[]
 }
+
+export type OrchestrateEnvironment = {
+  createUser:{
+    userName:string,
+    passWord:string,
+    distro?:string
+  },
+  changeSSHPort:{
+    port:number
+  },
+  
+    
+}
