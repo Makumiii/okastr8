@@ -6,6 +6,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const lockUserForm = document.getElementById('lock-user-form');
     const switchUserForm = document.getElementById('switch-user-form');
     const listUsersButton = document.getElementById('list-users-button');
+    const resultsDisplay = document.getElementById('user-results');
+
+    function displayResult(message, isError = false) {
+        resultsDisplay.innerHTML = ``; // Clear previous results
+        const p = document.createElement('p');
+        p.textContent = message;
+        p.style.color = isError ? 'red' : 'green';
+        resultsDisplay.appendChild(p);
+    }
 
     async function handleFormSubmit(event, url) {
         event.preventDefault();
@@ -22,9 +31,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(data)
             });
             const result = await response.json();
-            alert(result.message);
+            displayResult(result.message, !result.success);
         } catch (error) {
-            alert(`Error: ${error.message}`);
+            displayResult(`Error: ${error.message}`, true);
         }
     }
 
@@ -32,9 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(`/api${url}`);
             const result = await response.json();
-            alert(result.message);
+            displayResult(result.message, !result.success);
         } catch (error) {
-            alert(`Error: ${error.message}`);
+            displayResult(`Error: ${error.message}`, true);
         }
     }
 

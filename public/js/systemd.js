@@ -10,6 +10,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const disableServiceForm = document.getElementById('disable-service-form');
     const reloadDaemonButton = document.getElementById('reload-daemon-button');
     const listServicesButton = document.getElementById('list-services-button');
+    const resultsDisplay = document.getElementById('systemd-results');
+
+    function displayResult(message, isError = false) {
+        resultsDisplay.innerHTML = ``; // Clear previous results
+        const p = document.createElement('p');
+        p.textContent = message;
+        p.style.color = isError ? 'red' : 'green';
+        resultsDisplay.appendChild(p);
+    }
 
     async function handleFormSubmit(event, url) {
         event.preventDefault();
@@ -26,9 +35,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(data)
             });
             const result = await response.json();
-            alert(result.message);
+            displayResult(result.message, !result.success);
         } catch (error) {
-            alert(`Error: ${error.message}`);
+            displayResult(`Error: ${error.message}`, true);
         }
     }
 
@@ -36,9 +45,9 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(`/api${url}`);
             const result = await response.json();
-            alert(result.message);
+            displayResult(result.message, !result.success);
         } catch (error) {
-            alert(`Error: ${error.message}`);
+            displayResult(`Error: ${error.message}`, true);
         }
     }
 
