@@ -201,7 +201,7 @@ CREATE_SCRIPT_PATH="$INSTALL_DIR/scripts/systemd/create.sh"
 
 if [ ! -f "$CREATE_SCRIPT_PATH" ]; then
   error "systemd create script not found at $CREATE_SCRIPT_PATH"
-}
+fi
 
 # Always create/update the service file
 info "Creating systemd service '$WEBHOOK_SERVICE_NAME'."
@@ -227,7 +227,7 @@ NGROK_TUNNEL_SCRIPT="$INSTALL_DIR/scripts/tunnel.sh"
 
 if [ ! -f "$NGROK_TUNNEL_SCRIPT" ]; then
   error "Ngrok tunnel script not found at $NGROK_TUNNEL_SCRIPT"
-}
+fi
 
 # Run in background so install.sh can complete
 "$NGROK_TUNNEL_SCRIPT" &
