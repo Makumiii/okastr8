@@ -1,14 +1,17 @@
-import { exec } from 'child_process';
+import { spawn } from "child_process";
 
-export function runCommand(command: string): Promise<{ stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    exec(command, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`Error executing command: ${command}`, error);
-        reject(error);
-        return;
-      }
-      resolve({ stdout, stderr });
-    });
-  });
+export async function runCommand(scriptPath: string, args: string[] = []) {
+    try {
+        const command = spawn(scriptPath, args, {
+        stdio: 'inherit',
+        });
+        await new Promise<void>((resolve, reject) => {
+            command.on('close', () => resolve());
+            command.on('error', reject);
+        });
+    } catch (error) {
+        console.error(`[SSHIP] Error executing command: ${error}`);
+        process.exit(1);
+    }
+
 }

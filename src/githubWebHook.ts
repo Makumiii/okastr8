@@ -1,11 +1,26 @@
 import { Hono } from 'hono';
 import { createHmac } from 'node:crypto';
+import { homedir } from 'os';
+import { readFile } from './utils/fs';
+import type { GitWebhookPayload, Okastr8Config } from './types';
+
+import { deploy } from './deploy';
 
 interface Env {
   Variables: {
     rawBody: string;
   };
 }
+
+const userConfigPath = `${homedir()}/.okastr8/config.json`;
+let config: Okastr8Config = {} as Okastr8Config;
+try {
+  const content = await readFile(userConfigPath);
+  config = JSON.parse(content);
+} catch (e) {
+  console.error(`Failed to load config from ${userConfigPath}`, e);
+}
+
 
 const app = new Hono<Env>();
 
@@ -36,24 +51,37 @@ app.post('/webhook', async (c) => {
     return c.text('Forbidden', 403);
   }
 
-  let payload: any;
+  let payload: GitWebhookPayload;
   try {
-    payload = JSON.parse(rawBody);
+    payload = JSON.parse(rawBody) as GitWebhookPayload;
   } catch (error) {
     console.error('Failed to parse JSON payload:', error);
     return c.text('Bad Request - Invalid JSON', 400);
   }
 
-  if (payload.ref && payload.repository) {
-    const branch = payload.ref.split('/').pop();
-    const repoName = payload.repository.name;
-    console.log(`Received push to repository: ${repoName}, branch: ${branch}`);
+  if (!payload || !payload.ref || !payload.repository) {
+    console.error('Invalid payload structure.');
+    return c.text('Bad Request - Invalid Payload', 400);
   }
 
-  // Run deploy script
-  Bun.spawn(['/bin/bash', './scripts/deploy.sh'], {
-    stdio: ['inherit', 'inherit', 'inherit'],
-  });
+  const repoName = payload.repository.name;
+  const branch = payload.ref.split('/')[2];
+  if(!branch) {
+    console.error('Invalid branch name in payload.');
+    return c.text('Bad Request - Invalid Branch', 400);
+  }
+  const service = config.services.find((service)=> service.git.remoteName.trim() === repoName.trim() && service.git.watchRemoteBranch.trim() === branch.trim())
+  if (!service) {
+    console.error(`No service found for repository ${repoName} on branch ${branch}`);
+    return c.text('Not Found - No Service Configured', 404);
+  }
+
+  const buildCommands = service.buildSteps
+  await deploy(service.systemd.serviceName, buildCommands)
+
+
+
+
 
   return c.text('Webhook received and deployment initiated!', 200);
 });

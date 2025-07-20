@@ -10,11 +10,34 @@ export type ServiceConfig = {
   };
   git: {
     remoteName:string
-    watchRemote: string;         // Remote to watch (e.g., main/develop)
+    watchRemoteBranch: string;         // Remote to watch (e.g., main/develop)
   };
   buildSteps: string[];          // Shell commands to run before starting service
 };
 
-export type Okastr8 = {
+export type GitWebhookPayload = {
+    ref:string,
+    repository:{
+        name:string
+    }
+}
+
+export type Okastr8Config = {
     services: ServiceConfig[]
+}
+
+export type DeploysMetadata = {
+    gitHash: string;  // Commit hash of the deployment
+    timeStamp: Date;  // Timestamp of the deployment
+}
+
+export type Deployment = {
+    serviceName:string,
+    gitRemoteName:string,
+    deploys:DeploysMetadata[]
+
+}
+
+export type DeploymentRecord = {
+    deployments: Deployment[]
 }
