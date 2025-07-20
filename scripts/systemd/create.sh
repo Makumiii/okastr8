@@ -27,13 +27,9 @@ OKASTR8_DIR="/etc/systemd/system/okastr8"
 mkdir -p "$OKASTR8_DIR"
 UNIT_FILE="$OKASTR8_DIR/$SERVICE_NAME.service"
 
-# --- Check if Unit File Already Exists ---
-if [ -f "$UNIT_FILE" ]; then
-  echo "Info: Systemd unit file '$UNIT_FILE' already exists. Skipping creation." >&2
-  # Proceed to link/enable/start if auto_start is true, as the file might exist but not be enabled
-else
-  # --- Unit File Creation ---
-  cat > "$UNIT_FILE" << EOL
+# --- Unit File Creation (Always overwrite/create) ---
+echo "Creating/Updating systemd unit file: '$UNIT_FILE'"
+cat > "$UNIT_FILE" << EOL
 [Unit]
 Description=$DESCRIPTION
 After=network.target
@@ -51,9 +47,6 @@ StandardError=journal
 [Install]
 WantedBy=$WANTED_BY
 EOL
-
-  echo "Systemd unit file '$UNIT_FILE' created."
-fi
 
 # --- Reload systemd ---
 systemctl daemon-reexec

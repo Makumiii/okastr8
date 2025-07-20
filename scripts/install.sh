@@ -81,7 +81,7 @@ info "Starting Okastr8 installation..."
 
 if [[ $EUID -eq 0 ]]; then
   error "This script should not be run as root. It will use 'sudo' when necessary."
-fi
+}
 
 # Call clean_install at the beginning to ensure a fresh state
 clean_install
@@ -104,7 +104,7 @@ SETUP_SCRIPT_URL="https://raw.githubusercontent.com/Makumiii/okastr8/main/script
 TEMP_SETUP_SCRIPT="$(mktemp)"
 if ! curl -fsSL "$SETUP_SCRIPT_URL" -o "$TEMP_SETUP_SCRIPT"; then
   error "Failed to download setup.sh"
-fi
+}
 chmod +x "$TEMP_SETUP_SCRIPT"
 
 if ! "$TEMP_SETUP_SCRIPT"; then
@@ -136,12 +136,7 @@ mkdir -p "$CONFIG_DIR"
 info "Creating default config.json..."
 cat <<EOF > "$CONFIG_FILE"
 {
-  "services": [],
-  "networking": {
-    "ngrok": {
-      "authToken": ""
-    }
-  }
+  "services": []
 }
 EOF
 
@@ -206,9 +201,9 @@ CREATE_SCRIPT_PATH="$INSTALL_DIR/scripts/systemd/create.sh"
 
 if [ ! -f "$CREATE_SCRIPT_PATH" ]; then
   error "systemd create script not found at $CREATE_SCRIPT_PATH"
-fi
+}
 
-# This step is now simplified as clean_install handles removal
+# Always create/update the service file
 info "Creating systemd service '$WEBHOOK_SERVICE_NAME'."
 if ! sudo "$CREATE_SCRIPT_PATH" "$WEBHOOK_SERVICE_NAME" "$WEBHOOK_SERVICE_DESCRIPTION" "$WEBHOOK_EXEC_START" "$SERVICE_WORKING_DIR" "$CURRENT_USER" "multi-user.target" "true"; then
   error "Failed to create systemd service for webhook listener."
@@ -219,7 +214,7 @@ info "Systemd service '$WEBHOOK_SERVICE_NAME' created and enabled."
 info "Creating systemd service for Web Manager Server..."
 MANAGER_EXEC_START="$BUN_PATH run $INSTALL_DIR/src/managerServer.ts"
 
-# This step is now simplified as clean_install handles removal
+# Always create/update the service file
 info "Creating systemd service '$MANAGER_SERVICE_NAME'."
 if ! sudo "$CREATE_SCRIPT_PATH" "$MANAGER_SERVICE_NAME" "$MANAGER_SERVICE_DESCRIPTION" "$MANAGER_EXEC_START" "$SERVICE_WORKING_DIR" "$CURRENT_USER" "multi-user.target" "true"; then
   error "Failed to create systemd service for manager server."
@@ -232,7 +227,7 @@ NGROK_TUNNEL_SCRIPT="$INSTALL_DIR/scripts/tunnel.sh"
 
 if [ ! -f "$NGROK_TUNNEL_SCRIPT" ]; then
   error "Ngrok tunnel script not found at $NGROK_TUNNEL_SCRIPT"
-fi
+}
 
 # Run in background so install.sh can complete
 "$NGROK_TUNNEL_SCRIPT" &
