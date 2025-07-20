@@ -3,21 +3,16 @@ set -eou pipefail
 
 # Check for jq
 if ! command -v jq &> /dev/null; then
-  echo "Error: jq is required but not installed."
+  echo "Error: jq is required but not installed." >&2
   exit 1
 fi
 
-# Check if the environment JSON file path is provided
-if [ -z "${1:-}" ]; then
-  echo "Usage: $0 <path-to-environment-json>"
-  exit 1
-fi
-
-ENV_JSON_PATH="$1"
+# Hardcoded path to the environment JSON file
+ENV_JSON_PATH="$HOME/.okastr8/environment.json"
 
 # Check if the file exists
 if [ ! -f "$ENV_JSON_PATH" ]; then
-  echo "Error: Environment JSON file not found at ${ENV_JSON_PATH}"
+  echo "Error: Environment JSON file not found at ${ENV_JSON_PATH}" >&2
   exit 1
 fi
 
@@ -31,7 +26,7 @@ CHANGE_SSH_PORT_PORT=$(jq -r '.changeSSHPort.port // empty' "$ENV_JSON_PATH")
 
 # Check that all required values were found
 if [[ -z "$CREATE_USER_USERNAME" || -z "$CREATE_USER_PASSWORD" || -z "$CREATE_USER_DISTRO" || -z "$CHANGE_SSH_PORT_PORT" ]]; then
-  echo "❌ Missing one or more required fields in environment JSON."
+  echo "❌ Missing one or more required fields in environment JSON." >&2
   exit 1
 fi
 

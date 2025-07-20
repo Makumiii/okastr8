@@ -10,18 +10,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function handleFormSubmit(event, url) {
         event.preventDefault();
-        const form = event.target;
-        const formData = new FormData(form);
-        const data = Object.fromEntries(formData.entries());
 
-        console.log(`Sending POST to /api${url} with data:`, data);
+        console.log(`Sending POST to /api${url}`);
         try {
             const response = await fetch(`/api${url}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(data)
+                body: JSON.stringify({}) // Send empty body as no arguments are needed
             });
             const result = await response.json();
             console.log(`Response from /api${url}:`, result);
