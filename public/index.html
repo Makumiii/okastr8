@@ -1,9 +1,177 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Okastr8</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Okastr8 Dashboard</title>
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <h1>Welcome to Okastr8</h1>
+    <div class="container">
+        <header>
+            <h1>Okastr8 Dashboard</h1>
+        </header>
+        <nav>
+            <button class="tab-button" data-tab="user-management">User Management</button>
+            <button class="tab-button" data-tab="systemd-management">Systemd Management</button>
+            <button class="tab-button" data-tab="orchestration">Orchestration</button>
+        </nav>
+
+        <main>
+            <div id="user-management" class="tab-content">
+                <h2>User Management</h2>
+                <div class="form-grid">
+                    <div class="form-container">
+                        <h3>Create User</h3>
+                        <form id="create-user-form">
+                            <input type="text" name="username" placeholder="Username" required>
+                            <input type="password" name="password" placeholder="Password">
+                            <select name="distro">
+                                <option value="">Auto-detect Distro</option>
+                                <option value="debian">Debian</option>
+                                <option value="fedora">Fedora</option>
+                            </select>
+                            <button type="submit">Create User</button>
+                        </form>
+                    </div>
+                    <div class="form-container">
+                        <h3>Delete User</h3>
+                        <form id="delete-user-form">
+                            <input type="text" name="username" placeholder="Username" required>
+                            <button type="submit">Delete User</button>
+                        </form>
+                    </div>
+                    <div class="form-container">
+                        <h3>Last Login</h3>
+                        <form id="last-login-form">
+                            <input type="text" name="username" placeholder="Username" required>
+                            <button type="submit">Show Last Login</button>
+                        </form>
+                    </div>
+                    <div class="form-container">
+                        <h3>List Groups</h3>
+                        <form id="list-groups-form">
+                            <input type="text" name="username" placeholder="Username" required>
+                            <button type="submit">List Groups</button>
+                        </form>
+                    </div>
+                    <div class="form-container">
+                        <h3>Lock User</h3>
+                        <form id="lock-user-form">
+                            <input type="text" name="username" placeholder="Username" required>
+                            <button type="submit">Lock User</button>
+                        </form>
+                    </div>
+                    <div class="form-container">
+                        <h3>Switch User</h3>
+                        <form id="switch-user-form">
+                            <input type="text" name="username" placeholder="Username" required>
+                            <button type="submit">Switch User</button>
+                        </form>
+                    </div>
+                    <div class="form-container full-width">
+                        <h3>List Users</h3>
+                        <button id="list-users-button">List All Users</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="systemd-management" class="tab-content">
+                <h2>Systemd Management</h2>
+                <div class="form-grid">
+                    <div class="form-container full-width">
+                        <h3>Create Service</h3>
+                        <form id="create-service-form">
+                            <input type="text" name="service_name" placeholder="Service Name" required>
+                            <input type="text" name="description" placeholder="Description" required>
+                            <input type="text" name="exec_start" placeholder="ExecStart" required>
+                            <input type="text" name="working_directory" placeholder="Working Directory" required>
+                            <input type="text" name="user" placeholder="User" required>
+                            <input type="text" name="wanted_by" placeholder="WantedBy" value="multi-user.target" required>
+                            <label><input type="checkbox" name="auto_start" checked> Auto-start</label>
+                            <button type="submit">Create Service</button>
+                        </form>
+                    </div>
+                    <div class="form-container">
+                        <h3>Delete Service</h3>
+                        <form id="delete-service-form">
+                            <input type="text" name="service_name" placeholder="Service Name" required>
+                            <button type="submit">Delete Service</button>
+                        </form>
+                    </div>
+                    <div class="form-container">
+                        <h3>Start Service</h3>
+                        <form id="start-service-form">
+                            <input type="text" name="service_name" placeholder="Service Name" required>
+                            <button type="submit">Start Service</button>
+                        </form>
+                    </div>
+                    <div class="form-container">
+                        <h3>Stop Service</h3>
+                        <form id="stop-service-form">
+                            <input type="text" name="service_name" placeholder="Service Name" required>
+                            <button type="submit">Stop Service</button>
+                        </form>
+                    </div>
+                    <div class="form-container">
+                        <h3>Restart Service</h3>
+                        <form id="restart-service-form">
+                            <input type="text" name="service_name" placeholder="Service Name" required>
+                            <button type="submit">Restart Service</button>
+                        </form>
+                    </div>
+                    <div class="form-container">
+                        <h3>Service Status</h3>
+                        <form id="status-service-form">
+                            <input type="text" name="service_name" placeholder="Service Name" required>
+                            <button type="submit">Show Status</button>
+                        </form>
+                    </div>
+                    <div class="form-container">
+                        <h3>Service Logs</h3>
+                        <form id="logs-service-form">
+                            <input type="text" name="service_name" placeholder="Service Name" required>
+                            <button type="submit">Show Logs</button>
+                        </form>
+                    </div>
+                    <div class="form-container">
+                        <h3>Enable Service</h3>
+                        <form id="enable-service-form">
+                            <input type="text" name="service_name" placeholder="Service Name" required>
+                            <button type="submit">Enable Service</button>
+                        </form>
+                    </div>
+                    <div class="form-container">
+                        <h3>Disable Service</h3>
+                        <form id="disable-service-form">
+                            <input type="text" name="service_name" placeholder="Service Name" required>
+                            <button type="submit">Disable Service</button>
+                        </form>
+                    </div>
+                    <div class="form-container">
+                        <h3>Reload Daemon</h3>
+                        <button id="reload-daemon-button">Reload systemd</button>
+                    </div>
+                    <div class="form-container">
+                        <h3>List Services</h3>
+                        <button id="list-services-button">List Services</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="orchestration" class="tab-content">
+                <h2>Orchestration</h2>
+                <div class="form-container full-width">
+                    <h3>Orchestrate Environment</h3>
+                    <form id="orchestrate-form">
+                        <input type="text" name="env_json_path" placeholder="Path to environment.json" required>
+                        <button type="submit">Orchestrate</button>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/main.js"></script>
 </body>
 </html>
