@@ -12,9 +12,16 @@ export type ServiceConfig = {
     remoteName:string
     watchRemoteBranch: string;         // Remote to watch (e.g., main/develop)
   };
-  buildSteps: string[];          // Shell commands to run before starting service
+  buildSteps: string[]         // Shell commands to run before starting service
+  networking:{
+    port:number,
+    domain:string
+  }
 };
 
+export type Okastr8Config = {
+    services: ServiceConfig[]
+}
 export type GitWebhookPayload = {
     ref:string,
     before:string,
@@ -27,9 +34,6 @@ export type GitWebhookPayload = {
     }
 }
 
-export type Okastr8Config = {
-    services: ServiceConfig[]
-}
 
 export type DeploysMetadata = {
     gitHash: string;  // Commit hash of the deployment
@@ -58,6 +62,6 @@ export type OrchestrateEnvironment = {
   changeSSHPort:{
     port:number
   },
-  
+
     
 }
