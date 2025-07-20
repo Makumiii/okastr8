@@ -24,7 +24,7 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
 if [ -z "$PROJECT_ROOT" ]; then
   echo "Error: Could not determine project root." >&2
   exit 1
-}
+fi
 
 SUDOERS_FILE="/etc/sudoers.d/okastr8-bun-server"
 
@@ -37,7 +37,6 @@ SCRIPTS=(
   "scripts/user/lastLogin.sh"
   "scripts/user/listGroups.sh"
   "scripts/user/listUsers.sh"
-  "scripts/user/switch-user.sh"
   "scripts/systemd/create.sh"
   "scripts/systemd/delete.sh"
   "scripts/systemd/start.sh"
