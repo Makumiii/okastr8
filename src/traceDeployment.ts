@@ -6,7 +6,13 @@ const pathToDeployment = `${homedir()}/.okastr8/deployment.json`;
 export async function saveDeployment(deployment: DeploysMetadata, serviceId:{ serviceName: string, gitRemoteName: string }) {
     try{
 
-        const content = await readFile(pathToDeployment);
+        const content = await readFile(pathToDeployment).catch((e)=>{
+            if(e.code === 'ENOENT'){
+                
+                return JSON.stringify({ deployments: [] });
+            }
+            throw e; 
+        });
         const existingDeployments = JSON.parse(content) as DeploymentRecord
         const entry = existingDeployments.deployments.find((d) => d.serviceName === serviceId.serviceName && d.gitRemoteName === serviceId.gitRemoteName)
         if(!entry){
@@ -24,10 +30,25 @@ export async function saveDeployment(deployment: DeploysMetadata, serviceId:{ se
 
 }
 
-export async function rollbackDeployment(hash:string, ){
+export async function rollbackDeployment(hash:string, serviceId:{ serviceName: string, gitRemoteName: string }) {
     try{
-        const content = await readFile(pathToDeployment);
+        const content = await readFile(pathToDeployment).catch((e)=>{
+            if(e.code === 'ENOENT'){
+                return JSON.stringify({ deployments: [] });
+            }
+            throw e;
+        })
         const existingDeployments = JSON.parse(content) as DeploymentRecord;
+        const entry = existingDeployments.deployments.find((d) => d.serviceName === serviceId.serviceName && d.gitRemoteName === serviceId.gitRemoteName)
+        if(!entry){
+            throw new Error(`No deployment found for service ${serviceId.serviceName} with remote ${serviceId.gitRemoteName}`);
+        }
+        const foundDeployment = entry.deploys.find((d) => d.gitHash === hash);
+        if(!foundDeployment){
+            throw new Error(`No deployment found with hash ${hash} for service ${serviceId.serviceName}`);
+        }
+        const {gitRemoteName,serviceName} = entry
+        const {ssh_url } = foundDeployment
 
         
 

@@ -18,7 +18,10 @@ export type ServiceConfig = {
 export type GitWebhookPayload = {
     ref:string,
     repository:{
-        name:string
+        name:string,
+        ssh_url:string,
+        clone_url:string,
+        html_url:string,
     }
 }
 
@@ -28,7 +31,8 @@ export type Okastr8Config = {
 
 export type DeploysMetadata = {
     gitHash: string;  // Commit hash of the deployment
-    timeStamp: Date;  // Timestamp of the deployment
+    timeStamp: Date;
+    ssh_url:string  // Timestamp of the deployment
 }
 
 export type Deployment = {
