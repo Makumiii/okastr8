@@ -4,7 +4,7 @@ import { homedir } from 'os';
 import { readFile } from './utils/fs';
 import type { GitWebhookPayload, Okastr8Config } from './types';
 
-import { deploy } from './deploy';
+import { deploy } from './utils/deploy';
 
 interface Env {
   Variables: {

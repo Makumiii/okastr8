@@ -1,4 +1,4 @@
-import { runCommand } from "./utils/command";
+import { runCommand } from "./command";
 
 export default async function build(buildSteps:string[], serviceName:string){
     try{

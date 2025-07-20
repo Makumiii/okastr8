@@ -1,10 +1,10 @@
 import { homedir } from "os";
 import build from "./build";
-import { runCommand } from "./utils/command";
+import { runCommand } from "./command";
 import {join, resolve} from 'path'
-import { readFile } from "./utils/fs";
-import type { DeploymentRecord } from "./types";
-import { saveDeployment } from "./traceDeployment";
+import { readFile } from "./fs";
+import type { DeploymentRecord } from "../types";
+import { saveDeployment } from "./deployments";
 const projectsFolder = `${homedir()}/.okastr8/projects`;
 const pathToDeployment = `${homedir()}/.okastr8/deployment.json`;
 
@@ -13,7 +13,7 @@ export async function deploy(service:{ serviceName: string, gitRemoteName: strin
 
         process.chdir(resolve(projectsFolder, service.serviceName));
         await build(buildSteps, service.serviceName);
-        const pathToScript = join(process.cwd(),'..','scripts','systemd', 'restart.sh')
+        const pathToScript = join(process.cwd(),'..','..','scripts','systemd', 'restart.sh')
         await runCommand(pathToScript, [service.serviceName]);
         await saveDeployment({gitHash:git.gitHash, timeStamp:new Date(), ssh_url:git.ssh_url
         }, { serviceName: service.serviceName, gitRemoteName: service.gitRemoteName });

@@ -1,8 +1,8 @@
 import { homedir } from 'os';
-import type { Deployment, DeploymentRecord, DeploysMetadata } from './types';
-import { readFile, writeFile } from './utils/fs';
+import type { Deployment, DeploymentRecord, DeploysMetadata } from '../types';
+import { readFile, writeFile } from './fs';
 import path, { join } from 'path';
-import { runCommand } from './utils/command';
+import { runCommand } from './command';
 const pathToDeployment = `${homedir()}/.okastr8/deployment.json`;
 const projectsFolder = `${homedir()}/.okastr8/projects`;
 
@@ -53,9 +53,9 @@ export async function rollbackDeployment(hash:string, serviceId:{ serviceName: s
         }
         const {serviceName} = entry
         const {ssh_url } = foundDeployment
-        const pathToScript = join(process.cwd(),'..','scripts','systemd', 'rollback.sh')
+        const pathToScript = join(process.cwd(),'..','..','scripts','systemd', 'rollback.sh')
         await runCommand(pathToScript, [ssh_url, hash, projectsFolder]);
-        const pathToRestartScript = join(process.cwd(),'..','scripts','systemd', 'restart.sh')
+        const pathToRestartScript = join(process.cwd(),'..','..','scripts','systemd', 'restart.sh')
         await runCommand(pathToRestartScript, [serviceName]);
 
 
