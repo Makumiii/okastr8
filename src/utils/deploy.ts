@@ -5,7 +5,7 @@ import {join, resolve} from 'path'
 import { readFile } from "./fs";
 import type { DeploymentRecord } from "../types";
 import { saveDeployment } from "./deployments";
-import { genCaddyFile } from "../genCaddyFile";
+import { genCaddyFile } from "./genCaddyFile";
 const projectsFolder = `${homedir()}/.okastr8/projects`;
 const pathToDeployment = `${homedir()}/.okastr8/deployment.json`;
 

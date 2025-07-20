@@ -1,5 +1,5 @@
 import { Command } from 'commander';
-import { orchestrateEnvironment } from '../ochestrateEnvironment';
+import { orchestrateEnvironment } from '../utils/ochestrateEnvironment';
 
 export function addOrchestrateCommand(program: Command) {
   program.command('orchestrate')
