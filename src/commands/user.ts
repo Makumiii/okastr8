@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { runCommand } from '../utils/command';
 import * as path from 'path';
 
-const SCRIPT_BASE_PATH = path.join(process.cwd(), '..', '..', 'scripts', 'user');
+const SCRIPT_BASE_PATH = path.join(process.cwd(), 'scripts', 'user');
 
 // Core Functions
 export async function createUser(username: string, password?: string, distro?: string) {
@@ -28,11 +28,6 @@ export async function listUsers() {
 export async function lockUser(username: string) {
     return await runCommand('sudo', [path.join(SCRIPT_BASE_PATH, 'lockUser.sh'), username]);
 }
-
-export async function switchUser(username: string) {
-    return await runCommand(path.join(SCRIPT_BASE_PATH, 'switch-user.sh'), [username]);
-}
-
 
 // Commander Integration
 export function addUserCommands(program: Command) {
@@ -84,14 +79,6 @@ export function addUserCommands(program: Command) {
     .argument('<username>', 'Username of the user to lock')
     .action(async (username) => {
         const result = await lockUser(username);
-        console.log(result.stdout || result.stderr);
-    });
-
-  user.command('switch')
-    .description('Switch to another user')
-    .argument('<username>', 'Username to switch to')
-    .action(async (username) => {
-        const result = await switchUser(username);
         console.log(result.stdout || result.stderr);
     });
 }
