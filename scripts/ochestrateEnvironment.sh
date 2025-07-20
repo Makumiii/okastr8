@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 set -eou pipefail
 
+# Check for jq
+if ! command -v jq &> /dev/null; then
+  echo "Error: jq is required but not installed."
+  exit 1
+fi
+
 # Check if the environment JSON file path is provided
-if [ -z "$1" ]; then
+if [ -z "${1:-}" ]; then
   echo "Usage: $0 <path-to-environment-json>"
   exit 1
 fi
@@ -15,30 +21,43 @@ if [ ! -f "$ENV_JSON_PATH" ]; then
   exit 1
 fi
 
-echo "Reading environment configuration from ${ENV_JSON_PATH}"
+echo "📄 Reading environment configuration from ${ENV_JSON_PATH}"
 
 # Extract values using jq
-CREATE_USER_USERNAME=$(jq -r '.createUser.userName // ""' "$ENV_JSON_PATH")
-CREATE_USER_PASSWORD=$(jq -r '.createUser.passWord // ""' "$ENV_JSON_PATH")
-CREATE_USER_DISTRO=$(jq -r '.createUser.distro // ""' "$ENV_JSON_PATH")
-CHANGE_SSH_PORT_PORT=$(jq -r '.changeSSHPort.port // ""' "$ENV_JSON_PATH")
+CREATE_USER_USERNAME=$(jq -r '.createUser.userName // empty' "$ENV_JSON_PATH")
+CREATE_USER_PASSWORD=$(jq -r '.createUser.passWord // empty' "$ENV_JSON_PATH")
+CREATE_USER_DISTRO=$(jq -r '.createUser.distro // empty' "$ENV_JSON_PATH")
+CHANGE_SSH_PORT_PORT=$(jq -r '.changeSSHPort.port // empty' "$ENV_JSON_PATH")
 
-# Display extracted values (for verification)
-echo "Extracted Configuration:"
-echo "  Create User Username: ${CREATE_USER_USERNAME}"
-echo "  Create User Password: ${CREATE_USER_PASSWORD}"
-echo "  Create User Distro: ${CREATE_USER_DISTRO}"
-echo "  Change SSH Port: ${CHANGE_SSH_PORT_PORT}"
+# Check that all required values were found
+if [[ -z "$CREATE_USER_USERNAME" || -z "$CREATE_USER_PASSWORD" || -z "$CREATE_USER_DISTRO" || -z "$CHANGE_SSH_PORT_PORT" ]]; then
+  echo "❌ Missing one or more required fields in environment JSON."
+  exit 1
+fi
 
-# Call other scripts
-echo "Running setup.sh..."
-"$(dirname "$0")"/setup.sh
+# Display extracted values
+echo "✅ Extracted Configuration:"
+echo "  Create User Username: $CREATE_USER_USERNAME"
+echo "  Create User Password: (hidden)"
+echo "  Create User Distro:   $CREATE_USER_DISTRO"
+echo "  Change SSH Port:      $CHANGE_SSH_PORT_PORT"
 
-echo "Creating user..."
-"$(dirname "$0")"/user/create-user.sh "$CREATE_USER_USERNAME" "$CREATE_USER_PASSWORD" "$CREATE_USER_DISTRO"
+SCRIPT_DIR="$(dirname "$0")"
 
-echo "Configuring UFW defaults and SSH port..."
-"$(dirname "$0")"/ufw/defaults.sh "$CHANGE_SSH_PORT_PORT"
+# Run setup
+echo "🚀 Running setup.sh..."
+"$SCRIPT_DIR/setup.sh"
 
-echo "Configuring Fail2Ban..."
-"$(dirname "$0")"/fail2ban/fail2ban.sh
+# Create user
+echo "👤 Creating user..."
+"$SCRIPT_DIR/user/create-user.sh" "$CREATE_USER_USERNAME" "$CREATE_USER_PASSWORD" "$CREATE_USER_DISTRO"
+
+# UFW and SSH Port
+echo "🧱 Configuring UFW defaults and SSH port..."
+"$SCRIPT_DIR/ufw/defaults.sh" "$CHANGE_SSH_PORT_PORT"
+
+# Fail2Ban setup
+echo "🔒 Configuring Fail2Ban..."
+"$SCRIPT_DIR/fail2ban/fail2ban.sh"
+
+echo "✅ Server hardening complete."
