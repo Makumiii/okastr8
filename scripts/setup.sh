@@ -3,6 +3,7 @@ set -eou pipefail
 
 # --- Config ---
 USE_FEDORA=${USE_FEDORA:-false}
+CONFIG_FILE="$HOME/.okastr8/config.json"
 
 # --- Detect OS ---
 if [[ "$USE_FEDORA" != true ]]; then
@@ -15,7 +16,6 @@ fi
 # --- Dependency Lists ---
 DEBIAN_PACKAGES=(
   curl
-  wget
   git
   ufw
   jq
@@ -26,7 +26,6 @@ DEBIAN_PACKAGES=(
 
 FEDORA_PACKAGES=(
   curl
-  wget
   git
   firewalld
   jq
@@ -66,22 +65,20 @@ else
   sudo apt install -y caddy
 fi
 
-# --- Ngrok Installation ---
+# --- Ngrok Installation (Direct Download) ---
 echo "🌍 Installing Ngrok CLI..."
 
 if ! command -v ngrok &> /dev/null; then
   NGROK_ARCH="amd64"
-  NGROK_OS="linux"
-
   if [[ "$(uname -m)" == "aarch64" ]]; then
     NGROK_ARCH="arm64"
   fi
 
-  NGRK_ZIP="ngrok-v3-stable-${NGROK_OS}-${NGROK_ARCH}.zip"
-  NGRK_URL="https://ngrok.com/download/${NGRK_ZIP}"
+  NGRK_ZIP="ngrok-stable-linux-${NGROK_ARCH}.zip"
+  NGRK_URL="https://bin.equinox.io/c/4VmDzA7iaHb/${NGRK_ZIP}"
 
   echo "Downloading Ngrok from ${NGRK_URL}"
-  if ! wget -q "${NGRK_URL}" -O "/tmp/${NGRK_ZIP}"; then
+  if ! curl -L "${NGRK_URL}" -o "/tmp/${NGRK_ZIP}"; then
     echo "Error: Failed to download Ngrok." >&2
     exit 1
   fi
@@ -99,14 +96,26 @@ else
   echo "Ngrok is already installed."
 fi
 
-# Configure Ngrok authtoken if available
-if [ -n "$NGROK_AUTHTOKEN" ]; then
-  echo "Configuring Ngrok authtoken..."
-  ngrok config add-authtoken "$NGROK_AUTHTOKEN"
+# Configure Ngrok authtoken from config.json
+echo "Configuring Ngrok authtoken from $CONFIG_FILE..."
+if [ -f "$CONFIG_FILE" ]; then
+  if ! command -v jq &> /dev/null; then
+    echo "Error: jq is required to read authtoken from config.json. Please install it." >&2
+  else
+    AUTHTOKEN=$(jq -r '.networking.ngrok.authToken // ""' "$CONFIG_FILE")
+    if [ -n "$AUTHTOKEN" ]; then
+      ngrok config add-authtoken "$AUTHTOKEN"
+      echo "Ngrok authtoken configured successfully."
+    else
+      echo "Warning: Ngrok authtoken not found in $CONFIG_FILE. Ngrok will run unauthenticated." >&2
+      echo "To persist your ngrok configuration, add your authtoken to networking.ngrok.authToken in $CONFIG_FILE." >&2
+      echo "Get your authtoken from: https://dashboard.ngrok.com/get-started/setup" >&2
+    fi
+  fi
 else
-  echo "Warning: NGROK_AUTHTOKEN environment variable is not set."
-  echo "Please set it to persist your ngrok configuration."
-  echo "Get your authtoken from: https://dashboard.ngrok.com/get-started/setup"
+  echo "Warning: Config file not found at $CONFIG_FILE. Ngrok authtoken cannot be configured." >&2
+  echo "Ngrok will run unauthenticated. Please create $CONFIG_FILE and add your authtoken." >&2
+  echo "Get your authtoken from: https://dashboard.ngrok.com/get-started/setup" >&2
 fi
 
 # --- Firewall Rules ---
