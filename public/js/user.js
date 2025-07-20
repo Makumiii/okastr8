@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('user.js loaded');
     const createUserForm = document.getElementById('create-user-form');
     const deleteUserForm = document.getElementById('delete-user-form');
     const lastLoginForm = document.getElementById('last-login-form');
@@ -7,10 +6,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const lockUserForm = document.getElementById('lock-user-form');
     const listUsersButton = document.getElementById('list-users-button');
     const resultsDisplay = document.getElementById('user-results');
-
-    console.log('User Management Elements:', {
-        createUserForm, deleteUserForm, lastLoginForm, listGroupsForm, lockUserForm, listUsersButton, resultsDisplay
-    });
 
     function displayResult(message, isError = false) {
         resultsDisplay.innerHTML = ``; // Clear previous results

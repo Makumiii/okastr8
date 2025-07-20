@@ -14,10 +14,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function displayResult(message, isError = false) {
         resultsDisplay.innerHTML = ``; // Clear previous results
-        const p = document.createElement('p');
-        p.textContent = message;
-        p.style.color = isError ? 'red' : 'green';
-        resultsDisplay.appendChild(p);
+        resultsDisplay.textContent = message;
+        resultsDisplay.style.color = isError ? 'red' : 'green';
     }
 
     async function handleFormSubmit(event, url) {
@@ -26,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
 
+        console.log(`Sending POST to /api${url} with data:`, data);
         try {
             const response = await fetch(`/api${url}`, {
                 method: 'POST',
@@ -35,31 +34,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(data)
             });
             const result = await response.json();
+            console.log(`Response from /api${url}:`, result);
             displayResult(result.message, !result.success);
         } catch (error) {
+            console.error(`Fetch error for /api${url}:`, error);
             displayResult(`Error: ${error.message}`, true);
         }
     }
 
     async function handleButtonClick(url) {
+        console.log(`Sending GET to /api${url}`);
         try {
             const response = await fetch(`/api${url}`);
             const result = await response.json();
+            console.log(`Response from /api${url}:`, result);
             displayResult(result.message, !result.success);
         } catch (error) {
             displayResult(`Error: ${error.message}`, true);
         }
     }
 
-    createServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/create'));
-    deleteServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/delete'));
-    startServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/start'));
-    stopServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/stop'));
-    restartServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/restart'));
-    statusServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/status'));
-    logsServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/logs'));
-    enableServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/enable'));
-    disableServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/disable'));
-    reloadDaemonButton.addEventListener('click', () => handleButtonClick('/systemd/reload'));
-    listServicesButton.addEventListener('click', () => handleButtonClick('/systemd/list'));
+    if (createServiceForm) createServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/create'));
+    if (deleteServiceForm) deleteServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/delete'));
+    if (startServiceForm) startServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/start'));
+    if (stopServiceForm) stopServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/stop'));
+    if (restartServiceForm) restartServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/restart'));
+    if (statusServiceForm) statusServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/status'));
+    if (logsServiceForm) logsServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/logs'));
+    if (enableServiceForm) enableServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/enable'));
+    if (disableServiceForm) disableServiceForm.addEventListener('submit', (e) => handleFormSubmit(e, '/systemd/disable'));
+    if (reloadDaemonButton) reloadDaemonButton.addEventListener('click', () => handleButtonClick('/systemd/reload'));
+    if (listServicesButton) listServicesButton.addEventListener('click', () => handleButtonClick('/systemd/list'));
 });

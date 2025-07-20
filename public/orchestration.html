@@ -1,11 +1,30 @@
-<h2>Orchestration</h2>
-<div class="form-grid">
-    <div class="form-container full-width">
-        <h3>Orchestrate Environment</h3>
-        <form id="orchestrate-form">
-            <input type="text" name="env_json_path" placeholder="Path to environment.json" required>
-            <button type="submit">Orchestrate</button>
-        </form>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orchestration - Okastr8</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Orchestration</h1>
+            <nav>
+                <a href="index.html">Back to Dashboards</a>
+            </nav>
+        </header>
+        <div class="form-grid">
+            <div class="form-container full-width">
+                <h3>Orchestrate Environment</h3>
+                <form id="orchestrate-form">
+                    <input type="text" name="env_json_path" placeholder="Path to environment.json" required>
+                    <button type="submit">Orchestrate</button>
+                </form>
+            </div>
+        </div>
+        <div class="results-display" id="orchestration-results"></div>
     </div>
-</div>
-<div class="results-display" id="orchestration-results"></div>
+    <script src="js/orchestration.js"></script>
+</body>
+</html>

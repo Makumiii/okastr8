@@ -1,9 +1,12 @@
 import { Command } from 'commander';
 import { orchestrateEnvironment as coreOrchestrate } from '../utils/ochestrateEnvironment';
+import * as path from 'path';
+
+const SCRIPT_BASE_PATH = path.join(process.cwd(), 'scripts');
 
 // Core Function
 export async function orchestrateEnvironment(envJsonPath: string) {
-    return await coreOrchestrate(envJsonPath);
+    return await coreOrchestrate(path.join(SCRIPT_BASE_PATH, envJsonPath));
 }
 
 // Commander Integration

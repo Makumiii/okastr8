@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import { runCommand } from '../utils/command';
 import * as path from 'path';
 
-const SCRIPT_BASE_PATH = path.join(process.cwd(),'..','..', 'scripts', 'systemd');
+const SCRIPT_BASE_PATH = path.join(process.cwd(), 'scripts', 'systemd');
 
 // Core Functions
 export async function createService(service_name: string, description: string, exec_start: string, working_directory: string, user: string, wanted_by: string, auto_start: boolean) {

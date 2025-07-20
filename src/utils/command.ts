@@ -1,39 +1,49 @@
 import { spawn } from 'child_process';
 
-export async function runCommand(command: string, args: string[] = []): Promise<void> {
+interface CommandResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null;
+}
+
+export async function runCommand(command: string, args: string[] = []): Promise<CommandResult> {
   let cmdToExecute: string;
   let argsToExecute: string[];
 
   if (command === 'sudo') {
-    // If 'sudo' is the command, the first element of args is the actual script/command
-    // and the rest are its arguments.
     cmdToExecute = 'sudo';
-    argsToExecute = args; // args will contain [scriptPath, arg1, arg2, ...]
+    argsToExecute = args;
   } else {
     cmdToExecute = command;
     argsToExecute = args;
   }
 
-  try {
+  return new Promise((resolve, reject) => {
     const child = spawn(cmdToExecute, argsToExecute, {
-      stdio: 'inherit',
+      stdio: ['inherit', 'pipe', 'pipe'], // stdin, stdout, stderr
     });
 
-    await new Promise<void>((resolve, reject) => {
-      child.on('close', (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(new Error(`Command "${cmdToExecute} ${argsToExecute.join(' ')}" exited with code ${code}`));
-        }
-      });
+    let stdout = '';
+    let stderr = '';
 
-      child.on('error', (err) => {
-        reject(new Error(`Failed to start command "${cmdToExecute} ${argsToExecute.join(' ')}": ${err.message}`));
+    child.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    child.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    child.on('close', (code) => {
+      resolve({
+        stdout,
+        stderr,
+        exitCode: code,
       });
     });
-  } catch (error) {
-    console.error(`Error executing command: ${error}`);
-    throw error; // Re-throw the error for the caller to handle
-  }
+
+    child.on('error', (err) => {
+      reject(new Error(`Failed to start command "${cmdToExecute} ${argsToExecute.join(' ')}": ${err.message}`));
+    });
+  });
 }

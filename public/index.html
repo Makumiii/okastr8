@@ -3,25 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Okastr8 Dashboard</title>
+    <title>Okastr8 Dashboards</title>
     <link rel="stylesheet" href="css/styles.css">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f4f7f9;
+        }
+        .dashboard-links {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 40px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .dashboard-links h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .dashboard-links a {
+            display: block;
+            padding: 15px 25px;
+            background-color: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 18px;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        .dashboard-links a:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>Okastr8 Dashboard</h1>
-        </header>
-        <nav>
-            <button class="tab-button" data-tab="user">User Management</button>
-            <button class="tab-button" data-tab="systemd">Systemd Management</button>
-            <button class="tab-button" data-tab="orchestration">Orchestration</button>
-        </nav>
-
-        <main id="tab-content">
-            <!-- Content will be loaded here -->
-        </main>
+    <div class="dashboard-links">
+        <h1>Okastr8 Dashboards</h1>
+        <a href="user.html">User Management</a>
+        <a href="systemd.html">Systemd Management</a>
+        <a href="orchestration.html">Orchestration</a>
     </div>
-
-    <script src="js/main.js"></script>
 </body>
 </html>

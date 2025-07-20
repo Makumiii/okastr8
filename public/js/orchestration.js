@@ -4,10 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function displayResult(message, isError = false) {
         resultsDisplay.innerHTML = ``; // Clear previous results
-        const p = document.createElement('p');
-        p.textContent = message;
-        p.style.color = isError ? 'red' : 'green';
-        resultsDisplay.appendChild(p);
+        resultsDisplay.textContent = message;
+        resultsDisplay.style.color = isError ? 'red' : 'green';
     }
 
     async function handleFormSubmit(event, url) {
@@ -16,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
 
+        console.log(`Sending POST to /api${url} with data:`, data);
         try {
             const response = await fetch(`/api${url}`, {
                 method: 'POST',
@@ -25,11 +24,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify(data)
             });
             const result = await response.json();
+            console.log(`Response from /api${url}:`, result);
             displayResult(result.message, !result.success);
         } catch (error) {
+            console.error(`Fetch error for /api${url}:`, error);
             displayResult(`Error: ${error.message}`, true);
         }
     }
 
-    orchestrateForm.addEventListener('submit', (e) => handleFormSubmit(e, '/orchestrate'));
+    if (orchestrateForm) orchestrateForm.addEventListener('submit', (e) => handleFormSubmit(e, '/orchestrate'));
 });
