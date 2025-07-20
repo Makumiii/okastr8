@@ -18,12 +18,19 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsDisplay.style.color = isError ? 'red' : 'green';
     }
 
+    function showLoading() {
+        resultsDisplay.innerHTML = ``; // Clear previous results
+        resultsDisplay.textContent = 'Loading...';
+        resultsDisplay.style.color = 'gray';
+    }
+
     async function handleFormSubmit(event, url) {
         event.preventDefault();
         const form = event.target;
         const formData = new FormData(form);
         const data = Object.fromEntries(formData.entries());
 
+        showLoading();
         console.log(`Sending POST to /api${url} with data:`, data);
         try {
             const response = await fetch(`/api${url}`, {
@@ -43,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function handleButtonClick(url) {
+        showLoading();
         console.log(`Sending GET to /api${url}`);
         try {
             const response = await fetch(`/api${url}`);
@@ -50,6 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`Response from /api${url}:`, result);
             displayResult(result.message, !result.success);
         } catch (error) {
+            console.error(`Fetch error for /api${url}:`, error);
             displayResult(`Error: ${error.message}`, true);
         }
     }

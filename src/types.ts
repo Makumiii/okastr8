@@ -15,12 +15,18 @@ export type ServiceConfig = {
   buildSteps: string[]         // Shell commands to run before starting service
   networking:{
     port:number,
-    domain:string
+    domain:string,
+    ngrokExpose?:boolean
   }
 };
 
 export type Okastr8Config = {
-    services: ServiceConfig[]
+    services: ServiceConfig[],
+    networking:{
+      ngrok:{
+        authToken?:string, // Ngrok auth token
+      }
+    }
 }
 export type GitWebhookPayload = {
     ref:string,

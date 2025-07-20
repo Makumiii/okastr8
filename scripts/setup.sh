@@ -21,6 +21,7 @@ DEBIAN_PACKAGES=(
   jq
   unzip
   gnupg
+  xclip # For copying ngrok URL to clipboard
 )
 
 FEDORA_PACKAGES=(
@@ -31,6 +32,7 @@ FEDORA_PACKAGES=(
   jq
   unzip
   gnupg2
+  xclip # For copying ngrok URL to clipboard
 )
 
 # --- Package Installation ---
@@ -62,6 +64,49 @@ else
     sudo tee /etc/apt/sources.list.d/caddy-stable.list
   sudo apt update
   sudo apt install -y caddy
+fi
+
+# --- Ngrok Installation ---
+echo "🌍 Installing Ngrok CLI..."
+
+if ! command -v ngrok &> /dev/null; then
+  NGROK_ARCH="amd64"
+  NGROK_OS="linux"
+
+  if [[ "$(uname -m)" == "aarch64" ]]; then
+    NGROK_ARCH="arm64"
+  fi
+
+  NGRK_ZIP="ngrok-v3-stable-${NGROK_OS}-${NGROK_ARCH}.zip"
+  NGRK_URL="https://ngrok.com/download/${NGRK_ZIP}"
+
+  echo "Downloading Ngrok from ${NGRK_URL}"
+  if ! wget -q "${NGRK_URL}" -O "/tmp/${NGRK_ZIP}"; then
+    echo "Error: Failed to download Ngrok." >&2
+    exit 1
+  fi
+
+  echo "Unzipping Ngrok..."
+  if ! sudo unzip -o "/tmp/${NGRK_ZIP}" -d /usr/local/bin; then
+    echo "Error: Failed to unzip Ngrok." >&2
+    exit 1
+  fi
+
+  sudo chmod +x /usr/local/bin/ngrok
+  rm "/tmp/${NGRK_ZIP}"
+  echo "Ngrok installed to /usr/local/bin/ngrok"
+else
+  echo "Ngrok is already installed."
+fi
+
+# Configure Ngrok authtoken if available
+if [ -n "$NGROK_AUTHTOKEN" ]; then
+  echo "Configuring Ngrok authtoken..."
+  ngrok config add-authtoken "$NGROK_AUTHTOKEN"
+else
+  echo "Warning: NGROK_AUTHTOKEN environment variable is not set."
+  echo "Please set it to persist your ngrok configuration."
+  echo "Get your authtoken from: https://dashboard.ngrok.com/get-started/setup"
 fi
 
 # --- Firewall Rules ---
