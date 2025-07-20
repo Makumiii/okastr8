@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const lastLoginForm = document.getElementById('last-login-form');
     const listGroupsForm = document.getElementById('list-groups-form');
     const lockUserForm = document.getElementById('lock-user-form');
+    const switchUserForm = document.getElementById('switch-user-form');
     const listUsersButton = document.getElementById('list-users-button');
 
     async function handleFormSubmit(event, url) {
@@ -42,5 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
     lastLoginForm.addEventListener('submit', (e) => handleFormSubmit(e, '/user/last-login'));
     listGroupsForm.addEventListener('submit', (e) => handleFormSubmit(e, '/user/list-groups'));
     lockUserForm.addEventListener('submit', (e) => handleFormSubmit(e, '/user/lock'));
+    switchUserForm.addEventListener('submit', (e) => handleFormSubmit(e, '/user/switch'));
     listUsersButton.addEventListener('click', () => handleButtonClick('/user/list-users'));
 });
