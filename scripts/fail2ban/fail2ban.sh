@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -eou pipefail
 # Configures and restarts fail2ban with a custom SSH port.
 
 if [[ $EUID -ne 0 ]]; then

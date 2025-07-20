@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -eou pipefail
 # Creates a systemd unit file from command-line arguments, with optional auto-start.
 
 # --- Root Check ---

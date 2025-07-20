@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -eou pipefail
 
 # This is a placeholder for your deployment logic.
 # It will be executed when a valid GitHub webhook is received.

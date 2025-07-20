@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -eou pipefail
 
 OKASTR8_DIR="/etc/systemd/system/okastr8"
 

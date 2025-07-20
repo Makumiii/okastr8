@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-
-set -e
+set -eou pipefail
 
 # --- Config ---
 USE_FEDORA=${USE_FEDORA:-false}

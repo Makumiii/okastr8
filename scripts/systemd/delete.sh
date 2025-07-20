@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -eou pipefail
 
 # Check if a service name is provided
 if [ -z "$1" ]; then

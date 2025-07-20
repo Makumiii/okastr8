@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -eou pipefail
 # Changes the SSH port in /etc/ssh/sshd_config
 
 if [ -z "$1" ]; then

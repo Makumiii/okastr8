@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -eou pipefail
 
 if [ -z "$1" ]; then
   echo "Usage: $0 <service-name>"

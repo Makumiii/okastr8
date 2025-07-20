@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -eou pipefail
 # Locks a user account
 
 if [ -z "$1" ]; then

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -eou pipefail
 
 # Check if all arguments are provided
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then

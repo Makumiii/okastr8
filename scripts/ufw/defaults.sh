@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -eou pipefail
 
 # This script must be run as root
 if [[ $EUID -ne 0 ]]; then
