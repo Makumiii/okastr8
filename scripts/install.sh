@@ -81,7 +81,7 @@ info "Starting Okastr8 installation..."
 
 if [[ $EUID -eq 0 ]]; then
   error "This script should not be run as root. It will use 'sudo' when necessary."
-}
+fi
 
 # Call clean_install at the beginning to ensure a fresh state
 clean_install
@@ -104,7 +104,7 @@ SETUP_SCRIPT_URL="https://raw.githubusercontent.com/Makumiii/okastr8/main/script
 TEMP_SETUP_SCRIPT="$(mktemp)"
 if ! curl -fsSL "$SETUP_SCRIPT_URL" -o "$TEMP_SETUP_SCRIPT"; then
   error "Failed to download setup.sh"
-}
+fi
 chmod +x "$TEMP_SETUP_SCRIPT"
 
 if ! "$TEMP_SETUP_SCRIPT"; then
