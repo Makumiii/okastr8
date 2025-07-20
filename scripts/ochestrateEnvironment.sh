@@ -30,7 +30,15 @@ echo "  Create User Password: ${CREATE_USER_PASSWORD}"
 echo "  Create User Distro: ${CREATE_USER_DISTRO}"
 echo "  Change SSH Port: ${CHANGE_SSH_PORT_PORT}"
 
-# You can now use these variables to call other scripts or perform actions
-# For example:
-# scripts/user/create-user.sh "$CREATE_USER_USERNAME" "$CREATE_USER_PASSWORD" "$CREATE_USER_DISTRO"
-# scripts/ssh/change-ssh-port.sh "$CHANGE_SSH_PORT_PORT"
+# Call other scripts
+echo "Running setup.sh..."
+"$(dirname "$0")"/setup.sh
+
+echo "Creating user..."
+"$(dirname "$0")"/user/create-user.sh "$CREATE_USER_USERNAME" "$CREATE_USER_PASSWORD" "$CREATE_USER_DISTRO"
+
+echo "Configuring UFW defaults and SSH port..."
+"$(dirname "$0")"/ufw/defaults.sh "$CHANGE_SSH_PORT_PORT"
+
+echo "Configuring Fail2Ban..."
+"$(dirname "$0")"/fail2ban/fail2ban.sh
