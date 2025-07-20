@@ -16,24 +16,21 @@ addSystemdCommands(program);
 addUserCommands(program);
 addOrchestrateCommand(program);
 
-program.command('serve')
-  .description('Start the GitHub webhook server')
-  .action(async () => {
-    interface Env {
-      Variables: {
-        rawBody: string;
-      };
-    }
-    const app = new Hono<Env>();
-    await addGithubWebhookRoute(app);
+// If no arguments are provided, start the Hono server
+if (process.argv.length === 2) {
+  interface Env {
+    Variables: {
+      rawBody: string;
+    };
+  }
+  const app = new Hono<Env>();
+  addGithubWebhookRoute(app);
 
-    console.log('Hono server listening on port 8787');
-    // Bun.serve is used here as it's a Bun project
-    // If this were a Node.js project, a different server setup would be needed
-    Bun.serve({
-      port: 8787,
-      fetch: app.fetch,
-    });
+  console.log('Hono server listening on port 8787');
+  Bun.serve({
+    port: 8787,
+    fetch: app.fetch,
   });
-
-program.parse(process.argv);
+} else {
+  program.parse(process.argv);
+}
