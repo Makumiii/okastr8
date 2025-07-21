@@ -204,6 +204,8 @@ fi
 BUN_SOURCE="$HOME/.bun/bin/bun"
 BUN_TARGET="/usr/local/bin/bun"
 
+echo "performing bun chores"
+
 if [ -f "$BUN_SOURCE" ]; then
   if [ ! -f "$BUN_TARGET" ]; then
     echo "Moving Bun to /usr/local/bin..."

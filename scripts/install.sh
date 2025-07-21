@@ -86,17 +86,8 @@ fi
 # Call clean_install at the beginning to ensure a fresh state
 clean_install
 
-# --- 1. Install Bun ---
-info "Checking for Bun..."
-if ! command -v bun &> /dev/null; then
-  info "Bun not found. Installing..."
-  curl -fsSL https://bun.sh/install | bash
-  export BUN_INSTALL="$HOME/.bun"
-  export PATH="$BUN_INSTALL/bin:$PATH"
-  info "Bun installed successfully."
-else
-  info "Bun is already installed."
-fi
+# --- 1.
+
 
 # --- 2. Run setup.sh ---
 info "Running initial system setup..."
