@@ -33,6 +33,19 @@ error() {
 clean_install() {
   info "Performing clean installation: Removing existing components..."
 
+  # Stop and remove systemd services
+  info "Stopping and removing systemd services if they exist..."
+  sudo systemctl stop "$WEBHOOK_SERVICE_NAME" || true
+  sudo systemctl disable "$WEBHOOK_SERVICE_NAME" || true
+  sudo rm -f "/etc/systemd/system/$WEBHOOK_SERVICE_NAME.service"
+
+  sudo systemctl stop "$MANAGER_SERVICE_NAME" || true
+  sudo systemctl disable "$MANAGER_SERVICE_NAME" || true
+  sudo rm -f "/etc/systemd/system/$MANAGER_SERVICE_NAME.service"
+
+  info "Reloading systemd daemon..."
+  sudo systemctl daemon-reload
+
   # Remove installed directory
   if [ -d "$INSTALL_DIR" ]; then
     info "Removing existing installation directory: $INSTALL_DIR"
@@ -54,24 +67,6 @@ clean_install() {
   #   info "Removing existing deployment file: $DEPLOYMENT_FILE"
   #   rm "$DEPLOYMENT_FILE"
   # fi
-
-  # Remove systemd services
-  CREATE_SCRIPT_PATH="$INSTALL_DIR/scripts/systemd/create.sh"
-  DELETE_SCRIPT_PATH="$INSTALL_DIR/scripts/systemd/delete.sh"
-
-  # Check if delete script exists (it will after cloning, but not before first install)
-  if [ -f "$DELETE_SCRIPT_PATH" ]; then
-    if systemctl list-units --full --all | grep -q "$WEBHOOK_SERVICE_NAME.service"; then
-      info "Deleting existing systemd service: $WEBHOOK_SERVICE_NAME"
-      sudo "$DELETE_SCRIPT_PATH" "$WEBHOOK_SERVICE_NAME" || true # Use || true to prevent script from exiting if service is not found/running
-    fi
-    if systemctl list-units --full --all | grep -q "$MANAGER_SERVICE_NAME.service"; then
-      info "Deleting existing systemd service: $MANAGER_SERVICE_NAME"
-      sudo "$DELETE_SCRIPT_PATH" "$MANAGER_SERVICE_NAME" || true
-    fi
-  else
-    info "Systemd delete script not found yet, skipping service removal."
-  fi
 
   info "Clean installation complete."
 }
@@ -190,7 +185,7 @@ fi
 
 # --- 8. Create systemd service for GitHub Webhook Listener ---
 info "Creating systemd service for GitHub Webhook Listener..."
-BUN_PATH="$(command -v bun)"
+BUN_PATH="/usr/local/bin/bun"
 WEBHOOK_EXEC_START="$BUN_PATH run $INSTALL_DIR/src/githubWebHook.ts"
 SERVICE_WORKING_DIR="$INSTALL_DIR"
 CURRENT_USER="$(whoami)"
