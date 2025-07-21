@@ -192,6 +192,32 @@ else
   echo "Get your authtoken from: https://dashboard.ngrok.com/get-started/setup" >&2
 fi
 
+# --- Setup bun ---
+echo "🔧 Setting up Bun..."
+
+if ! command -v bun &> /dev/null; then
+  echo "Bun not found. Installing Bun..."
+  yes | curl -fsSL https://bun.com/install | bash
+fi
+
+# Move bun binary to /usr/local/bin if it's not already there
+BUN_SOURCE="$HOME/.bun/bin/bun"
+BUN_TARGET="/usr/local/bin/bun"
+
+if [ -f "$BUN_SOURCE" ]; then
+  if [ ! -f "$BUN_TARGET" ]; then
+    echo "Moving Bun to /usr/local/bin..."
+    sudo mv "$BUN_SOURCE" "$BUN_TARGET"
+    sudo chmod +x "$BUN_TARGET"
+    echo "✅ Bun moved to /usr/local/bin successfully."
+  else
+    echo "ℹ️ Bun already exists in /usr/local/bin."
+  fi
+  sudo restorecon -v "$BUN_TARGET"  # Restore SELinux context if applicable
+else
+  echo "❌ Error: Bun binary not found at $BUN_SOURCE."
+fi
+
 # --- Firewall Rules ---
 echo "🛡 Setting up firewall..."
 

@@ -136,14 +136,20 @@ mkdir -p "$CONFIG_DIR"
 info "Creating default config.json..."
 cat <<EOF > "$CONFIG_FILE"
 {
-  "services": []
+  "services": [],
+  "networking": {
+    "ngrok": {
+      "authToken": "" // Ngrok auth token
+    }
+  }
 }
 EOF
 
 info "Creating default deployment.json..."
 cat <<EOF > "$DEPLOYMENT_FILE"
 {
-  "deployments": []
+  "deployments": [],
+  
 }
 EOF
 info "User config initialized in $CONFIG_DIR"
