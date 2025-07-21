@@ -58,6 +58,40 @@ clean_install() {
     rm "$SYMLINK_DIR/$SYMLINK_NAME"
   fi
 
+  # --- 5. Initialize User Config Directory ---
+  info "Initializing ~/.okastr8 directory..."
+  mkdir -p "$CONFIG_DIR"
+
+  # These files are now always created if they don't exist, or overwritten if clean_install removed them
+
+
+  if [ ! -f "$CONFIG_FILE" ]; then
+    info "creating default config file "
+    cat <<EOF > "$CONFIG_FILE"
+{
+"services": [],
+"networking": {
+  "ngrok": {
+    "authToken": ""
+  }
+}
+}
+EOF
+   
+fi
+
+
+if [ ! -f "$DEPLOYMENT_FILE" ]; then 
+  info "creating defaut config file"
+  cat <<EOF > "$DEPLOYMENT_FILE"
+{
+  "deployments": [],
+  
+}
+EOF
+  info "User config initialized in $CONFIG_DIR"
+fi
+
   # Remove user config files (optional, uncomment if you want to reset these too)
   # if [ -f "$CONFIG_FILE" ]; then
   #   info "Removing existing config file: $CONFIG_FILE"
@@ -114,31 +148,7 @@ if ! bun install --frozen-lockfile; then
 fi
 info "Dependencies installed."
 
-# --- 5. Initialize User Config Directory ---
-info "Initializing ~/.okastr8 directory..."
-mkdir -p "$CONFIG_DIR"
 
-# These files are now always created if they don't exist, or overwritten if clean_install removed them
-info "Creating default config.json..."
-cat <<EOF > "$CONFIG_FILE"
-{
-  "services": [],
-  "networking": {
-    "ngrok": {
-      "authToken": "" // Ngrok auth token
-    }
-  }
-}
-EOF
-
-info "Creating default deployment.json..."
-cat <<EOF > "$DEPLOYMENT_FILE"
-{
-  "deployments": [],
-  
-}
-EOF
-info "User config initialized in $CONFIG_DIR"
 
 # --- 6. Create Executable ---
 info "Creating executable in $SYMLINK_DIR..."
