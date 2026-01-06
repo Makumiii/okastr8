@@ -1,0 +1,17 @@
+{
+    "createUser": {
+        "userName": "deploy",
+        "passWord": "secure-password-123",
+        "distro": "debian"
+    },
+    "changeSSHPort": {
+        "port": 2222
+    },
+    "firewall": {
+        "allowedPorts": [
+            80,
+            443,
+            2222
+        ]
+    }
+}

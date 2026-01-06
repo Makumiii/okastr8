@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apps - okastr8</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>📦 Applications</h1>
+            <span id="auth-status" class="auth-status">Checking...</span>
+        </header>
+
+        <a href="index.html" class="back-link">← Back to Dashboard</a>
+
+        <div class="form-grid">
+            <!-- Create App -->
+            <div class="form-container">
+                <h3>➕ Create App</h3>
+                <form id="create-app-form">
+                    <input type="text" name="name" placeholder="App name (e.g., myapp)" required>
+                    <input type="text" name="execStart" placeholder="Start command (e.g., bun run start)" required>
+                    <input type="text" name="description" placeholder="Description (optional)">
+                    <input type="text" name="user" placeholder="Run as user (default: current)">
+                    <input type="text" name="workingDirectory" placeholder="Working directory (optional)">
+                    <input type="number" name="port" placeholder="Port (optional)">
+                    <input type="text" name="domain" placeholder="Domain (optional, for Caddy)">
+                    <input type="text" name="gitRepo" placeholder="Git repo URL (optional)">
+                    <input type="text" name="gitBranch" placeholder="Git branch (default: main)">
+                    <button type="submit">Create App</button>
+                </form>
+            </div>
+
+            <!-- Delete App -->
+            <div class="form-container">
+                <h3>🗑️ Delete App</h3>
+                <form id="delete-app-form">
+                    <input type="text" name="name" placeholder="App name" required>
+                    <button type="submit" class="btn-danger">Delete App</button>
+                </form>
+            </div>
+
+            <!-- App Status -->
+            <div class="form-container">
+                <h3>📊 App Status</h3>
+                <form id="status-app-form">
+                    <input type="text" name="name" placeholder="App name" required>
+                    <button type="submit">Check Status</button>
+                </form>
+            </div>
+
+            <!-- App Logs -->
+            <div class="form-container">
+                <h3>📜 View Logs</h3>
+                <form id="logs-app-form">
+                    <input type="text" name="name" placeholder="App name" required>
+                    <input type="number" name="lines" placeholder="Lines (default: 50)" value="50">
+                    <button type="submit">View Logs</button>
+                </form>
+            </div>
+
+            <!-- Export Logs -->
+            <div class="form-container">
+                <h3>💾 Export Logs</h3>
+                <form id="export-logs-form">
+                    <input type="text" name="name" placeholder="App name" required>
+                    <button type="submit">Export to File</button>
+                </form>
+            </div>
+
+            <!-- Start/Stop/Restart -->
+            <div class="form-container">
+                <h3>🔄 Control App</h3>
+                <form id="control-app-form">
+                    <input type="text" name="name" placeholder="App name" required id="control-app-name">
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" id="start-app-btn" class="btn btn-primary">▶️ Start</button>
+                        <button type="button" id="stop-app-btn" class="btn btn-secondary">⏹️ Stop</button>
+                        <button type="button" id="restart-app-btn" class="btn btn-secondary">🔄 Restart</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- List Apps -->
+            <div class="form-container full-width">
+                <h3>📋 List All Apps</h3>
+                <button type="button" id="list-apps-btn">Refresh App List</button>
+            </div>
+        </div>
+
+        <!-- Results Display -->
+        <div id="apps-results" class="results-display"></div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const result = createResultDisplay('apps-results');
+
+            // Create App
+            handleFormSubmit(
+                document.getElementById('create-app-form'),
+                '/app/create',
+                result,
+                (data) => ({
+                    ...data,
+                    port: data.port ? parseInt(data.port) : undefined
+                })
+            );
+
+            // Delete App
+            handleFormSubmit(
+                document.getElementById('delete-app-form'),
+                '/app/delete',
+                result
+            );
+
+            // Status
+            handleFormSubmit(
+                document.getElementById('status-app-form'),
+                '/app/status',
+                result
+            );
+
+            // Logs
+            handleFormSubmit(
+                document.getElementById('logs-app-form'),
+                '/app/logs',
+                result,
+                (data) => ({
+                    name: data.name,
+                    lines: parseInt(data.lines) || 50
+                })
+            );
+
+            // Export Logs
+            handleFormSubmit(
+                document.getElementById('export-logs-form'),
+                '/app/export-logs',
+                result
+            );
+
+            // Control buttons
+            const nameInput = document.getElementById('control-app-name');
+
+            document.getElementById('start-app-btn').addEventListener('click', async () => {
+                result.showLoading();
+                try {
+                    const res = await apiPost('/app/start', { name: nameInput.value });
+                    res.success ? result.showSuccess(res.message) : result.showError(res.message);
+                } catch (e) {
+                    e.message === 'UNAUTHORIZED' ? result.showUnauthorized() : result.showError(e.message);
+                }
+            });
+
+            document.getElementById('stop-app-btn').addEventListener('click', async () => {
+                result.showLoading();
+                try {
+                    const res = await apiPost('/app/stop', { name: nameInput.value });
+                    res.success ? result.showSuccess(res.message) : result.showError(res.message);
+                } catch (e) {
+                    e.message === 'UNAUTHORIZED' ? result.showUnauthorized() : result.showError(e.message);
+                }
+            });
+
+            document.getElementById('restart-app-btn').addEventListener('click', async () => {
+                result.showLoading();
+                try {
+                    const res = await apiPost('/app/restart', { name: nameInput.value });
+                    res.success ? result.showSuccess(res.message) : result.showError(res.message);
+                } catch (e) {
+                    e.message === 'UNAUTHORIZED' ? result.showUnauthorized() : result.showError(e.message);
+                }
+            });
+
+            // List Apps
+            document.getElementById('list-apps-btn').addEventListener('click', async () => {
+                result.showLoading();
+                try {
+                    const res = await apiGet('/app/list');
+                    if (res.success) {
+                        result.showData(res.data.apps, `Found ${res.data.apps.length} apps`);
+                    } else {
+                        result.showError(res.message);
+                    }
+                } catch (e) {
+                    e.message === 'UNAUTHORIZED' ? result.showUnauthorized() : result.showError(e.message);
+                }
+            });
+
+            // Auto-load apps on page load
+            document.getElementById('list-apps-btn').click();
+        });
+    </script>
+</body>
+
+</html>

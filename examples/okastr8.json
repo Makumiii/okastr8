@@ -1,0 +1,16 @@
+{
+    "name": "my-node-app",
+    "description": "A sample Node.js application deployed with okastr8",
+    "build": [
+        "npm install",
+        "npm run build"
+    ],
+    "start": "npm start",
+    "port": 3000,
+    "domain": "myapp.example.com",
+    "env": {
+        "NODE_ENV": "production",
+        "DATABASE_URL": "postgresql://user:pass@localhost:5432/db",
+        "API_KEY": "your-secret-api-key"
+    }
+}

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup - okastr8</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>⚙️ Server Setup</h1>
+            <span id="auth-status" class="auth-status">Checking...</span>
+        </header>
+
+        <a href="index.html" class="back-link">← Back to Dashboard</a>
+
+        <div class="form-grid">
+            <!-- Full Setup -->
+            <div class="form-container full-width">
+                <h3>🚀 Full Server Setup</h3>
+                <p style="color: #666; margin-bottom: 10px;">
+                    Runs complete server setup: installs dependencies, configures firewall, installs Caddy, Ngrok, etc.
+                </p>
+                <button type="button" id="full-setup-btn" class="btn btn-primary">Run Full Setup</button>
+            </div>
+
+            <!-- SSH Hardening -->
+            <div class="form-container">
+                <h3>🔐 SSH Hardening</h3>
+                <p style="color: #666; font-size: 13px; margin-bottom: 10px;">
+                    Disables password auth, root login, validates config before applying.
+                </p>
+                <form id="ssh-harden-form">
+                    <input type="number" name="port" placeholder="New SSH port (optional)">
+                    <button type="submit">Harden SSH</button>
+                </form>
+            </div>
+
+            <!-- Change SSH Port -->
+            <div class="form-container">
+                <h3>🔧 Change SSH Port</h3>
+                <form id="ssh-port-form">
+                    <input type="number" name="port" placeholder="New port (e.g., 2222)" required>
+                    <button type="submit">Change Port</button>
+                </form>
+            </div>
+
+            <!-- Firewall -->
+            <div class="form-container">
+                <h3>🛡️ Configure Firewall</h3>
+                <p style="color: #666; font-size: 13px; margin-bottom: 10px;">
+                    Configures UFW with secure defaults (SSH, HTTP, HTTPS).
+                </p>
+                <form id="firewall-form">
+                    <input type="number" name="ssh_port" placeholder="SSH port to allow (default: 2222)">
+                    <button type="submit">Configure Firewall</button>
+                </form>
+            </div>
+
+            <!-- Fail2ban -->
+            <div class="form-container">
+                <h3>🔒 Fail2ban (DDoS Protection)</h3>
+                <p style="color: #666; font-size: 13px; margin-bottom: 10px;">
+                    Configures fail2ban to protect against brute-force attacks.
+                </p>
+                <button type="button" id="fail2ban-btn">Configure Fail2ban</button>
+            </div>
+
+            <!-- Orchestrate -->
+            <div class="form-container">
+                <h3>📋 Orchestrate Environment</h3>
+                <p style="color: #666; font-size: 13px; margin-bottom: 10px;">
+                    Runs full orchestration from ~/.okastr8/environment.json
+                </p>
+                <button type="button" id="orchestrate-btn">Orchestrate</button>
+            </div>
+        </div>
+
+        <!-- Warning -->
+        <div style="background: #fff3cd; border: 1px solid #ffeeba; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <strong>⚠️ Warning:</strong> These operations make system-level changes. Make sure you have console access
+            in case SSH configuration changes lock you out.
+        </div>
+
+        <!-- Results Display -->
+        <div id="setup-results" class="results-display"></div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const result = createResultDisplay('setup-results');
+
+            // Full Setup
+            document.getElementById('full-setup-btn').addEventListener('click', async () => {
+                result.showLoading('Running full server setup... This may take several minutes.');
+                try {
+                    const res = await apiPost('/setup/full');
+                    res.success ? result.showSuccess(res.message) : result.showError(res.message);
+                } catch (e) {
+                    e.message === 'UNAUTHORIZED' ? result.showUnauthorized() : result.showError(e.message);
+                }
+            });
+
+            // SSH Harden
+            document.getElementById('ssh-harden-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                result.showLoading('Hardening SSH configuration...');
+
+                const formData = new FormData(e.target);
+                const port = formData.get('port');
+
+                try {
+                    const res = await apiPost('/setup/ssh-harden', port ? { port: parseInt(port) } : {});
+                    res.success ? result.showSuccess(res.message) : result.showError(res.message);
+                } catch (e) {
+                    e.message === 'UNAUTHORIZED' ? result.showUnauthorized() : result.showError(e.message);
+                }
+            });
+
+            // SSH Port
+            document.getElementById('ssh-port-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                result.showLoading('Changing SSH port...');
+
+                const formData = new FormData(e.target);
+
+                try {
+                    const res = await apiPost('/setup/ssh-port', { port: formData.get('port') });
+                    res.success ? result.showSuccess(res.message) : result.showError(res.message);
+                } catch (e) {
+                    e.message === 'UNAUTHORIZED' ? result.showUnauthorized() : result.showError(e.message);
+                }
+            });
+
+            // Firewall
+            document.getElementById('firewall-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                result.showLoading('Configuring firewall...');
+
+                const formData = new FormData(e.target);
+                const sshPort = formData.get('ssh_port');
+
+                try {
+                    const res = await apiPost('/setup/firewall', sshPort ? { ssh_port: parseInt(sshPort) } : {});
+                    res.success ? result.showSuccess(res.message) : result.showError(res.message);
+                } catch (e) {
+                    e.message === 'UNAUTHORIZED' ? result.showUnauthorized() : result.showError(e.message);
+                }
+            });
+
+            // Fail2ban
+            document.getElementById('fail2ban-btn').addEventListener('click', async () => {
+                result.showLoading('Configuring fail2ban...');
+                try {
+                    const res = await apiPost('/setup/fail2ban');
+                    res.success ? result.showSuccess(res.message) : result.showError(res.message);
+                } catch (e) {
+                    e.message === 'UNAUTHORIZED' ? result.showUnauthorized() : result.showError(e.message);
+                }
+            });
+
+            // Orchestrate
+            document.getElementById('orchestrate-btn').addEventListener('click', async () => {
+                result.showLoading('Orchestrating environment...');
+                try {
+                    const res = await apiPost('/orchestrate');
+                    res.success ? result.showSuccess(res.message) : result.showError(res.message);
+                } catch (e) {
+                    e.message === 'UNAUTHORIZED' ? result.showUnauthorized() : result.showError(e.message);
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

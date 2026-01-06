@@ -1,55 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Okastr8 Dashboards</title>
+    <title>okastr8 Dashboard</title>
     <link rel="stylesheet" href="css/styles.css">
-    <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            background-color: #f4f7f9;
-        }
-        .dashboard-links {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            padding: 40px;
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-        .dashboard-links h1 {
-            color: #2c3e50;
-            margin-bottom: 30px;
-        }
-        .dashboard-links a {
-            display: block;
-            padding: 15px 25px;
-            background-color: #3498db;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-            font-size: 18px;
-            transition: background-color 0.3s ease, transform 0.2s ease;
-        }
-        .dashboard-links a:hover {
-            background-color: #2980b9;
-            transform: translateY(-2px);
-        }
-    </style>
 </head>
+
 <body>
-    <div class="dashboard-links">
-        <h1>Okastr8 Dashboards</h1>
-        <a href="user.html">User Management</a>
-        <a href="systemd.html">Systemd Management</a>
-        <a href="orchestration.html">Orchestration</a>
+    <div class="container">
+        <header>
+            <h1>🚀 okastr8 Dashboard</h1>
+            <span id="auth-status" class="auth-status">Checking...</span>
+        </header>
+
+        <nav>
+            <a href="github.html">🐙 GitHub</a>
+            <a href="apps.html">📦 Apps</a>
+            <a href="deploy.html">🚀 Deploy</a>
+            <a href="setup.html">⚙️ Setup</a>
+            <a href="systemd.html">🔧 Systemd</a>
+            <a href="user.html">👤 Users</a>
+        </nav>
+
+        <div class="dashboard-overview">
+            <h2>Welcome to okastr8</h2>
+            <p>Server orchestration made simple. Select a section from the navigation above.</p>
+
+            <div class="form-grid">
+                <div class="form-container"
+                    style="background: linear-gradient(135deg, #24292e 0%, #1b1f23 100%); color: white;">
+                    <h3 style="color: white;">🐙 GitHub Import</h3>
+                    <p>Connect GitHub and deploy any repo with one click. Auto-detects build config.</p>
+                    <a href="github.html" class="btn" style="background: white; color: #24292e;">Import from GitHub
+                        →</a>
+                </div>
+
+                <div class="form-container">
+                    <h3>📦 Applications</h3>
+                    <p>Create, manage, and monitor your apps with centralized logging and systemd integration.</p>
+                    <a href="apps.html" class="btn btn-primary">Manage Apps →</a>
+                </div>
+
+                <div class="form-container">
+                    <h3>🚀 Deployments</h3>
+                    <p>Trigger deployments, rollback on failure, and view deployment history.</p>
+                    <a href="deploy.html" class="btn btn-primary">Deploy →</a>
+                </div>
+
+                <div class="form-container">
+                    <h3>⚙️ Server Setup</h3>
+                    <p>Configure SSH hardening, firewall, fail2ban, and run full server setup.</p>
+                    <a href="setup.html" class="btn btn-primary">Setup →</a>
+                </div>
+
+                <div class="form-container">
+                    <h3>🔧 Systemd Services</h3>
+                    <p>Low-level systemd service management: create, start, stop, view logs.</p>
+                    <a href="systemd.html" class="btn btn-secondary">Systemd →</a>
+                </div>
+
+                <div class="form-container">
+                    <h3>👤 User Management</h3>
+                    <p>Create and manage system users, check login history, lock accounts.</p>
+                    <a href="user.html" class="btn btn-secondary">Users →</a>
+                </div>
+
+                <div class="form-container">
+                    <h3>🔑 Authentication</h3>
+                    <p>Manage API key for secure access to the dashboard API.</p>
+                    <button onclick="showApiKeyModal()" class="btn btn-secondary">Configure API Key</button>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <script src="js/common.js"></script>
 </body>
+
 </html>

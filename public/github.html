@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub - okastr8</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .github-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #24292e 0%, #1b1f23 100%);
+            border-radius: 8px;
+            color: white;
+        }
+
+        .github-header h2 {
+            margin: 0;
+            color: white;
+            border: none;
+            padding: 0;
+        }
+
+        .github-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-connected {
+            color: #2ea44f;
+        }
+
+        .status-disconnected {
+            color: #f85149;
+        }
+
+        .repo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .repo-card {
+            background: white;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 16px;
+            transition: box-shadow 0.2s, transform 0.2s;
+        }
+
+        .repo-card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .repo-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #0366d6;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .repo-name:hover {
+            text-decoration: underline;
+        }
+
+        .repo-private {
+            background: #ffd33d;
+            color: #24292e;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .repo-desc {
+            color: #586069;
+            font-size: 14px;
+            margin: 8px 0;
+            line-height: 1.4;
+        }
+
+        .repo-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 12px;
+            color: #586069;
+            margin-top: 12px;
+        }
+
+        .repo-lang {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .lang-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #3178c6;
+        }
+
+        .repo-actions {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .search-box {
+            padding: 10px 15px;
+            font-size: 16px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .filter-bar {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .setup-card {
+            background: #f6f8fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .setup-card h3 {
+            margin-top: 0;
+        }
+
+        .setup-card code {
+            background: #24292e;
+            color: #f6f8fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 13px;
+        }
+
+        .deploy-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .deploy-modal.active {
+            display: flex;
+        }
+
+        .deploy-modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .deploy-modal-content h3 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>🐙 GitHub Integration</h1>
+            <span id="auth-status" class="auth-status">Checking...</span>
+        </header>
+
+        <a href="index.html" class="back-link">← Back to Dashboard</a>
+
+        <!-- GitHub Connection Status -->
+        <div class="github-header">
+            <div>
+                <h2>📦 Your Repositories</h2>
+                <p id="github-user" style="margin: 5px 0 0; opacity: 0.8;"></p>
+            </div>
+            <div class="github-status">
+                <span id="connection-status"></span>
+                <button id="connect-btn" class="btn btn-primary" style="display: none;">Connect GitHub</button>
+                <button id="disconnect-btn" class="btn btn-secondary" style="display: none;">Disconnect</button>
+            </div>
+        </div>
+
+        <!-- Setup Instructions (shown when not configured) -->
+        <div id="setup-section" class="setup-card" style="display: none;">
+            <h3>🔧 Setup Required</h3>
+            <p>To connect GitHub, you need to create an OAuth App:</p>
+            <ol>
+                <li>Go to <a href="https://github.com/settings/developers" target="_blank">GitHub Developer Settings</a>
+                </li>
+                <li>Click "New OAuth App"</li>
+                <li>Set Homepage URL: <code id="homepage-url">http://localhost:8788</code></li>
+                <li>Set Callback URL: <code id="callback-url">http://localhost:8788/api/github/callback</code></li>
+                <li>Copy Client ID and Client Secret</li>
+                <li>Add to <code>~/.okastr8/config.json</code>:
+                    <pre
+                        style="background: #24292e; color: #f6f8fa; padding: 10px; border-radius: 4px; overflow-x: auto;">
+{
+  "github": {
+    "clientId": "YOUR_CLIENT_ID",
+    "clientSecret": "YOUR_CLIENT_SECRET"
+  }
+}</pre>
+                </li>
+                <li>Restart the server and refresh this page</li>
+            </ol>
+        </div>
+
+        <!-- Repository List (shown when connected) -->
+        <div id="repos-section" style="display: none;">
+            <div class="filter-bar">
+                <input type="text" id="search-repos" class="search-box" placeholder="🔍 Search repositories...">
+                <select id="filter-lang" style="padding: 10px;">
+                    <option value="">All languages</option>
+                </select>
+                <button id="refresh-repos" class="btn btn-secondary">🔄 Refresh</button>
+            </div>
+
+            <div id="repos-grid" class="repo-grid"></div>
+        </div>
+
+        <!-- Results Display -->
+        <div id="github-results" class="results-display"></div>
+    </div>
+
+    <!-- Deploy Modal -->
+    <div id="deploy-modal" class="deploy-modal">
+        <div class="deploy-modal-content">
+            <h3>🚀 Deploy Repository</h3>
+            <form id="deploy-form">
+                <input type="hidden" id="deploy-repo-name" name="repoFullName">
+
+                <label>App Name</label>
+                <input type="text" id="deploy-app-name" name="appName" placeholder="my-app (auto-generated if empty)">
+
+                <label>Branch</label>
+                <input type="text" id="deploy-branch" name="branch" placeholder="main (uses default)">
+
+                <label>Port (optional)</label>
+                <input type="number" id="deploy-port" name="port" placeholder="3000">
+
+                <label>Domain (optional, for Caddy)</label>
+                <input type="text" id="deploy-domain" name="domain" placeholder="myapp.example.com">
+
+                <label>Start Command (leave empty to auto-detect)</label>
+                <input type="text" id="deploy-start" name="startCommand" placeholder="npm run start">
+
+                <label>Build Steps (one per line, optional)</label>
+                <textarea id="deploy-build" name="buildSteps" placeholder="npm install&#10;npm run build"></textarea>
+
+                <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    <button type="submit" class="btn btn-primary">🚀 Deploy</button>
+                    <button type="button" id="cancel-deploy" class="btn btn-cancel">Cancel</button>
+                </div>
+            </form>
+            <div id="deploy-result" style="margin-top: 15px;"></div>
+        </div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script>
+        let allRepos = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const result = createResultDisplay('github-results');
+
+            // Check URL params for OAuth callback result
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('connected')) {
+                result.showSuccess(`Connected as ${params.get('user')}!`);
+                history.replaceState({}, '', '/github.html');
+            } else if (params.get('error')) {
+                result.showError(`GitHub auth failed: ${params.get('error')}`);
+                history.replaceState({}, '', '/github.html');
+            }
+
+            // Set URLs for setup instructions
+            const host = window.location.host;
+            document.getElementById('homepage-url').textContent = `http://${host}`;
+            document.getElementById('callback-url').textContent = `http://${host}/api/github/callback`;
+
+            await checkConnectionStatus();
+        });
+
+        async function checkConnectionStatus() {
+            const result = createResultDisplay('github-results');
+
+            try {
+                const statusRes = await apiGet('/github/status');
+                const status = statusRes.data;
+
+                if (status.connected) {
+                    document.getElementById('connection-status').innerHTML = `<span class="status-connected">✅ Connected</span>`;
+                    document.getElementById('github-user').textContent = `@${status.username}`;
+                    document.getElementById('disconnect-btn').style.display = 'inline-block';
+                    document.getElementById('connect-btn').style.display = 'none';
+                    document.getElementById('setup-section').style.display = 'none';
+                    document.getElementById('repos-section').style.display = 'block';
+
+                    await loadRepos();
+                } else {
+                    document.getElementById('connection-status').innerHTML = `<span class="status-disconnected">❌ Not connected</span>`;
+                    document.getElementById('github-user').textContent = '';
+                    document.getElementById('disconnect-btn').style.display = 'none';
+                    document.getElementById('connect-btn').style.display = 'inline-block';
+                    document.getElementById('repos-section').style.display = 'none';
+
+                    // Check if OAuth is configured
+                    const authUrlRes = await apiGet('/github/auth-url');
+                    if (!authUrlRes.success) {
+                        document.getElementById('setup-section').style.display = 'block';
+                        document.getElementById('connect-btn').style.display = 'none';
+                    }
+                }
+            } catch (e) {
+                if (e.message === 'UNAUTHORIZED') {
+                    result.showUnauthorized();
+                } else {
+                    result.showError(e.message);
+                }
+            }
+        }
+
+        async function loadRepos() {
+            const result = createResultDisplay('github-results');
+            result.showLoading('Loading repositories...');
+
+            try {
+                const res = await apiGet('/github/repos');
+                if (res.success) {
+                    allRepos = res.data.repos;
+                    result.clear();
+                    renderRepos(allRepos);
+                    populateLanguageFilter(allRepos);
+                } else {
+                    result.showError(res.message);
+                }
+            } catch (e) {
+                if (e.message === 'UNAUTHORIZED') {
+                    result.showUnauthorized();
+                } else {
+                    result.showError(e.message);
+                }
+            }
+        }
+
+        function renderRepos(repos) {
+            const grid = document.getElementById('repos-grid');
+
+            if (repos.length === 0) {
+                grid.innerHTML = '<p style="color: #586069;">No repositories found.</p>';
+                return;
+            }
+
+            grid.innerHTML = repos.map(repo => `
+                <div class="repo-card">
+                    <a href="${repo.html_url}" target="_blank" class="repo-name">
+                        ${repo.name}
+                        ${repo.private ? '<span class="repo-private">Private</span>' : ''}
+                    </a>
+                    <p class="repo-desc">${repo.description || 'No description'}</p>
+                    <div class="repo-meta">
+                        ${repo.language ? `<span class="repo-lang"><span class="lang-dot" style="background: ${getLanguageColor(repo.language)}"></span> ${repo.language}</span>` : ''}
+                        <span>Updated ${formatDate(repo.pushed_at)}</span>
+                    </div>
+                    <div class="repo-actions">
+                        <button class="btn btn-primary btn-small" onclick="openDeployModal('${repo.full_name}', '${repo.name}', '${repo.default_branch}')">
+                            🚀 Deploy
+                        </button>
+                        <a href="${repo.html_url}" target="_blank" class="btn btn-secondary btn-small">View on GitHub</a>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function populateLanguageFilter(repos) {
+            const languages = [...new Set(repos.map(r => r.language).filter(Boolean))].sort();
+            const select = document.getElementById('filter-lang');
+            select.innerHTML = '<option value="">All languages</option>' +
+                languages.map(lang => `<option value="${lang}">${lang}</option>`).join('');
+        }
+
+        function getLanguageColor(language) {
+            const colors = {
+                JavaScript: '#f1e05a',
+                TypeScript: '#3178c6',
+                Python: '#3572A5',
+                Go: '#00ADD8',
+                Rust: '#dea584',
+                Java: '#b07219',
+                Ruby: '#701516',
+                PHP: '#4F5D95',
+                C: '#555555',
+                'C++': '#f34b7d',
+                'C#': '#178600',
+                Swift: '#ffac45',
+                Kotlin: '#A97BFF',
+                Shell: '#89e051',
+                HTML: '#e34c26',
+                CSS: '#563d7c',
+            };
+            return colors[language] || '#8b8b8b';
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 0) return 'today';
+            if (diffDays === 1) return 'yesterday';
+            if (diffDays < 7) return `${diffDays} days ago`;
+            if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+            if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+            return `${Math.floor(diffDays / 365)} years ago`;
+        }
+
+        // Search and filter
+        document.getElementById('search-repos').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            const langFilter = document.getElementById('filter-lang').value;
+
+            const filtered = allRepos.filter(repo => {
+                const matchesQuery = repo.name.toLowerCase().includes(query) ||
+                    (repo.description && repo.description.toLowerCase().includes(query));
+                const matchesLang = !langFilter || repo.language === langFilter;
+                return matchesQuery && matchesLang;
+            });
+
+            renderRepos(filtered);
+        });
+
+        document.getElementById('filter-lang').addEventListener('change', () => {
+            document.getElementById('search-repos').dispatchEvent(new Event('input'));
+        });
+
+        document.getElementById('refresh-repos').addEventListener('click', loadRepos);
+
+        // Connect button
+        document.getElementById('connect-btn').addEventListener('click', async () => {
+            const result = createResultDisplay('github-results');
+            result.showLoading('Redirecting to GitHub...');
+
+            try {
+                const res = await apiGet('/github/auth-url');
+                if (res.success) {
+                    window.location.href = res.data.authUrl;
+                } else {
+                    result.showError(res.message);
+                }
+            } catch (e) {
+                result.showError(e.message);
+            }
+        });
+
+        // Disconnect button
+        document.getElementById('disconnect-btn').addEventListener('click', async () => {
+            const result = createResultDisplay('github-results');
+            result.showLoading('Disconnecting...');
+
+            try {
+                const res = await apiPost('/github/disconnect');
+                if (res.success) {
+                    result.showSuccess('GitHub disconnected');
+                    await checkConnectionStatus();
+                } else {
+                    result.showError(res.message);
+                }
+            } catch (e) {
+                result.showError(e.message);
+            }
+        });
+
+        // Deploy modal
+        function openDeployModal(repoFullName, repoName, defaultBranch) {
+            document.getElementById('deploy-repo-name').value = repoFullName;
+            document.getElementById('deploy-app-name').value = repoName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+            document.getElementById('deploy-branch').value = defaultBranch;
+            document.getElementById('deploy-result').innerHTML = '';
+            document.getElementById('deploy-modal').classList.add('active');
+        }
+
+        document.getElementById('cancel-deploy').addEventListener('click', () => {
+            document.getElementById('deploy-modal').classList.remove('active');
+        });
+
+        document.getElementById('deploy-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const resultEl = document.getElementById('deploy-result');
+            resultEl.innerHTML = '<div class="result-status result-loading"><span class="result-icon">⏳</span><span class="result-message">Deploying... This may take a while.</span></div>';
+
+            const formData = new FormData(e.target);
+            const buildStepsRaw = formData.get('buildSteps');
+            const buildSteps = buildStepsRaw ? buildStepsRaw.split('\n').map(s => s.trim()).filter(s => s) : undefined;
+
+            try {
+                const res = await apiPost('/github/import', {
+                    repoFullName: formData.get('repoFullName'),
+                    appName: formData.get('appName') || undefined,
+                    branch: formData.get('branch') || undefined,
+                    port: formData.get('port') ? parseInt(formData.get('port')) : undefined,
+                    domain: formData.get('domain') || undefined,
+                    startCommand: formData.get('startCommand') || undefined,
+                    buildSteps: buildSteps,
+                });
+
+                if (res.success) {
+                    resultEl.innerHTML = `<div class="result-status result-success"><span class="result-icon">✅</span><span class="result-message">${res.message}</span></div>`;
+                    setTimeout(() => {
+                        document.getElementById('deploy-modal').classList.remove('active');
+                        window.location.href = 'apps.html';
+                    }, 2000);
+                } else {
+                    resultEl.innerHTML = `<div class="result-status result-error"><span class="result-icon">❌</span><span class="result-message">${res.message}</span></div>`;
+                }
+            } catch (e) {
+                resultEl.innerHTML = `<div class="result-status result-error"><span class="result-icon">❌</span><span class="result-message">${e.message}</span></div>`;
+            }
+        });
+    </script>
+</body>
+
+</html>
