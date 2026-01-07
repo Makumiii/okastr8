@@ -94,40 +94,63 @@ WantedBy=multi-user.target
         const unitFilePath = join(appDir, `${config.name}.service`);
         await writeFile(unitFilePath, unitContent);
 
-        // Create/update app metadata
+        // Deploy service to /etc/systemd/system/
+        const SYSTEMD_DIR = "/etc/systemd/system";
+        const result = await runCommand("sudo", ["cp", unitFilePath, `${SYSTEMD_DIR}/${config.name}.service`]);
+
+        if (result.exitCode !== 0) {
+            return {
+                success: false,
+                appDir,
+                message: `Failed to copy service file: ${result.stderr}`,
+            };
+        }
+
+        // Reload daemon, enable, and start the service
+        await runCommand("sudo", ["systemctl", "daemon-reload"]);
+        await runCommand("sudo", ["systemctl", "enable", config.name]);
+        const startResult = await runCommand("sudo", ["systemctl", "start", config.name]);
+
+        if (startResult.exitCode !== 0) {
+            return {
+                success: false,
+                appDir,
+                message: `Failed to start service: ${startResult.stderr}`,
+            };
+        }
+
+        // ONLY NOW: Write app.json after service is running
+        // This ensures app only appears in UI when fully operational
         const metadataPath = join(appDir, "app.json");
+
+        let existingMetadata: any = {};
+        try {
+            const content = await readFile(metadataPath, "utf-8");
+            existingMetadata = JSON.parse(content);
+        } catch { }
+
         await writeFile(
             metadataPath,
             JSON.stringify(
                 {
                     ...config,
-                    createdAt: new Date().toISOString(),
+                    createdAt: existingMetadata.createdAt || new Date().toISOString(),
                     unitFile: unitFilePath,
                     repoDir,
                     logsDir,
+                    // Preserve versioning data
+                    versions: existingMetadata.versions || [],
+                    currentVersionId: existingMetadata.currentVersionId || null
                 },
                 null,
                 2
             )
         );
 
-        // Use the create script to install the service
-        // Deploy to standard /etc/systemd/system/ directory
-        // Services are identified by okastr8- prefix (e.g., okastr8-myapp.service)
-        const SYSTEMD_DIR = "/etc/systemd/system";
-
-        const result = await runCommand("sudo", ["cp", unitFilePath, `${SYSTEMD_DIR}/${config.name}.service`]);
-
-        if (result.exitCode === 0) {
-            await runCommand("sudo", ["systemctl", "daemon-reload"]);
-            await runCommand("sudo", ["systemctl", "enable", config.name]);
-            await runCommand("sudo", ["systemctl", "start", config.name]);
-        }
-
         return {
-            success: result.exitCode === 0,
+            success: true,
             appDir,
-            message: result.exitCode === 0 ? "App created and started" : result.stderr,
+            message: "App created and started",
         };
     } catch (error) {
         console.error(`Error creating app ${config.name}:`, error);
@@ -137,20 +160,41 @@ WantedBy=multi-user.target
 
 export async function deleteApp(appName: string) {
     try {
+        console.log(`Deleting app: ${appName}`);
+
         // Stop and remove the systemd service
+        console.log(`Running systemd delete script for ${appName}...`);
         const result = await runCommand("sudo", [SYSTEMD_SCRIPTS.delete, appName]);
 
-        // Remove the app directory
-        const appDir = join(APPS_DIR, appName);
-        await rm(appDir, { recursive: true, force: true });
+        if (result.exitCode !== 0) {
+            console.error(`Systemd delete script failed: ${result.stderr}`);
+        }
 
+        // Explicitly verify and remove service file as fallback
+        const serviceFile = `/etc/systemd/system/${appName}.service`;
+        console.log(`Ensuring service file is removed: ${serviceFile}`);
+        await runCommand("sudo", ["rm", "-f", serviceFile]);
+
+        // Reload systemd daemon to clear any cached state
+        console.log(`Reloading systemd daemon...`);
+        await runCommand("sudo", ["systemctl", "daemon-reload"]);
+
+        // Remove the app directory using sudo to handle permission issues
+        const appDir = join(APPS_DIR, appName);
+        console.log(`Removing app directory: ${appDir}`);
+        await runCommand("sudo", ["rm", "-rf", appDir]);
+
+        console.log(`Successfully deleted app: ${appName}`);
         return {
-            success: result.exitCode === 0,
-            message: result.stdout || result.stderr,
+            success: true,
+            message: `App '${appName}' deleted successfully`,
         };
     } catch (error) {
         console.error(`Error deleting app ${appName}:`, error);
-        throw error;
+        return {
+            success: false,
+            message: `Failed to delete app: ${error instanceof Error ? error.message : String(error)}`,
+        };
     }
 }
 

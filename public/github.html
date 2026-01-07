@@ -28,15 +28,100 @@
         .github-status {
             display: flex;
             align-items: center;
+            gap: 16px;
+        }
+
+        /* Glowing status indicator */
+        .status-indicator {
+            display: flex;
+            align-items: center;
             gap: 10px;
+            padding: 8px 16px;
+            border-radius: 24px;
+            font-weight: 600;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
-        .status-connected {
-            color: #2ea44f;
+        .status-indicator.connected {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
         }
 
-        .status-disconnected {
-            color: #f85149;
+        .status-indicator.disconnected {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse-glow 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: #22c55e;
+            box-shadow: 0 0 8px #22c55e, 0 0 16px rgba(34, 197, 94, 0.4);
+        }
+
+        .status-dot.disconnected {
+            background: #ef4444;
+            box-shadow: 0 0 8px #ef4444, 0 0 16px rgba(239, 68, 68, 0.4);
+        }
+
+        @keyframes pulse-glow {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.7;
+                transform: scale(1.1);
+            }
+        }
+
+        .connect-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .connect-btn.connect {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+            color: white;
+        }
+
+        .connect-btn.connect:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+        }
+
+        .connect-btn.disconnect {
+            background: #374151;
+            color: white;
+        }
+
+        .connect-btn.disconnect:hover {
+            background: #ef4444;
+        }
+
+        /* Icon styles */
+        .icon {
+            width: 20px;
+            height: 20px;
+            display: inline-block;
         }
 
         .repo-grid {
@@ -188,28 +273,68 @@
 <body>
     <div class="container">
         <header>
-            <h1>🐙 GitHub Integration</h1>
+            <div class="header-group">
+                <a href="index.html" class="back-arrow">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                    </svg>
+                </a>
+                <h1>
+                    <svg class="icon" viewBox="0 0 24 24" fill="currentColor"
+                        style="width: 32px; height: 32px; vertical-align: middle; margin-right: 8px;">
+                        <path
+                            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+                    </svg>
+                    GitHub Integration
+                </h1>
+            </div>
             <span id="auth-status" class="auth-status">Checking...</span>
         </header>
 
-        <a href="index.html" class="back-link">← Back to Dashboard</a>
+
 
         <!-- GitHub Connection Status -->
         <div class="github-header">
             <div>
-                <h2>📦 Your Repositories</h2>
+                <h2 style="display: flex; align-items: center; gap: 10px;">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        style="width: 24px; height: 24px;">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    Your Repositories
+                </h2>
                 <p id="github-user" style="margin: 5px 0 0; opacity: 0.8;"></p>
             </div>
             <div class="github-status">
-                <span id="connection-status"></span>
-                <button id="connect-btn" class="btn btn-primary" style="display: none;">Connect GitHub</button>
-                <button id="disconnect-btn" class="btn btn-secondary" style="display: none;">Disconnect</button>
+                <div id="connection-status" class="status-indicator disconnected">
+                    <span class="status-dot disconnected"></span>
+                    <span class="status-text">Disconnected</span>
+                </div>
+                <button id="connection-btn" class="connect-btn connect" onclick="handleConnectionAction()">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        style="width: 18px; height: 18px;">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                        <polyline points="10 17 15 12 10 7"></polyline>
+                        <line x1="15" y1="12" x2="3" y2="12"></line>
+                    </svg>
+                    <span id="connection-btn-text">Connect</span>
+                </button>
             </div>
         </div>
 
         <!-- Setup Instructions (shown when not configured) -->
         <div id="setup-section" class="setup-card" style="display: none;">
-            <h3>🔧 Setup Required</h3>
+            <h3 style="display: flex; align-items: center; gap: 8px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    style="width: 20px; height: 20px;">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path
+                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                    </path>
+                </svg>
+                Setup Required
+            </h3>
             <p>To connect GitHub, you need to create an OAuth App:</p>
             <ol>
                 <li>Go to <a href="https://github.com/settings/developers" target="_blank">GitHub Developer Settings</a>
@@ -233,11 +358,20 @@ manager:
         <!-- Repository List (shown when connected) -->
         <div id="repos-section" style="display: none;">
             <div class="filter-bar">
-                <input type="text" id="search-repos" class="search-box" placeholder="🔍 Search repositories...">
+                <input type="text" id="search-repos" class="search-box" placeholder="Search repositories...">
                 <select id="filter-lang" style="padding: 10px;">
                     <option value="">All languages</option>
                 </select>
-                <button id="refresh-repos" class="btn btn-secondary">🔄 Refresh</button>
+                <button id="refresh-repos" class="btn btn-secondary"
+                    style="display: flex; align-items: center; gap: 6px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        style="width: 16px; height: 16px;">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    Refresh
+                </button>
             </div>
 
             <div id="repos-grid" class="repo-grid"></div>
@@ -251,11 +385,13 @@ manager:
     <div id="deploy-modal" class="deploy-modal">
         <div class="deploy-modal-content">
             <h3>🚀 Deploy Repository</h3>
+            <div id="deploy-app-name-display"
+                style="background: #f6f8fa; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 14px; color: #24292e;">
+                <strong>App Name:</strong> <code id="deploy-app-name-text"
+                    style="background: #e1e4e8; padding: 2px 6px; border-radius: 3px;"></code>
+            </div>
             <form id="deploy-form">
                 <input type="hidden" id="deploy-repo-name" name="repoFullName">
-
-                <label>App Name</label>
-                <input type="text" id="deploy-app-name" name="appName" placeholder="my-app (auto-generated if empty)">
 
                 <label>Branch</label>
                 <select id="deploy-branch" name="branch"
@@ -263,22 +399,11 @@ manager:
                     <option>Loading...</option>
                 </select>
 
-                <div id="config-check-status"
-                    style="margin-bottom: 15px; padding: 10px; border-radius: 6px; display: none;"></div>
-
-                <div id="manual-config-section">
-                    <label>Port (optional)</label>
-                    <input type="number" id="deploy-port" name="port" placeholder="3000">
-
-                    <label>Domain (optional, for Caddy)</label>
-                    <input type="text" id="deploy-domain" name="domain" placeholder="myapp.example.com">
-
-                    <label>Start Command (leave empty to auto-detect)</label>
-                    <input type="text" id="deploy-start" name="startCommand" placeholder="npm run start">
-
-                    <label>Build Steps (one per line, optional)</label>
-                    <textarea id="deploy-build" name="buildSteps"
-                        placeholder="npm install&#10;npm run build"></textarea>
+                <div
+                    style="background: #f6f8fa; padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; color: #586069;">
+                    <strong>ℹ️ Configuration Required</strong><br>
+                    Your repository must have an <code>okastr8.yaml</code> file in the root defining:
+                    runtime, build steps, start command, port, etc.
                 </div>
 
                 <label style="display:flex; align-items:center; gap:8px; margin-top:10px;">
@@ -322,32 +447,51 @@ manager:
 
         async function checkConnectionStatus() {
             const result = createResultDisplay('github-results');
+            const statusIndicator = document.getElementById('connection-status');
+            const statusDot = statusIndicator.querySelector('.status-dot');
+            const statusText = statusIndicator.querySelector('.status-text');
+            const connectionBtn = document.getElementById('connection-btn');
+            const connectionBtnText = document.getElementById('connection-btn-text');
 
             try {
                 const statusRes = await apiGet('/github/status');
                 const status = statusRes.data;
 
                 if (status.connected) {
-                    document.getElementById('connection-status').innerHTML = `<span class="status-connected">✅ Connected</span>`;
+                    // Update status indicator to connected (green glow)
+                    statusIndicator.className = 'status-indicator connected';
+                    statusDot.className = 'status-dot connected';
+                    statusText.textContent = 'Connected';
+
+                    // Update button to disconnect mode
+                    connectionBtn.className = 'connect-btn disconnect';
+                    connectionBtnText.textContent = 'Disconnect';
+
                     document.getElementById('github-user').textContent = `@${status.username}`;
-                    document.getElementById('disconnect-btn').style.display = 'inline-block';
-                    document.getElementById('connect-btn').style.display = 'none';
                     document.getElementById('setup-section').style.display = 'none';
                     document.getElementById('repos-section').style.display = 'block';
 
                     await loadRepos();
                 } else {
-                    document.getElementById('connection-status').innerHTML = `<span class="status-disconnected">❌ Not connected</span>`;
+                    // Update status indicator to disconnected (red glow)
+                    statusIndicator.className = 'status-indicator disconnected';
+                    statusDot.className = 'status-dot disconnected';
+                    statusText.textContent = 'Disconnected';
+
+                    // Update button to connect mode
+                    connectionBtn.className = 'connect-btn connect';
+                    connectionBtnText.textContent = 'Connect';
+
                     document.getElementById('github-user').textContent = '';
-                    document.getElementById('disconnect-btn').style.display = 'none';
-                    document.getElementById('connect-btn').style.display = 'inline-block';
                     document.getElementById('repos-section').style.display = 'none';
 
                     // Check if OAuth is configured
                     const authUrlRes = await apiGet('/github/auth-url');
                     if (!authUrlRes.success) {
                         document.getElementById('setup-section').style.display = 'block';
-                        document.getElementById('connect-btn').style.display = 'none';
+                        connectionBtn.style.display = 'none';
+                    } else {
+                        connectionBtn.style.display = 'flex';
                     }
                 }
             } catch (e) {
@@ -355,6 +499,34 @@ manager:
                     result.showUnauthorized();
                 } else {
                     result.showError(e.message);
+                }
+            }
+        }
+
+        // Unified connection action handler
+        async function handleConnectionAction() {
+            const connectionBtn = document.getElementById('connection-btn');
+            const isConnected = connectionBtn.classList.contains('disconnect');
+
+            if (isConnected) {
+                // Disconnect
+                if (confirm('Disconnect from GitHub?')) {
+                    try {
+                        await apiPost('/github/disconnect', {});
+                        await checkConnectionStatus();
+                    } catch (e) {
+                        createResultDisplay('github-results').showError(e.message);
+                    }
+                }
+            } else {
+                // Connect - redirect to OAuth
+                try {
+                    const res = await apiGet('/github/auth-url');
+                    if (res.success && res.data.authUrl) {
+                        window.location.href = res.data.authUrl;
+                    }
+                } catch (e) {
+                    createResultDisplay('github-results').showError(e.message);
                 }
             }
         }
@@ -393,6 +565,9 @@ manager:
             grid.innerHTML = repos.map(repo => `
                 <div class="repo-card">
                     <a href="${repo.html_url}" target="_blank" class="repo-name">
+                        <svg class="icon" viewBox="0 0 16 16" fill="currentColor" style="width:16px; height:16px; margin-right:6px; color:#586069;">
+                            <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 1 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 0 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5v-9zm10.5-1V9h-8c-.356 0-.694.074-1 .208V2.5a1 1 0 0 1 1-1h8zM5 12.25v3.25a.25.25 0 0 0 .4.2l1.45-1.087a.25.25 0 0 1 .3 0L8.6 15.7a.25.25 0 0 0 .4-.2v-3.25a.25.25 0 0 0-.25-.25h-3.5a.25.25 0 0 0-.25.25z"></path>
+                        </svg>
                         ${repo.name}
                         ${repo.private ? '<span class="repo-private">Private</span>' : ''}
                     </a>
@@ -402,7 +577,7 @@ manager:
                         <span>Updated ${formatDate(repo.pushed_at)}</span>
                     </div>
                     <div class="repo-actions">
-                        <button class="btn btn-primary btn-small" onclick="openDeployModal('${repo.full_name}', '${repo.name}', '${repo.default_branch}')">
+                        <button type="button" class="btn btn-primary btn-small" onclick="openDeployModal('${repo.full_name}', '${repo.name}', '${repo.default_branch || 'main'}')">
                             🚀 Deploy
                         </button>
                         <a href="${repo.html_url}" target="_blank" class="btn btn-secondary btn-small">View on GitHub</a>
@@ -475,45 +650,15 @@ manager:
 
         document.getElementById('refresh-repos').addEventListener('click', loadRepos);
 
-        // Connect button
-        document.getElementById('connect-btn').addEventListener('click', async () => {
-            const result = createResultDisplay('github-results');
-            result.showLoading('Redirecting to GitHub...');
 
-            try {
-                const res = await apiGet('/github/auth-url');
-                if (res.success) {
-                    window.location.href = res.data.authUrl;
-                } else {
-                    result.showError(res.message);
-                }
-            } catch (e) {
-                result.showError(e.message);
-            }
-        });
-
-        // Disconnect button
-        document.getElementById('disconnect-btn').addEventListener('click', async () => {
-            const result = createResultDisplay('github-results');
-            result.showLoading('Disconnecting...');
-
-            try {
-                const res = await apiPost('/github/disconnect');
-                if (res.success) {
-                    result.showSuccess('GitHub disconnected');
-                    await checkConnectionStatus();
-                } else {
-                    result.showError(res.message);
-                }
-            } catch (e) {
-                result.showError(e.message);
-            }
-        });
 
         // Deploy modal
         async function openDeployModal(repoFullName, repoName, defaultBranch) {
             document.getElementById('deploy-repo-name').value = repoFullName;
-            document.getElementById('deploy-app-name').value = repoName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+
+            // Set app name display
+            const appName = repoName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+            document.getElementById('deploy-app-name-text').textContent = appName;
 
             const branchSelect = document.getElementById('deploy-branch');
             branchSelect.innerHTML = '<option>Loading...</option>';
@@ -579,33 +724,79 @@ manager:
             e.preventDefault();
 
             const resultEl = document.getElementById('deploy-result');
-            resultEl.innerHTML = '<div class="result-status result-loading"><span class="result-icon">⏳</span><span class="result-message">Deploying... This may take a while.</span></div>';
+            // Create logs container
+            resultEl.innerHTML = `
+                <div class="deployment-logs-container" style="max-height: 400px; overflow-y: auto; background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 6px; font-family: 'Consolas', monospace; font-size: 13px; line-height: 1.6;">
+                    <div class="deployment-logs"></div>
+                </div>
+            `;
+            const logsContainer = resultEl.querySelector('.deployment-logs');
 
             const formData = new FormData(e.target);
-            const buildStepsRaw = formData.get('buildSteps');
-            const buildSteps = buildStepsRaw ? buildStepsRaw.split('\n').map(s => s.trim()).filter(s => s) : undefined;
 
             try {
+                // Start deployment - config comes from okastr8.yaml
                 const res = await apiPost('/github/import', {
                     repoFullName: formData.get('repoFullName'),
-                    appName: formData.get('appName') || undefined,
                     branch: formData.get('branch') || undefined,
-                    port: formData.get('port') ? parseInt(formData.get('port')) : undefined,
-                    domain: formData.get('domain') || undefined,
-                    startCommand: formData.get('startCommand') || undefined,
-                    buildSteps: buildSteps,
                     setupWebhook: document.getElementById('deploy-webhook').checked,
                 });
 
-                if (res.success) {
-                    resultEl.innerHTML = `<div class="result-status result-success"><span class="result-icon">✅</span><span class="result-message">${res.message}</span></div>`;
-                    setTimeout(() => {
-                        document.getElementById('deploy-modal').classList.remove('active');
-                        window.location.href = 'apps.html';
-                    }, 2000);
-                } else {
-                    resultEl.innerHTML = `<div class="result-status result-error"><span class="result-icon">❌</span><span class="result-message">${res.message}</span></div>`;
+                if (!res.success || !res.data?.deploymentId) {
+                    resultEl.innerHTML = `<div class="result-status result-error"><span class="result-icon">❌</span><span class="result-message">${res.message || 'Deployment failed to start'}</span></div>`;
+                    return;
                 }
+
+                const deploymentId = res.data.deploymentId;
+                logsContainer.innerHTML += `<div style="color: #4ec9b0;">🚀 Connecting to deployment stream...</div>`;
+
+                // Connect to SSE stream
+                const eventSource = new EventSource(`/api/github/deploy-stream/${deploymentId}`);
+                let deploymentSucceeded = null;
+
+                eventSource.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+
+                        if (data.type === 'connected') {
+                            logsContainer.innerHTML += `<div style="color: #4ec9b0;">✓ Connected to deployment stream</div>`;
+                        } else if (data.type === 'log') {
+                            const logLine = escapeHtml(data.message);
+                            // Color code based on content
+                            let color = '#d4d4d4';
+                            if (logLine.includes('✅') || logLine.includes('successfully')) color = '#4ec9b0';
+                            if (logLine.includes('❌') || logLine.includes('failed')) color = '#f48771';
+                            if (logLine.includes('⚠️') || logLine.includes('warning')) color = '#dcdcaa';
+
+                            logsContainer.innerHTML += `<div style="color: ${color};">${logLine}</div>`;
+                            logsContainer.parentElement.scrollTop = logsContainer.parentElement.scrollHeight;
+
+                            // Capture success/failure
+                            if (logLine.includes('Deployment succeeded')) deploymentSucceeded = true;
+                            if (logLine.includes('Deployment failed')) deploymentSucceeded = false;
+                        } else if (data.type === 'end') {
+                            eventSource.close();
+                            logsContainer.innerHTML += `<div style="color: #4ec9b0; margin-top: 10px;">━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>`;
+                            logsContainer.innerHTML += `<div style="color: ${deploymentSucceeded ? '#4ec9b0' : '#f48771'}; font-weight: bold; margin-top: 5px;">${deploymentSucceeded ? '✅ Deployment Complete!' : '❌ Deployment Failed'}</div>`;
+
+                            if (deploymentSucceeded) {
+                                setTimeout(() => {
+                                    document.getElementById('deploy-modal').classList.remove('active');
+                                    window.location.href = 'apps.html';
+                                }, 2000);
+                            }
+                        }
+                    } catch (err) {
+                        console.error('Error parsing SSE message:', err);
+                    }
+                };
+
+                eventSource.onerror = (error) => {
+                    console.error('SSE Error:', error);
+                    eventSource.close();
+                    logsContainer.innerHTML += `<div style="color: #f48771; margin-top: 10px;">⚠️ Connection lost. Deployment may still be running in background.</div>`;
+                };
+
             } catch (e) {
                 resultEl.innerHTML = `<div class="result-status result-error"><span class="result-icon">❌</span><span class="result-message">${e.message}</span></div>`;
             }

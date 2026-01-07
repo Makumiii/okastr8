@@ -39,6 +39,97 @@ const apiResponse = (success: boolean, message: string, data?: any) => ({
     data,
 });
 
+// ============ System Status Endpoints ============
+
+api.get('/system/status', async (c) => {
+    try {
+        const { detectAllRuntimes } = await import('./commands/env');
+        const { getRecentLogs, getLogCounts, getHealthStatus } = await import('./utils/logger');
+        const { runCommand } = await import('./utils/command');
+        const os = await import('os');
+
+        // Get system uptime
+        const uptimeSeconds = os.uptime();
+        const days = Math.floor(uptimeSeconds / 86400);
+        const hours = Math.floor((uptimeSeconds % 86400) / 3600);
+        const minutes = Math.floor((uptimeSeconds % 3600) / 60);
+        const uptime = days > 0 ? `${days}d ${hours}h ${minutes}m` : `${hours}h ${minutes}m`;
+
+        // Get current user (prefer SUDO_USER to show actual admin, not root)
+        const user = process.env.SUDO_USER || process.env.USER || 'unknown';
+
+        // Get environments
+        const environments = await detectAllRuntimes();
+
+        // Get okastr8 services status
+        const services = [];
+        const serviceNames = ['okastr8-manager', 'okastr8-webhook'];
+        for (const name of serviceNames) {
+            const result = await runCommand('systemctl', ['is-active', name]);
+            services.push({
+                name,
+                status: result.stdout.trim() || 'unknown',
+                running: result.exitCode === 0
+            });
+        }
+
+        // Get deployed apps
+        const { listApps } = await import('./commands/app');
+        let apps: any[] = [];
+        try {
+            const result = await listApps();
+            apps = result.success && Array.isArray(result.apps) ? result.apps : [];
+        } catch { }
+
+        // Check app service statuses
+        for (const app of apps) {
+            if (app && app.name) {
+                const result = await runCommand('systemctl', ['is-active', app.name]);
+                services.push({
+                    name: app.name,
+                    status: result.stdout.trim() || 'unknown',
+                    running: result.exitCode === 0,
+                    isApp: true
+                });
+            }
+        }
+
+        // Get log health
+        const logCounts = getLogCounts();
+        const health = getHealthStatus();
+
+        return c.json(apiResponse(true, 'System status', {
+            user,
+            uptime,
+            serverTime: new Date().toISOString(),
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            locale: Intl.DateTimeFormat().resolvedOptions().locale,
+            hostname: os.hostname(),
+            platform: os.platform(),
+            environments,
+            services,
+            health: {
+                status: health,
+                counts: logCounts
+            }
+        }));
+    } catch (error: any) {
+        console.error('API /system/status error:', error);
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
+api.get('/logs/recent', async (c) => {
+    try {
+        const { getRecentLogs } = await import('./utils/logger');
+        const count = parseInt(c.req.query('count') || '10');
+        const logs = getRecentLogs(count);
+        return c.json(apiResponse(true, 'Recent logs', { logs }));
+    } catch (error: any) {
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
 // User routes
 api.post('/user/create', async (c) => {
     console.log('API: /user/create hit');
@@ -434,6 +525,40 @@ api.post('/app/restart', async (c) => {
     }
 });
 
+api.post('/app/versions', async (c) => {
+    console.log('API: /app/versions hit');
+    try {
+        const { name } = await c.req.json();
+        const { getVersions } = await import('./commands/version');
+        const versions = await getVersions(name);
+        return c.json(apiResponse(true, "", versions));
+    } catch (error: any) {
+        console.error('API: /app/versions error:', error);
+        return c.json(apiResponse(false, error.message || 'Internal Server Error'));
+    }
+});
+
+api.post('/app/rollback', async (c) => {
+    console.log('API: /app/rollback hit');
+    try {
+        const { name, versionId } = await c.req.json();
+        const { rollback, getCurrentVersion } = await import('./commands/version');
+        const { restartApp } = await import('./commands/app');
+
+        const result = await rollback(name, parseInt(versionId));
+        if (result.success) {
+            // Restart the app to pick up changes
+            await restartApp(name);
+            return c.json(apiResponse(true, result.message));
+        } else {
+            return c.json(apiResponse(false, result.message));
+        }
+    } catch (error: any) {
+        console.error('API: /app/rollback error:', error);
+        return c.json(apiResponse(false, error.message || 'Internal Server Error'));
+    }
+});
+
 // Deploy routes
 api.post('/deploy/trigger', async (c) => {
     console.log('API: /deploy/trigger hit');
@@ -622,16 +747,112 @@ api.post('/github/import', async (c) => {
     console.log('API: /github/import hit');
     try {
         const { importRepo } = await import('./commands/github');
+        const { startDeploymentStream, endDeploymentStream, streamLog } = await import('./utils/deploymentLogger');
+        const { randomBytes } = await import('crypto');
+
         const options = await c.req.json();
-        const result = await importRepo(options);
-        return c.json(apiResponse(result.success, result.message, {
-            appName: result.appName,
-            config: result.config,
+
+        // Generate unique deployment ID
+        const deploymentId = randomBytes(16).toString('hex');
+
+        // Start the deployment stream
+        startDeploymentStream(deploymentId);
+
+        // Run deployment asynchronously
+        importRepo(options, deploymentId)
+            .then((result) => {
+                streamLog(deploymentId, `✅ Deployment ${result.success ? 'succeeded' : 'failed'}: ${result.message}`);
+                setTimeout(() => endDeploymentStream(deploymentId), 1000);
+            })
+            .catch((error) => {
+                streamLog(deploymentId, `❌ Deployment error: ${error.message}`);
+                setTimeout(() => endDeploymentStream(deploymentId), 1000);
+            });
+
+        // Return immediately with deployment ID
+        return c.json(apiResponse(true, 'Deployment started', {
+            deploymentId,
+            message: 'Deployment started. Connect to stream for real-time logs.',
         }));
     } catch (error: any) {
         console.error('API: /github/import error:', error);
         return c.json(apiResponse(false, error.message || 'Internal Server Error'));
     }
+});
+
+// GitHub Deployment Log Stream (SSE)
+api.get('/github/deploy-stream/:deploymentId', async (c) => {
+    const deploymentId = c.req.param('deploymentId');
+    console.log(`[SSE] Client connecting to deployment stream: ${deploymentId}`);
+
+    const { subscribe } = await import('./utils/deploymentLogger');
+
+    // Create a readable stream for SSE
+    const stream = new ReadableStream({
+        start(controller) {
+            const encoder = new TextEncoder();
+            let heartbeatInterval: Timer | null = null;
+            let isClosed = false;
+
+            // Helper to safely enqueue data
+            const safeEnqueue = (data: Uint8Array) => {
+                if (!isClosed) {
+                    try {
+                        controller.enqueue(data);
+                    } catch (error) {
+                        console.error('[SSE] Error enqueuing data:', error);
+                        isClosed = true;
+                    }
+                }
+            };
+
+            // Send heartbeat every 5 seconds to keep connection alive
+            heartbeatInterval = setInterval(() => {
+                // SSE comment format - ignored by EventSource but keeps connection alive
+                safeEnqueue(encoder.encode(': heartbeat\n\n'));
+            }, 5000);
+
+            // Subscribe to deployment logs
+            const unsubscribe = subscribe(deploymentId, (message: string) => {
+                if (isClosed) return;
+
+                // Check if stream should end
+                if (message === '[DEPLOYMENT_STREAM_END]') {
+                    safeEnqueue(encoder.encode(`data: ${JSON.stringify({ type: 'end' })}\n\n`));
+                    if (heartbeatInterval) clearInterval(heartbeatInterval);
+                    controller.close();
+                    isClosed = true;
+                    unsubscribe();
+                    return;
+                }
+
+                // Send log message to client
+                safeEnqueue(encoder.encode(`data: ${JSON.stringify({ type: 'log', message })}\n\n`));
+            });
+
+            // Send initial connection message
+            safeEnqueue(encoder.encode(`data: ${JSON.stringify({ type: 'connected', deploymentId })}\n\n`));
+
+            console.log(`[SSE] Client subscribed to: ${deploymentId}`);
+
+            // Cleanup on stream cancel
+            return () => {
+                console.log(`[SSE] Stream cancelled for: ${deploymentId}`);
+                if (heartbeatInterval) clearInterval(heartbeatInterval);
+                isClosed = true;
+                unsubscribe();
+            };
+        },
+    });
+
+    return new Response(stream, {
+        headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',
+        },
+    });
 });
 
 api.post('/github/disconnect', async (c) => {

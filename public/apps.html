@@ -6,89 +6,494 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Apps - okastr8</title>
     <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Apps Page Specific Styles */
+        .apps-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .apps-header h2 {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .create-app-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .create-app-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        /* App Cards Grid */
+        .apps-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 20px;
+        }
+
+        .app-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid #f0f0f5;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .app-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+        }
+
+        .app-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .app-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1f2937;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .app-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .app-status.running {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .app-status.stopped {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .app-status.unknown {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-dot.running {
+            background: #22c55e;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.stopped {
+            background: #ef4444;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .app-meta {
+            color: #6b7280;
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+
+        .app-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+
+        /* Action buttons */
+        .app-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding-top: 16px;
+            border-top: 1px solid #f0f0f5;
+            align-items: center;
+        }
+
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid #e5e7eb;
+            background: white;
+            color: #374151;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .action-btn:hover {
+            background: #f9fafb;
+            border-color: #d1d5db;
+        }
+
+        .action-btn.primary {
+            background: #22c55e;
+            color: white;
+            border-color: #22c55e;
+        }
+
+        .action-btn.primary:hover {
+            background: #16a34a;
+        }
+
+        .action-btn.warning {
+            background: #f59e0b;
+            color: white;
+            border-color: #f59e0b;
+        }
+
+        .action-btn.warning:hover {
+            background: #d97706;
+        }
+
+        /* Dropdown Menu */
+        .dropdown {
+            position: relative;
+            margin-left: auto;
+        }
+
+        .dropdown-btn {
+            background: none;
+            border: none;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            color: #6b7280;
+        }
+
+        .dropdown-btn:hover {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            border: 1px solid #e5e7eb;
+            width: 160px;
+            display: none;
+            z-index: 10;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }
+
+        .dropdown-menu.active {
+            display: block;
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            width: 100%;
+            border: none;
+            background: none;
+            text-align: left;
+            font-size: 13px;
+            color: #374151;
+            cursor: pointer;
+        }
+
+        .dropdown-item:hover {
+            background: #f9fafb;
+        }
+
+        .dropdown-item.danger {
+            color: #dc2626;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .dropdown-item.danger:hover {
+            background: #fef2f2;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 32px;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #9ca3af;
+            padding: 4px;
+        }
+
+        .modal-close:hover {
+            color: #374151;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: #374151;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group small {
+            color: #9ca3af;
+            font-size: 12px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .modal-actions button {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* Logs Modal */
+        .logs-content {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 16px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        /* Versions Table */
+        .versions-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .versions-table th,
+        .versions-table td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f5;
+        }
+
+        .versions-table th {
+            font-weight: 600;
+            color: #6b7280;
+            background: #f9fafb;
+        }
+
+        .version-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .version-badge.success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .version-badge.failed {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .version-badge.current {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        /* Loading state */
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e5e7eb;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
 </head>
 
 <body>
     <div class="container">
         <header>
-            <h1>📦 Applications</h1>
+            <div class="header-group">
+                <a href="index.html" class="back-arrow">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                    </svg>
+                </a>
+                <h1>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        style="width: 28px; height: 28px; vertical-align: middle;">
+                        <path
+                            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                        </path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                    Applications
+                </h1>
+            </div>
             <span id="auth-status" class="auth-status">Checking...</span>
         </header>
 
-        <a href="index.html" class="back-link">← Back to Dashboard</a>
 
-        <div class="form-grid">
-            <!-- Create App -->
-            <div class="form-container">
-                <h3>➕ Create App</h3>
-                <form id="create-app-form">
-                    <input type="text" name="name" placeholder="App name (e.g., myapp)" required>
-                    <input type="text" name="execStart" placeholder="Start command (e.g., bun run start)" required>
-                    <input type="text" name="description" placeholder="Description (optional)">
-                    <input type="text" name="user" placeholder="Run as user (default: current)">
-                    <input type="text" name="workingDirectory" placeholder="Working directory (optional)">
-                    <input type="number" name="port" placeholder="Port (optional)">
-                    <input type="text" name="domain" placeholder="Domain (optional, for Caddy)">
-                    <input type="text" name="gitRepo" placeholder="Git repo URL (optional)">
-                    <input type="text" name="gitBranch" placeholder="Git branch (default: main)">
-                    <button type="submit">Create App</button>
-                </form>
-            </div>
 
-            <!-- Delete App -->
-            <div class="form-container">
-                <h3>🗑️ Delete App</h3>
-                <form id="delete-app-form">
-                    <input type="text" name="name" placeholder="App name" required>
-                    <button type="submit" class="btn-danger">Delete App</button>
-                </form>
-            </div>
+        <!-- Apps Header -->
+        <div class="apps-header">
+            <h2>
+                <span id="apps-count">0</span> Apps Deployed
+            </h2>
+            <button class="create-app-btn" onclick="openCreateModal()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    style="width: 20px; height: 20px;">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Create App
+            </button>
+        </div>
 
-            <!-- App Status -->
-            <div class="form-container">
-                <h3>📊 App Status</h3>
-                <form id="status-app-form">
-                    <input type="text" name="name" placeholder="App name" required>
-                    <button type="submit">Check Status</button>
-                </form>
-            </div>
-
-            <!-- App Logs -->
-            <div class="form-container">
-                <h3>📜 View Logs</h3>
-                <form id="logs-app-form">
-                    <input type="text" name="name" placeholder="App name" required>
-                    <input type="number" name="lines" placeholder="Lines (default: 50)" value="50">
-                    <button type="submit">View Logs</button>
-                </form>
-            </div>
-
-            <!-- Export Logs -->
-            <div class="form-container">
-                <h3>💾 Export Logs</h3>
-                <form id="export-logs-form">
-                    <input type="text" name="name" placeholder="App name" required>
-                    <button type="submit">Export to File</button>
-                </form>
-            </div>
-
-            <!-- Start/Stop/Restart -->
-            <div class="form-container">
-                <h3>🔄 Control App</h3>
-                <form id="control-app-form">
-                    <input type="text" name="name" placeholder="App name" required id="control-app-name">
-                    <div style="display: flex; gap: 10px;">
-                        <button type="button" id="start-app-btn" class="btn btn-primary">▶️ Start</button>
-                        <button type="button" id="stop-app-btn" class="btn btn-secondary">⏹️ Stop</button>
-                        <button type="button" id="restart-app-btn" class="btn btn-secondary">🔄 Restart</button>
-                    </div>
-                </form>
-            </div>
-
-            <!-- List Apps -->
-            <div class="form-container full-width">
-                <h3>📋 List All Apps</h3>
-                <button type="button" id="list-apps-btn">Refresh App List</button>
+        <!-- Apps Grid -->
+        <div id="apps-grid" class="apps-grid">
+            <div class="loading" style="grid-column: 1/-1; text-align: center; padding: 40px;">
+                <span class="loading-spinner"></span> Loading apps...
             </div>
         </div>
 
@@ -96,104 +501,416 @@
         <div id="apps-results" class="results-display"></div>
     </div>
 
+    <!-- Create App Modal -->
+    <div id="create-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Create New App</h3>
+                <button class="modal-close" onclick="closeCreateModal()">×</button>
+            </div>
+            <form id="create-app-form">
+                <div class="form-group">
+                    <label>App Name *</label>
+                    <input type="text" name="name" placeholder="my-app" required>
+                    <small>Lowercase letters, numbers, and hyphens only</small>
+                </div>
+                <div class="form-group">
+                    <label>Start Command *</label>
+                    <input type="text" name="execStart" placeholder="npm start" required>
+                    <small>Command to start your application</small>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" name="description" placeholder="My awesome application">
+                </div>
+                <div class="form-group">
+                    <label>Working Directory</label>
+                    <input type="text" name="workingDirectory" placeholder="/home/user/myapp">
+                </div>
+                <div class="form-group">
+                    <label>Port</label>
+                    <input type="number" name="port" placeholder="3000">
+                </div>
+                <div class="form-group">
+                    <label>Domain</label>
+                    <input type="text" name="domain" placeholder="myapp.example.com">
+                </div>
+                <div class="form-group">
+                    <label>Run as User</label>
+                    <input type="text" name="user" placeholder="Current user by default">
+                </div>
+                <!-- Other fields omitted for brevity -->
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create App</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- versions Modal -->
+    <div id="versions-modal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3 id="versions-modal-title">Version History</h3>
+                <button class="modal-close" onclick="closeVersionsModal()">×</button>
+            </div>
+            <div id="versions-content">Loading...</div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeVersionsModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs Modal -->
+    <div id="logs-modal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3 id="logs-modal-title">Logs</h3>
+                <button class="modal-close" onclick="closeLogsModal()">×</button>
+            </div>
+            <div id="logs-content" class="logs-content">Loading...</div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeLogsModal()">Close</button>
+                <button type="button" class="btn btn-primary" id="export-logs-btn">Export to File</button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/common.js"></script>
     <script>
+        let currentApps = [];
+        let currentLogsApp = '';
+
         document.addEventListener('DOMContentLoaded', () => {
-            const result = createResultDisplay('apps-results');
+            loadApps();
 
-            // Create App
-            handleFormSubmit(
-                document.getElementById('create-app-form'),
-                '/app/create',
-                result,
-                (data) => ({
-                    ...data,
-                    port: data.port ? parseInt(data.port) : undefined
-                })
-            );
-
-            // Delete App
-            handleFormSubmit(
-                document.getElementById('delete-app-form'),
-                '/app/delete',
-                result
-            );
-
-            // Status
-            handleFormSubmit(
-                document.getElementById('status-app-form'),
-                '/app/status',
-                result
-            );
-
-            // Logs
-            handleFormSubmit(
-                document.getElementById('logs-app-form'),
-                '/app/logs',
-                result,
-                (data) => ({
-                    name: data.name,
-                    lines: parseInt(data.lines) || 50
-                })
-            );
-
-            // Export Logs
-            handleFormSubmit(
-                document.getElementById('export-logs-form'),
-                '/app/export-logs',
-                result
-            );
-
-            // Control buttons
-            const nameInput = document.getElementById('control-app-name');
-
-            document.getElementById('start-app-btn').addEventListener('click', async () => {
-                result.showLoading();
-                try {
-                    const res = await apiPost('/app/start', { name: nameInput.value });
-                    res.success ? result.showSuccess(res.message) : result.showError(res.message);
-                } catch (e) {
-                    e.message === 'UNAUTHORIZED' ? result.showUnauthorized() : result.showError(e.message);
+            // Close dropdowns when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.dropdown')) {
+                    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('active'));
                 }
             });
 
-            document.getElementById('stop-app-btn').addEventListener('click', async () => {
-                result.showLoading();
-                try {
-                    const res = await apiPost('/app/stop', { name: nameInput.value });
-                    res.success ? result.showSuccess(res.message) : result.showError(res.message);
-                } catch (e) {
-                    e.message === 'UNAUTHORIZED' ? result.showUnauthorized() : result.showError(e.message);
-                }
-            });
+            // Create app form listeners
+            document.getElementById('create-app-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const data = Object.fromEntries(formData.entries());
 
-            document.getElementById('restart-app-btn').addEventListener('click', async () => {
-                result.showLoading();
-                try {
-                    const res = await apiPost('/app/restart', { name: nameInput.value });
-                    res.success ? result.showSuccess(res.message) : result.showError(res.message);
-                } catch (e) {
-                    e.message === 'UNAUTHORIZED' ? result.showUnauthorized() : result.showError(e.message);
-                }
-            });
+                // Clean up optional fields
+                Object.keys(data).forEach(key => {
+                    if (!data[key]) delete data[key];
+                });
+                if (data.port) data.port = parseInt(data.port);
 
-            // List Apps
-            document.getElementById('list-apps-btn').addEventListener('click', async () => {
-                result.showLoading();
                 try {
-                    const res = await apiGet('/app/list');
+                    const res = await apiPost('/app/create', data);
                     if (res.success) {
-                        result.showData(res.data.apps, `Found ${res.data.apps.length} apps`);
+                        closeCreateModal();
+                        loadApps();
+                        showToast('App created successfully!', 'success');
                     } else {
-                        result.showError(res.message);
+                        showToast(res.message, 'error');
                     }
                 } catch (e) {
-                    e.message === 'UNAUTHORIZED' ? result.showUnauthorized() : result.showError(e.message);
+                    showToast(e.message, 'error');
                 }
             });
 
-            // Auto-load apps on page load
-            document.getElementById('list-apps-btn').click();
+            // Export logs button
+            document.getElementById('export-logs-btn').addEventListener('click', async () => {
+                if (!currentLogsApp) return;
+                try {
+                    const res = await apiPost('/app/export-logs', { name: currentLogsApp });
+                    if (res.success) {
+                        showToast(`Logs exported: ${res.data?.logFile || 'Success'}`, 'success');
+                    } else {
+                        showToast(res.message, 'error');
+                    }
+                } catch (e) {
+                    showToast(e.message, 'error');
+                }
+            });
+        });
+
+        async function loadApps() {
+            const grid = document.getElementById('apps-grid');
+            try {
+                const res = await apiGet('/app/list');
+                if (res.success) {
+                    currentApps = res.data.apps || [];
+                    document.getElementById('apps-count').textContent = currentApps.length;
+
+                    if (currentApps.length === 0) {
+                        // Empty state...
+                        grid.innerHTML = `<div class="empty-state">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                </svg>
+                                <h3>No Apps Yet</h3>
+                                <p>Create your first app or deploy from GitHub</p>
+                            </div>`;
+                        return;
+                    }
+
+                    const appsWithStatus = await Promise.all(currentApps.map(async (app) => {
+                        try {
+                            const statusRes = await apiPost('/app/status', { name: app.name });
+                            return { ...app, running: statusRes.success };
+                        } catch {
+                            return { ...app, running: false };
+                        }
+                    }));
+
+                    grid.innerHTML = appsWithStatus.map(app => renderAppCard(app)).join('');
+                }
+            } catch (e) {
+                grid.innerHTML = `<p>Error loading apps: ${e.message}</p>`;
+            }
+        }
+
+        function renderAppCard(app) {
+            const status = app.running ? 'running' : 'stopped';
+            const statusLabel = app.running ? 'Running' : 'Stopped';
+
+            return `
+                <div class="app-card">
+                    <div class="app-card-header">
+                        <h3 class="app-name">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 20px; height: 20px; color: #667eea;">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                            </svg>
+                            ${app.name}
+                        </h3>
+                        <span class="app-status ${status}">
+                            <span class="status-dot ${status}"></span>
+                            ${statusLabel}
+                        </span>
+                    </div>
+                    
+                    <div class="app-meta">
+                        ${app.description ? `<div class="app-meta-item">${app.description}</div>` : ''}
+                        ${app.port ? `<div class="app-meta-item">Port ${app.port}</div>` : ''}
+                    </div>
+
+                    <div class="app-actions">
+                        ${app.running
+                    ? `<button class="action-btn warning" onclick="controlApp('${app.name}', 'stop')">Stop</button>`
+                    : `<button class="action-btn primary" onclick="controlApp('${app.name}', 'start')">Start</button>`
+                }
+                        <button class="action-btn" onclick="controlApp('${app.name}', 'restart')">Restart</button>
+                        <button class="action-btn" onclick="viewLogs('${app.name}')">Logs</button>
+                        
+                        <div class="dropdown">
+                            <button class="dropdown-btn" onclick="toggleDropdown(this, event)">
+                                <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle><circle cx="5" cy="12" r="2"></circle></svg>
+                            </button>
+                            <div class="dropdown-menu">
+                                <button class="dropdown-item" onclick="viewVersions('${app.name}')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><path d="M12 20v-6M6 20V10M18 20V4"></path></svg>
+                                    Version History
+                                </button>
+                                <button class="dropdown-item danger" onclick="deleteApp('${app.name}')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                    Delete App
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function toggleDropdown(btn, e) {
+            e.stopPropagation();
+            const menu = btn.nextElementSibling;
+            document.querySelectorAll('.dropdown-menu').forEach(m => {
+                if (m !== menu) m.classList.remove('active');
+            });
+            menu.classList.toggle('active');
+        }
+
+        async function viewVersions(name) {
+            document.getElementById('versions-modal-title').textContent = `History: ${name}`;
+            document.getElementById('versions-content').innerHTML = '<div class="loading-spinner"></div> Loading...';
+            document.getElementById('versions-modal').classList.add('active');
+
+            try {
+                const res = await apiPost('/app/versions', { name });
+                if (res.success) {
+                    renderVersionsTable(name, res.data);
+                } else {
+                    document.getElementById('versions-content').innerHTML = `<p class="error">Failed to load versions: ${res.message}</p>`;
+                }
+            } catch (e) {
+                document.getElementById('versions-content').innerHTML = `<p class="error">Error: ${e.message}</p>`;
+            }
+        }
+
+        function renderVersionsTable(appName, data) {
+            if (!data.versions || data.versions.length === 0) {
+                document.getElementById('versions-content').innerHTML = '<p>No version history available.</p>';
+                return;
+            }
+
+            // Sort by ID descending
+            const versions = data.versions.sort((a, b) => b.id - a.id);
+
+            let html = `
+                <table class="versions-table">
+                    <thead>
+                        <tr>
+                            <th>Ver</th>
+                            <th>Commit</th>
+                            <th>Status</th>
+                            <th>Deployed</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            versions.forEach(v => {
+                const isCurrent = v.id === data.current;
+                const statusClass = v.status === 'success' ? 'success' : 'failed';
+                const date = new Date(v.timestamp).toLocaleString();
+
+                html += `
+                    <tr style="${isCurrent ? 'background: #f0f9ff;' : ''}">
+                        <td>
+                            v${v.id}
+                            ${isCurrent ? '<span class="version-badge current">Current</span>' : ''}
+                        </td>
+                        <td><code>${v.commit.substring(0, 7)}</code> (${v.branch})</td>
+                        <td><span class="version-badge ${statusClass}">${v.status}</span></td>
+                        <td>${date}</td>
+                        <td>
+                            ${!isCurrent && v.status === 'success'
+                        ? `<button class="action-btn" onclick="rollbackApp('${appName}', ${v.id})">Rollback</button>`
+                        : ''}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('versions-content').innerHTML = html;
+        }
+
+        async function rollbackApp(name, versionId) {
+            if (!confirm(`Rollback ${name} to version v${versionId}?`)) return;
+
+            const content = document.getElementById('versions-content');
+            content.innerHTML = '<div class="loading-spinner"></div> Rolling back...';
+
+            try {
+                const res = await apiPost('/app/rollback', { name, versionId });
+                if (res.success) {
+                    showToast(`Rolled back to v${versionId}`, 'success');
+                    closeVersionsModal();
+                    loadApps(); // Refresh app status
+                } else {
+                    showToast(res.message, 'error');
+                    viewVersions(name); // Reload list
+                }
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        async function controlApp(name, action) {
+            try {
+                showToast(`${action.charAt(0).toUpperCase() + action.slice(1)}ing ${name}...`, 'info');
+                const res = await apiPost(`/app/${action}`, { name });
+                if (res.success) {
+                    showToast(`${name} ${action}ed successfully`, 'success');
+                    loadApps();
+                } else {
+                    showToast(res.message, 'error');
+                }
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        async function viewLogs(name) {
+            currentLogsApp = name;
+            document.getElementById('logs-modal-title').textContent = `Logs: ${name}`;
+            document.getElementById('logs-content').textContent = 'Loading...';
+            document.getElementById('logs-modal').classList.add('active');
+
+            try {
+                const res = await apiPost('/app/logs', { name, lines: 100 });
+                if (res.success) {
+                    document.getElementById('logs-content').textContent = res.data?.logs || 'No logs available';
+                } else {
+                    document.getElementById('logs-content').textContent = `Error: ${res.message}`;
+                }
+            } catch (e) {
+                document.getElementById('logs-content').textContent = `Error: ${e.message}`;
+            }
+        }
+
+        async function deleteApp(name) {
+            if (!confirm(`Delete app "${name}"? This cannot be undone.`)) return;
+            try {
+                const res = await apiPost('/app/delete', { name });
+                if (res.success) {
+                    showToast(`${name} deleted`, 'success');
+                    loadApps();
+                } else {
+                    showToast(res.message, 'error');
+                }
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        function openCreateModal() {
+            document.getElementById('create-modal').classList.add('active');
+            document.getElementById('create-app-form').reset();
+        }
+
+        function closeCreateModal() {
+            document.getElementById('create-modal').classList.remove('active');
+        }
+
+        function closeVersionsModal() {
+            document.getElementById('versions-modal').classList.remove('active');
+        }
+
+        function closeLogsModal() {
+            document.getElementById('logs-modal').classList.remove('active');
+            currentLogsApp = '';
+        }
+
+        function showToast(message, type = 'info') {
+            const result = createResultDisplay('apps-results');
+            if (type === 'success') result.showSuccess(message);
+            else if (type === 'error') result.showError(message);
+            else result.showSuccess(message);
+            setTimeout(() => result.clear(), 5000);
+        }
+
+        // Close modals on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeCreateModal();
+                closeLogsModal();
+                closeVersionsModal();
+            }
+        });
+
+        // Close modals on backdrop click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeCreateModal();
+                    closeLogsModal();
+                    closeVersionsModal();
+                }
+            });
         });
     </script>
 </body>

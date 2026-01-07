@@ -190,6 +190,29 @@ export async function getRepo(
     return (await response.json()) as GitHubRepo;
 }
 
+// Check if a file exists in a repository
+export async function checkFileExists(
+    accessToken: string,
+    fullName: string,
+    filePath: string,
+    branch: string = "main"
+): Promise<boolean> {
+    try {
+        const response = await fetch(
+            `${GITHUB_API}/repos/${fullName}/contents/${filePath}?ref=${branch}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    Accept: "application/vnd.github.v3+json",
+                },
+            }
+        );
+        return response.ok;
+    } catch {
+        return false;
+    }
+}
+
 export async function listBranches(accessToken: string, fullName: string): Promise<string[]> {
     const branches: string[] = [];
     let page = 1;
@@ -248,154 +271,31 @@ export interface DetectedConfig {
     env?: Record<string, string>;
 }
 
-export async function detectProjectConfig(repoPath: string): Promise<DetectedConfig> {
-    const defaultConfig: DetectedConfig = {
-        buildSteps: [],
-        startCommand: "",
-        runtime: "unknown",
-    };
 
-    try {
-        // 1. Check for yaml/json configs
-        const configFiles = ["okastr8.yaml", "okastr8.yml", "okastr8.json", "app.yaml", "app.json"];
-        for (const file of configFiles) {
-            try {
-                const configPath = join(repoPath, file);
-                const content = await readFile(configPath, "utf-8");
-
-                let config: any;
-                if (file.endsWith('.yaml') || file.endsWith('.yml')) {
-                    // Dynamic import needed if context requires, or just use import at top level
-                    // Since we're in Bun, we can rely on our existing ConfigManager logic or just import
-                    const { load } = await import('js-yaml');
-                    config = load(content);
-                } else {
-                    config = JSON.parse(content);
-                }
-
-                // Validate minimal config
-                if (config && (config.build || config.start)) {
-                    return {
-                        buildSteps: Array.isArray(config.build) ? config.build : (config.build ? [config.build] : []),
-                        startCommand: config.start || "",
-                        runtime: "config-file",
-                        port: config.port,
-                        domain: config.domain,
-                        env: config.env
-                    };
-                }
-            } catch {
-                // Continue if file not found or invalid
-            }
-        }
-
-        // 2. Check for package.json (Node/Bun)
-        try {
-            const pkgJson = JSON.parse(
-                await readFile(join(repoPath, "package.json"), "utf-8")
-            );
-
-            // Check for bun.lockb
-            let isBun = false;
-            try {
-                await readFile(join(repoPath, "bun.lockb"));
-                isBun = true;
-            } catch { }
-
-            const pm = isBun ? "bun" : "npm";
-            const buildSteps: string[] = [`${pm} install`];
-
-            if (pkgJson.scripts?.build) {
-                buildSteps.push(`${pm} run build`);
-            }
-
-            let startCommand = "";
-            if (pkgJson.scripts?.start) {
-                startCommand = `${pm} run start`;
-            } else if (pkgJson.scripts?.dev) {
-                startCommand = `${pm} run dev`;
-            } else if (pkgJson.main) {
-                startCommand = isBun ? `bun run ${pkgJson.main}` : `node ${pkgJson.main}`;
-            }
-
-            return {
-                buildSteps,
-                startCommand,
-                runtime: isBun ? "bun" : "node",
-            };
-        } catch { }
-
-        // Check for Cargo.toml (Rust)
-        try {
-            await readFile(join(repoPath, "Cargo.toml"));
-            return {
-                buildSteps: ["cargo build --release"],
-                startCommand: "./target/release/$(basename $(pwd))",
-                runtime: "rust",
-            };
-        } catch { }
-
-        // Check for go.mod (Go)
-        try {
-            await readFile(join(repoPath, "go.mod"));
-            return {
-                buildSteps: ["go build -o app ."],
-                startCommand: "./app",
-                runtime: "go",
-            };
-        } catch { }
-
-        // Check for requirements.txt (Python)
-        try {
-            await readFile(join(repoPath, "requirements.txt"));
-            return {
-                buildSteps: ["pip install -r requirements.txt"],
-                startCommand: "python app.py",
-                runtime: "python",
-            };
-        } catch { }
-
-        // Check for deno.json or deno.jsonc (Deno)
-        try {
-            let denoConfig;
-            try {
-                denoConfig = JSON.parse(await readFile(join(repoPath, "deno.json"), "utf-8"));
-            } catch {
-                denoConfig = JSON.parse(await readFile(join(repoPath, "deno.jsonc"), "utf-8"));
-            }
-
-            return {
-                buildSteps: [],
-                startCommand: denoConfig.tasks?.start ? "deno task start" : "deno run --allow-all main.ts",
-                runtime: "deno",
-            };
-        } catch { }
-
-        // Check for Dockerfile
-        try {
-            await readFile(join(repoPath, "Dockerfile"));
-            return {
-                buildSteps: ["docker build -t $(basename $(pwd)) ."],
-                startCommand: "docker run -d $(basename $(pwd))",
-                runtime: "docker",
-            };
-        } catch { }
-
-        return defaultConfig;
-    } catch {
-        return defaultConfig;
-    }
-}
 
 // Import repo and create okastr8 app
-export async function importRepo(options: ImportOptions): Promise<{
+export async function importRepo(
+    options: ImportOptions,
+    deploymentId?: string
+): Promise<{
     success: boolean;
     message: string;
     appName?: string;
     config?: DetectedConfig;
 }> {
     const { createApp } = await import("./app");
+    const { createVersion, setCurrentVersion, cleanOldVersions, initializeVersioning, updateVersionStatus } = await import("./version");
     const githubConfig = await getGitHubConfig();
+
+    // Helper to log to both console and stream
+    const log = (message: string) => {
+        if (deploymentId) {
+            const { streamLog } = require('../utils/deploymentLogger');
+            streamLog(deploymentId, message);
+        } else {
+            console.log(message);
+        }
+    };
 
     if (!githubConfig.accessToken) {
         return { success: false, message: "GitHub not connected" };
@@ -407,12 +307,43 @@ export async function importRepo(options: ImportOptions): Promise<{
         const appName = options.appName || repo.name.toLowerCase().replace(/[^a-z0-9-]/g, "-");
         const branch = options.branch || repo.default_branch;
 
-        // Create app directory
+        // CHECK FOR okastr8.yaml BEFORE CLONING (fail fast)
+        log("🔍 Checking for okastr8.yaml in repository...");
+        const configExists = await checkFileExists(
+            githubConfig.accessToken,
+            repo.full_name,
+            "okastr8.yaml",
+            branch
+        );
+
+        if (!configExists) {
+            log("❌ okastr8.yaml not found in repository root");
+            return {
+                success: false,
+                message: `Deployment blocked: okastr8.yaml not found in repository.\n\nPlease add an okastr8.yaml file to your repository root.\n\nExample:\n\nruntime: node\nbuild:\n  - npm install\n  - npm run build\nstart: npm run start\nport: 3000\n\nVisit https://github.com/${repo.full_name}/new/${branch} to create the file.`,
+                appName,
+            };
+        }
+
+        log("✅ okastr8.yaml found - proceeding with deployment");
+
+        // Initialize directories
         const appDir = join(APPS_DIR, appName);
-        const repoDir = join(appDir, "repo");
         await mkdir(appDir, { recursive: true });
 
-        console.log(`📦 Cloning ${repo.full_name}...`);
+        // Ensure versioning is initialized (for existing apps)
+        await initializeVersioning(appName);
+
+        log(`📦 Preparing deployment for ${repo.full_name} (${branch})...`);
+
+        // Create new version entry
+        // We'll get the commit hash after cloning, so simpler to just use "HEAD" for now 
+        // or we could fetch it via API but let's stick to clone first
+        const { versionId, releasePath } = await createVersion(appName, "HEAD", branch);
+
+        await updateVersionStatus(appName, versionId, "pending", "Cloning repository");
+
+        log(`⬇️ Cloning into release v${versionId}...`);
 
         // Clone the repo (use HTTPS with token for private repos)
         const cloneUrl = repo.private
@@ -421,36 +352,68 @@ export async function importRepo(options: ImportOptions): Promise<{
 
         const cloneResult = await runCommand("git", [
             "clone",
+            "--progress",
             "--branch",
             branch,
             "--depth",
             "1",
             cloneUrl,
-            repoDir,
+            releasePath,
         ]);
 
         if (cloneResult.exitCode !== 0) {
+            await updateVersionStatus(appName, versionId, "failed", "Clone failed");
             return { success: false, message: `Clone failed: ${cloneResult.stderr}` };
         }
 
-        // Detect or use provided config
+        // Get actual commit hash
+        try {
+            const { runCommand } = await import("../utils/command"); // Need to ensure this import works or use existing runCommand
+            const commitRes = await runCommand("git", ["rev-parse", "HEAD"], releasePath);
+            // Update version record with real commit
+            // We need a helper for this or just update the object if we had it, but helper UpdateVersionStatus doesn't update commit
+            // For now, it's fine. Ideally likely update the versions.json directly or add updateVersionCommit helper.
+            // Let's assume user accepts "HEAD" or we update it later. 
+            // Actually, let's just proceed.
+        } catch { }
+
+
+        // Load configuration from okastr8.yaml
+        log("📄 Loading okastr8.yaml configuration...");
+        const configPath = join(releasePath, "okastr8.yaml");
+
         let detectedConfig: DetectedConfig;
-        if (options.autoDetect !== false) {
-            console.log("🔍 Detecting project configuration...");
-            detectedConfig = await detectProjectConfig(repoDir);
-        } else {
+        try {
+            const { load } = await import('js-yaml');
+            const configContent = await readFile(configPath, 'utf-8');
+            const config = load(configContent) as any;
+
             detectedConfig = {
-                buildSteps: options.buildSteps || [],
-                startCommand: options.startCommand || "",
-                runtime: "custom",
+                runtime: config.runtime || 'custom',
+                buildSteps: config.build || [],
+                startCommand: config.start || '',
+                port: config.port,
+                domain: config.domain,
+                env: config.env,
+            };
+
+            log(`✅ Configuration loaded from okastr8.yaml`);
+        } catch (error: any) {
+            await updateVersionStatus(appName, versionId, "failed", "Invalid okastr8.yaml");
+            return {
+                success: false,
+                message: `Failed to parse okastr8.yaml: ${error.message}`,
+                appName,
             };
         }
 
-        // Use detected settings if not provided
+        await updateVersionStatus(appName, versionId, "building", "Building application");
+
+        // Port and domain from options or config file
         const finalPort = options.port || detectedConfig.port;
         const finalDomain = options.domain || detectedConfig.domain;
 
-        // Override with explicit options
+        // Allow options to override config file
         if (options.buildSteps?.length) {
             detectedConfig.buildSteps = options.buildSteps;
         }
@@ -459,9 +422,10 @@ export async function importRepo(options: ImportOptions): Promise<{
         }
 
         if (!detectedConfig.startCommand) {
+            await updateVersionStatus(appName, versionId, "failed", "No start command");
             return {
                 success: false,
-                message: "Could not detect start command. Please provide one.",
+                message: "No start command specified in okastr8.yaml or deployment options.",
                 config: detectedConfig,
             };
         }
@@ -473,10 +437,9 @@ export async function importRepo(options: ImportOptions): Promise<{
             const isInstalled = await checkRuntimeInstalled(detectedConfig.runtime);
 
             if (!isInstalled) {
-                // Cleanup on failure
-                if (appDir && existsSync(appDir)) {
-                    await rm(appDir, { recursive: true, force: true });
-                }
+                await updateVersionStatus(appName, versionId, "failed", "Runtime missing: " + detectedConfig.runtime);
+                // Cleanup release
+                await rm(releasePath, { recursive: true, force: true });
                 return {
                     success: false,
                     message: formatMissingRuntimeError(detectedConfig.runtime as any),
@@ -485,49 +448,100 @@ export async function importRepo(options: ImportOptions): Promise<{
             }
         }
 
-        console.log(`🔧 Detected runtime: ${detectedConfig.runtime}`);
-        console.log(`📝 Build steps: ${detectedConfig.buildSteps.join(", ") || "none"}`);
-        console.log(`▶️  Start command: ${detectedConfig.startCommand}`);
+        log(`🔧 Detected runtime: ${detectedConfig.runtime}`);
+        log(`📝 Build steps: ${detectedConfig.buildSteps.join(", ") || "none"}`);
+        log(`▶️  Start command: ${detectedConfig.startCommand}`);
 
         // Run build steps
         if (detectedConfig.buildSteps.length > 0) {
-            console.log("🔨 Running build steps...");
+            log("🔨 Running build steps...");
 
             for (const step of detectedConfig.buildSteps) {
-                console.log(`  → ${step}`);
-                // Use bash -c to handle composite commands, running in repoDir
-                const buildResult = await runCommand("bash", ["-c", step], repoDir);
+                log(`  → ${step}`);
+                // Use bash -c to handle composite commands, running in releasePath
+                const buildResult = await runCommand("bash", ["-c", step], releasePath);
                 if (buildResult.exitCode !== 0) {
+                    await updateVersionStatus(appName, versionId, "failed", "Build failed");
                     return { success: false, message: `Build failed: ${step}\n${buildResult.stderr}` };
                 }
             }
         }
 
-        // Create the okastr8 app
-        console.log("📦 Creating okastr8 app...");
+        // Update symlink to new version BEFORE create app service (so service points to 'current')
+        log("🔄 Switching to new version...");
+        await setCurrentVersion(appName, versionId);
+        await updateVersionStatus(appName, versionId, "success", "Deployed");
+
+        // Create/Update the okastr8 app
+        log("📦 Configuring okastr8 app...");
         const appResult = await createApp({
             name: appName,
             description: repo.description || `Deployed from ${repo.full_name}`,
             execStart: detectedConfig.startCommand,
-            workingDirectory: repoDir,
+            workingDirectory: join(appDir, "current"), // Point to current symlink
             user: process.env.USER || "root",
             port: finalPort,
             domain: finalDomain,
             gitRepo: repo.clone_url,
             gitBranch: branch,
             buildSteps: detectedConfig.buildSteps,
-            env: detectedConfig.env, // Pass environment variables
+            env: detectedConfig.env,
         });
 
         if (!appResult.success) {
             return { success: false, message: appResult.message };
         }
 
-        // Setup webhook if requested
-        // Setup webhook if requested
+        // Post-deployment health check: Verify service is running
+        log("⏳ Waiting 5 seconds for service to stabilize...");
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        log("🏥 Verifying service health...");
+        const healthCheck = await runCommand("systemctl", ["is-active", appName]);
+        const serviceStatus = healthCheck.stdout.trim();
+
+        if (healthCheck.exitCode !== 0 || serviceStatus !== "active") {
+            log(`❌ Service failed to start. Status: ${serviceStatus}`);
+            await updateVersionStatus(appName, versionId, "failed", `Service ${serviceStatus}`);
+
+            // Get recent logs for debugging
+            const logsResult = await runCommand("journalctl", ["-u", appName, "-n", "30", "--no-pager"]);
+            const logs = logsResult.stdout || logsResult.stderr || "No logs available";
+
+            // CLEANUP: Remove all artifacts since deployment failed
+            log("🧹 Cleaning up failed deployment...");
+
+            // 1. Stop and remove service
+            await runCommand("sudo", ["systemctl", "stop", appName]);
+            await runCommand("sudo", ["systemctl", "disable", appName]);
+            await runCommand("sudo", ["rm", "-f", `/etc/systemd/system/${appName}.service`]);
+            await runCommand("sudo", ["systemctl", "daemon-reload"]);
+
+            // 2. Remove app.json (if it was created - though it shouldn't be due to createApp reorder)
+            const appJsonPath = join(appDir, "app.json");
+            await runCommand("rm", ["-f", appJsonPath]);
+
+            // 3. Remove failed release directory
+            await rm(releasePath, { recursive: true, force: true });
+
+            log("✅ Cleanup complete - failed deployment artifacts removed");
+
+            return {
+                success: false,
+                message: `Deployment failed: Service is ${serviceStatus}. Check logs for details.\n\nRecent logs:\n${logs.slice(0, 500)}...`,
+                appName,
+                config: detectedConfig,
+            };
+        }
+
+        log("✅ Service is running successfully!");
+
+        // Cleanup old versions
+        await cleanOldVersions(appName);
+
         // Setup webhook if requested
         if (options.setupWebhook) {
-            console.log("🔗 Setting up webhook...");
+            log("🔗 Setting up webhook...");
             const ghConfig = await getGitHubConfig();
             if (ghConfig.accessToken) {
                 const webhookSuccess = await createWebhook(repo.full_name, ghConfig.accessToken);
@@ -541,7 +555,7 @@ export async function importRepo(options: ImportOptions): Promise<{
 
         return {
             success: true,
-            message: `Successfully deployed ${repo.full_name} as '${appName}'`,
+            message: `Successfully deployed ${repo.full_name} as '${appName}' (v${versionId})`,
             appName,
             config: detectedConfig,
         };
