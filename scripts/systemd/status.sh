@@ -8,7 +8,7 @@ if [ -z "$1" ]; then
 fi
 
 SERVICE_NAME="$1"
-SERVICE_FILE="/etc/systemd/system/okastr8/${SERVICE_NAME}.service"
+SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
 # Check if the service file exists
 if [ ! -f "$SERVICE_FILE" ]; then

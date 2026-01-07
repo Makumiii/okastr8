@@ -10,7 +10,9 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@types/js-yaml": "^4.0.9",
     "commander": "^14.0.0",
-    "hono": "^4.8.5"
+    "hono": "^4.8.5",
+    "js-yaml": "^4.1.1"
   }
 }

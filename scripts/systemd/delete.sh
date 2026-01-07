@@ -8,7 +8,7 @@ if [ -z "$1" ]; then
 fi
 
 SERVICE_NAME=$1
-SERVICE_FILE="/etc/systemd/system/okastr8/${SERVICE_NAME}.service"
+SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
 echo "Stopping ${SERVICE_NAME}..."
 systemctl stop "${SERVICE_NAME}"

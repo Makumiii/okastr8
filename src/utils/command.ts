@@ -6,7 +6,7 @@ interface CommandResult {
   exitCode: number | null;
 }
 
-export async function runCommand(command: string, args: string[] = []): Promise<CommandResult> {
+export async function runCommand(command: string, args: string[] = [], cwd?: string): Promise<CommandResult> {
   let cmdToExecute: string;
   let argsToExecute: string[];
 
@@ -21,6 +21,7 @@ export async function runCommand(command: string, args: string[] = []): Promise<
   return new Promise((resolve, reject) => {
     const child = spawn(cmdToExecute, argsToExecute, {
       stdio: ['inherit', 'pipe', 'pipe'], // stdin, stdout, stderr
+      cwd, // Pass the working directory
     });
 
     let stdout = '';

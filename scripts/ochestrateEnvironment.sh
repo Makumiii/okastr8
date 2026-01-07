@@ -1,28 +1,20 @@
 #!/usr/bin/env bash
 set -eou pipefail
 
-# Check for jq
-if ! command -v jq &> /dev/null; then
-  echo "Error: jq is required but not installed." >&2
+# Check for bun
+if ! command -v bun &> /dev/null; then
+  echo "Error: bun is required but not installed." >&2
   exit 1
 fi
 
-# Hardcoded path to the environment JSON file
-ENV_JSON_PATH="$HOME/.okastr8/environment.json"
+SCRIPT_DIR="$(dirname "$0")"
+READ_CONFIG="$SCRIPT_DIR/read_config.ts"
 
-# Check if the file exists
-if [ ! -f "$ENV_JSON_PATH" ]; then
-  echo "Error: Environment JSON file not found at ${ENV_JSON_PATH}" >&2
-  exit 1
-fi
-
-echo "📄 Reading environment configuration from ${ENV_JSON_PATH}"
-
-# Extract values using jq
-CREATE_USER_USERNAME=$(jq -r '.createUser.userName // empty' "$ENV_JSON_PATH")
-CREATE_USER_PASSWORD=$(jq -r '.createUser.passWord // empty' "$ENV_JSON_PATH")
-CREATE_USER_DISTRO=$(jq -r '.createUser.distro // empty' "$ENV_JSON_PATH")
-CHANGE_SSH_PORT_PORT=$(jq -r '.changeSSHPort.port // empty' "$ENV_JSON_PATH")
+# Extract values using bun script
+CREATE_USER_USERNAME=$(bun "$READ_CONFIG" setup.user.username)
+CREATE_USER_PASSWORD=$(bun "$READ_CONFIG" setup.user.password)
+CREATE_USER_DISTRO=$(bun "$READ_CONFIG" setup.user.distro)
+CHANGE_SSH_PORT_PORT=$(bun "$READ_CONFIG" setup.ssh.port)
 
 # Check that all required values were found
 if [[ -z "$CREATE_USER_USERNAME" || -z "$CREATE_USER_PASSWORD" || -z "$CREATE_USER_DISTRO" || -z "$CHANGE_SSH_PORT_PORT" ]]; then

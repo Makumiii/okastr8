@@ -218,15 +218,13 @@
                 <li>Set Homepage URL: <code id="homepage-url">http://localhost:8788</code></li>
                 <li>Set Callback URL: <code id="callback-url">http://localhost:8788/api/github/callback</code></li>
                 <li>Copy Client ID and Client Secret</li>
-                <li>Add to <code>~/.okastr8/config.json</code>:
+                <li>Add to <code>~/.okastr8/system.yaml</code>:
                     <pre
                         style="background: #24292e; color: #f6f8fa; padding: 10px; border-radius: 4px; overflow-x: auto;">
-{
-  "github": {
-    "clientId": "YOUR_CLIENT_ID",
-    "clientSecret": "YOUR_CLIENT_SECRET"
-  }
-}</pre>
+manager:
+  github:
+    client_id: YOUR_CLIENT_ID
+    client_secret: YOUR_CLIENT_SECRET</pre>
                 </li>
                 <li>Restart the server and refresh this page</li>
             </ol>
@@ -260,19 +258,33 @@
                 <input type="text" id="deploy-app-name" name="appName" placeholder="my-app (auto-generated if empty)">
 
                 <label>Branch</label>
-                <input type="text" id="deploy-branch" name="branch" placeholder="main (uses default)">
+                <select id="deploy-branch" name="branch"
+                    style="width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #ccc;">
+                    <option>Loading...</option>
+                </select>
 
-                <label>Port (optional)</label>
-                <input type="number" id="deploy-port" name="port" placeholder="3000">
+                <div id="config-check-status"
+                    style="margin-bottom: 15px; padding: 10px; border-radius: 6px; display: none;"></div>
 
-                <label>Domain (optional, for Caddy)</label>
-                <input type="text" id="deploy-domain" name="domain" placeholder="myapp.example.com">
+                <div id="manual-config-section">
+                    <label>Port (optional)</label>
+                    <input type="number" id="deploy-port" name="port" placeholder="3000">
 
-                <label>Start Command (leave empty to auto-detect)</label>
-                <input type="text" id="deploy-start" name="startCommand" placeholder="npm run start">
+                    <label>Domain (optional, for Caddy)</label>
+                    <input type="text" id="deploy-domain" name="domain" placeholder="myapp.example.com">
 
-                <label>Build Steps (one per line, optional)</label>
-                <textarea id="deploy-build" name="buildSteps" placeholder="npm install&#10;npm run build"></textarea>
+                    <label>Start Command (leave empty to auto-detect)</label>
+                    <input type="text" id="deploy-start" name="startCommand" placeholder="npm run start">
+
+                    <label>Build Steps (one per line, optional)</label>
+                    <textarea id="deploy-build" name="buildSteps"
+                        placeholder="npm install&#10;npm run build"></textarea>
+                </div>
+
+                <label style="display:flex; align-items:center; gap:8px; margin-top:10px;">
+                    <input type="checkbox" id="deploy-webhook" name="setupWebhook" checked>
+                    Enable Auto-Deploy (Webhook)
+                </label>
 
                 <div style="margin-top: 15px; display: flex; gap: 10px;">
                     <button type="submit" class="btn btn-primary">🚀 Deploy</button>
@@ -499,13 +511,65 @@
         });
 
         // Deploy modal
-        function openDeployModal(repoFullName, repoName, defaultBranch) {
+        async function openDeployModal(repoFullName, repoName, defaultBranch) {
             document.getElementById('deploy-repo-name').value = repoFullName;
             document.getElementById('deploy-app-name').value = repoName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-            document.getElementById('deploy-branch').value = defaultBranch;
+
+            const branchSelect = document.getElementById('deploy-branch');
+            branchSelect.innerHTML = '<option>Loading...</option>';
             document.getElementById('deploy-result').innerHTML = '';
             document.getElementById('deploy-modal').classList.add('active');
+
+            // Load Branches
+            try {
+                const res = await apiPost('/github/branches', { repoFullName });
+                if (res.success && res.data.branches?.length) {
+                    branchSelect.innerHTML = res.data.branches.map(b =>
+                        `<option value="${b}" ${b === defaultBranch ? 'selected' : ''}>${b}</option>`
+                    ).join('');
+                } else {
+                    branchSelect.innerHTML = `<option value="${defaultBranch}">${defaultBranch}</option>`;
+                }
+            } catch (e) {
+                console.error("Failed to load branches", e);
+                branchSelect.innerHTML = `<option value="${defaultBranch}">${defaultBranch}</option>`;
+            }
+
+            // Trigger Config Check
+            checkConfiguration(repoFullName, branchSelect.value);
+
+            // Add listener for branch change
+            branchSelect.onchange = () => checkConfiguration(repoFullName, branchSelect.value);
         }
+
+        async function checkConfiguration(repoFullName, branch) {
+            const statusDiv = document.getElementById('config-check-status');
+            const manualSection = document.getElementById('manual-config-section');
+
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '⏳ Checking for configuration...';
+            statusDiv.style.background = '#f6f8fa';
+            statusDiv.style.color = '#586069';
+
+            try {
+                const res = await apiPost('/github/check-config', { repoFullName, ref: branch });
+                if (res.success && res.data.hasConfig) {
+                    statusDiv.innerHTML = '✅ <strong>okastr8.yaml found!</strong> Using configuration from repository.';
+                    statusDiv.style.background = '#dcffe4';
+                    statusDiv.style.color = '#155225';
+                    manualSection.style.display = 'none';
+                } else {
+                    statusDiv.innerHTML = '⚠️ <strong>No config found.</strong> Please configure manually below:';
+                    statusDiv.style.background = '#fff5b1';
+                    statusDiv.style.color = '#735c0f';
+                    manualSection.style.display = 'block';
+                }
+            } catch (e) {
+                statusDiv.innerHTML = '⚠️ Could not check config status.';
+                manualSection.style.display = 'block';
+            }
+        }
+
 
         document.getElementById('cancel-deploy').addEventListener('click', () => {
             document.getElementById('deploy-modal').classList.remove('active');
@@ -530,6 +594,7 @@
                     domain: formData.get('domain') || undefined,
                     startCommand: formData.get('startCommand') || undefined,
                     buildSteps: buildSteps,
+                    setupWebhook: document.getElementById('deploy-webhook').checked,
                 });
 
                 if (res.success) {

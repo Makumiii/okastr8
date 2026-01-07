@@ -18,7 +18,10 @@ DEBIAN_PACKAGES=(
   curl
   git
   ufw
-  jq
+  git
+  ufw
+  unzip
+  gnupg
   unzip
   gnupg
   xclip # For copying ngrok URL to clipboard
@@ -28,7 +31,9 @@ FEDORA_PACKAGES=(
   curl
   git
   firewalld
-  jq
+  firewalld
+  unzip
+  gnupg2
   unzip
   gnupg2
   xclip # For copying ngrok URL to clipboard
@@ -46,6 +51,29 @@ if [[ "$USE_FEDORA" == true ]]; then
 else
   sudo apt update
   sudo apt install -y "${DEBIAN_PACKAGES[@]}"
+  sudo apt update
+  sudo apt install -y "${DEBIAN_PACKAGES[@]}"
+fi
+
+# --- Install Bun First ---
+echo "🔧 Setting up Bun..."
+if ! command -v bun &> /dev/null; then
+  echo "Bun installing..."
+  yes | curl -fsSL https://bun.sh/install | bash
+  # Manually add to path for current session
+  export BUN_INSTALL="$HOME/.bun"
+  export PATH="$BUN_INSTALL/bin:$PATH"
+fi
+
+# Move bun binary to /usr/local/bin so sudo can see it
+BUN_SOURCE="$HOME/.bun/bin/bun"
+BUN_TARGET="/usr/local/bin/bun"
+if [ -f "$BUN_SOURCE" ]; then
+  if [ ! -f "$BUN_TARGET" ]; then
+     echo "Moving Bun to /usr/local/bin..."
+     sudo mv "$BUN_SOURCE" "$BUN_TARGET"
+     sudo chmod +x "$BUN_TARGET"
+  fi
 fi
 
 # --- Caddy Installation ---
@@ -171,54 +199,23 @@ else
 fi
 
 # Configure Ngrok authtoken from config.json
-echo "Configuring Ngrok authtoken from $CONFIG_FILE..."
-if [ -f "$CONFIG_FILE" ]; then
-  if ! command -v jq &> /dev/null; then
-    echo "Error: jq is required to read authtoken from config.json. Please install it." >&2
-  else
-    AUTHTOKEN=$(jq -r '.networking.ngrok.authToken // ""' "$CONFIG_FILE")
-    if [ -n "$AUTHTOKEN" ]; then
-      ngrok config add-authtoken "$AUTHTOKEN"
-      echo "Ngrok authtoken configured successfully."
-    else
-      echo "Warning: Ngrok authtoken not found in $CONFIG_FILE. Ngrok will run unauthenticated." >&2
-      echo "To persist your ngrok configuration, add your authtoken to networking.ngrok.authToken in $CONFIG_FILE." >&2
-      echo "Get your authtoken from: https://dashboard.ngrok.com/get-started/setup" >&2
-    fi
-  fi
+# Configure Ngrok authtoken from system.yaml
+SCRIPT_DIR="$(dirname "$0")"
+READ_CONFIG="$SCRIPT_DIR/read_config.ts"
+
+echo "Configuring Ngrok authtoken..."
+# We now use bun to read the config
+AUTHTOKEN=$(bun "$READ_CONFIG" tunnel.auth_token)
+
+if [ -n "$AUTHTOKEN" ]; then
+  ngrok config add-authtoken "$AUTHTOKEN"
+  echo "Ngrok authtoken configured successfully."
 else
-  echo "Warning: Config file not found at $CONFIG_FILE. Ngrok authtoken cannot be configured." >&2
-  echo "Ngrok will run unauthenticated. Please create $CONFIG_FILE and add your authtoken." >&2
-  echo "Get your authtoken from: https://dashboard.ngrok.com/get-started/setup" >&2
+  echo "Warning: Ngrok authtoken not found in system.yaml. Ngrok will run unauthenticated." >&2
 fi
 
 # --- Setup bun ---
-echo "🔧 Setting up Bun..."
-
-if ! command -v bun &> /dev/null; then
-  echo "Bun not found. Installing Bun..."
-  yes | curl -fsSL https://bun.com/install | bash
-fi
-
-# Move bun binary to /usr/local/bin if it's not already there
-BUN_SOURCE="$HOME/.bun/bin/bun"
-BUN_TARGET="/usr/local/bin/bun"
-
-echo "performing bun chores"
-
-if [ -f "$BUN_SOURCE" ]; then
-  if [ ! -f "$BUN_TARGET" ]; then
-    echo "Moving Bun to /usr/local/bin..."
-    sudo mv "$BUN_SOURCE" "$BUN_TARGET"
-    sudo chmod +x "$BUN_TARGET"
-    echo "✅ Bun moved to /usr/local/bin successfully."
-  else
-    echo "ℹ️ Bun already exists in /usr/local/bin."
-  fi
-  sudo restorecon -v "$BUN_TARGET"  # Restore SELinux context if applicable
-else
-  echo "❌ Error: Bun binary not found at $BUN_SOURCE."
-fi
+# Bun setup moved to start of script
 
 # --- Firewall Rules ---
 echo "🛡 Setting up firewall..."

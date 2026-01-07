@@ -2,37 +2,22 @@ import { Hono } from 'hono';
 import { serveStatic } from 'hono/bun';
 import api from './api';
 import { homedir } from 'os';
-import { readFile, writeFile, mkdir } from 'fs/promises';
-import { join } from 'path';
 import { randomBytes } from 'crypto';
-
-const CONFIG_PATH = join(homedir(), '.okastr8', 'config.json');
+import { getSystemConfig, saveSystemConfig } from './config';
 
 // Load API key from config
 async function getApiKey(): Promise<string | null> {
-  try {
-    const content = await readFile(CONFIG_PATH, 'utf-8');
-    const config = JSON.parse(content);
-    return config.apiKey || null;
-  } catch {
-    return null;
-  }
+  const config = await getSystemConfig();
+  return config.manager?.api_key || null;
 }
 
 // Generate a new API key
 async function generateApiKey(): Promise<string> {
   const apiKey = randomBytes(32).toString('hex');
   try {
-    let config: any = {};
-    try {
-      const content = await readFile(CONFIG_PATH, 'utf-8');
-      config = JSON.parse(content);
-    } catch {
-      // File doesn't exist or is invalid
-      await mkdir(join(homedir(), '.okastr8'), { recursive: true });
-    }
-    config.apiKey = apiKey;
-    await writeFile(CONFIG_PATH, JSON.stringify(config, null, 2));
+    await saveSystemConfig({
+      manager: { api_key: apiKey }
+    });
     return apiKey;
   } catch (error) {
     console.error('Failed to save API key:', error);

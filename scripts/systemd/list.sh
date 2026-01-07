@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eou pipefail
 
-OKASTR8_DIR="/etc/systemd/system/okastr8"
+OKASTR8_DIR="/etc/systemd/system"
 
 if [ ! -d "$OKASTR8_DIR" ]; then
   echo "Directory not found: ${OKASTR8_DIR}"

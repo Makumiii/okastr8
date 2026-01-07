@@ -23,7 +23,7 @@ WANTED_BY=$6
 AUTO_START=${7:-true}  # Defaults to true if not provided
 
 # --- Unit File Path ---
-OKASTR8_DIR="/etc/systemd/system/okastr8"
+OKASTR8_DIR="/etc/systemd/system"
 mkdir -p "$OKASTR8_DIR"
 UNIT_FILE="$OKASTR8_DIR/$SERVICE_NAME.service"
 

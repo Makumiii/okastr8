@@ -1,0 +1,33 @@
+# SCOPE: System Level. Located at ~/.okastr8/system.yaml
+# Manages infrastructure setup, authentication, and external access.
+
+setup:
+  # Installer / Bootstrap settings
+  user:
+    username: deploy
+    # Password set during install or manually
+    distro: debian
+  ssh:
+    port: 2222
+  firewall:
+    allowed_ports: [80, 443, 2222]
+
+manager:
+  # Runtime settings
+  port: 8788
+  api_key: "your-generated-secret-key"
+  
+  github:
+    client_id: "Ov23..."
+    client_secret: "a623..."
+    # Access token is auto-filled after login
+    access_token: ""
+    username: ""
+
+tunnel:
+  # External access via ngrok/cloudflare
+  enabled: true
+  service: manager
+  port: 8788
+  url: "https://your-app.ngrok-free.app"
+  auth_token: "your-ngrok-token"

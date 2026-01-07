@@ -7,7 +7,7 @@ if [ -z "$1" ]; then
 fi
 
 SERVICE_NAME=$1
-SERVICE_FILE="/etc/systemd/system/okastr8/${SERVICE_NAME}.service"
+SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 
 if [ ! -f "$SERVICE_FILE" ]; then
   echo "Error: Service file not found at ${SERVICE_FILE}"

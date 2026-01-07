@@ -3,13 +3,13 @@ import { fileURLToPath } from "url";
 import { homedir } from "os";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { runCommand } from "../utils/command";
+import { randomBytes } from "crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, "..", "..");
 
 const OKASTR8_HOME = join(homedir(), ".okastr8");
-const CONFIG_FILE = join(OKASTR8_HOME, "config.json");
 const APPS_DIR = join(OKASTR8_HOME, "apps");
 
 // GitHub API base URL
@@ -51,29 +51,34 @@ export interface ImportOptions {
 }
 
 // Config helpers
-async function getConfig(): Promise<any> {
-    try {
-        const content = await readFile(CONFIG_FILE, "utf-8");
-        return JSON.parse(content);
-    } catch {
-        return {};
-    }
-}
-
-async function saveConfig(config: any): Promise<void> {
-    await mkdir(OKASTR8_HOME, { recursive: true });
-    await writeFile(CONFIG_FILE, JSON.stringify(config, null, 2));
-}
+// Config helpers
+// Note: We now use the Unified Config Manager
+import { getSystemConfig, saveSystemConfig } from "../config";
 
 export async function getGitHubConfig(): Promise<GitHubConfig> {
-    const config = await getConfig();
-    return config.github || {};
+    const config = await getSystemConfig();
+    const gh = config.manager?.github || {};
+    return {
+        clientId: gh.client_id,
+        clientSecret: gh.client_secret,
+        accessToken: gh.access_token,
+        username: gh.username,
+        connectedAt: gh.connected_at
+    };
 }
 
 export async function saveGitHubConfig(github: GitHubConfig): Promise<void> {
-    const config = await getConfig();
-    config.github = { ...config.github, ...github };
-    await saveConfig(config);
+    // We only update the runtime parts (access token, username)
+    // Client ID/Secret are managed via system.yaml directly by user
+    await saveSystemConfig({
+        manager: {
+            github: {
+                access_token: github.accessToken,
+                username: github.username,
+                connected_at: github.connectedAt
+            }
+        }
+    });
 }
 
 // OAuth Functions
@@ -184,12 +189,61 @@ export async function getRepo(
     return (await response.json()) as GitHubRepo;
 }
 
+export async function listBranches(accessToken: string, fullName: string): Promise<string[]> {
+    const branches: string[] = [];
+    let page = 1;
+    const perPage = 100;
+
+    while (true) {
+        const response = await fetch(`${GITHUB_API}/repos/${fullName}/branches?per_page=${perPage}&page=${page}`, {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                Accept: "application/vnd.github.v3+json",
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch branches: ${response.statusText}`);
+        }
+
+        const data = await response.json() as any[];
+        if (data.length === 0) break;
+
+        branches.push(...data.map(b => b.name));
+
+        if (data.length < perPage) break;
+        page++;
+    }
+
+    return branches;
+}
+
+export async function checkRepoConfig(accessToken: string, fullName: string, ref: string): Promise<boolean> {
+    // Check for okastr8.yaml, okastr8.yml, or okastr8.json
+    const files = ["okastr8.yaml", "okastr8.yml", "okastr8.json"];
+
+    for (const file of files) {
+        // Use contents API to check existence. Metadata request (HEAD) is not standard for API
+        const response = await fetch(`${GITHUB_API}/repos/${fullName}/contents/${file}?ref=${encodeURIComponent(ref)}`, {
+            method: "HEAD", // HEAD works for contents if we just want existence? No, API usually returns 404
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                Accept: "application/vnd.github.v3+json",
+            },
+        });
+
+        if (response.ok) return true;
+    }
+    return false;
+}
+
 // Auto-detection for build configs
 export interface DetectedConfig {
     buildSteps: string[];
     startCommand: string;
     runtime: string;
     port?: number;
+    domain?: string;
     env?: Record<string, string>;
 }
 
@@ -201,21 +255,31 @@ export async function detectProjectConfig(repoPath: string): Promise<DetectedCon
     };
 
     try {
-        // 1. Check for okastr8.json or app.json
-        const configFiles = ["okastr8.json", "app.json"];
+        // 1. Check for yaml/json configs
+        const configFiles = ["okastr8.yaml", "okastr8.yml", "okastr8.json", "app.yaml", "app.json"];
         for (const file of configFiles) {
             try {
                 const configPath = join(repoPath, file);
                 const content = await readFile(configPath, "utf-8");
-                const config = JSON.parse(content);
+
+                let config: any;
+                if (file.endsWith('.yaml') || file.endsWith('.yml')) {
+                    // Dynamic import needed if context requires, or just use import at top level
+                    // Since we're in Bun, we can rely on our existing ConfigManager logic or just import
+                    const { load } = await import('js-yaml');
+                    config = load(content);
+                } else {
+                    config = JSON.parse(content);
+                }
 
                 // Validate minimal config
-                if (config.build || config.start) {
+                if (config && (config.build || config.start)) {
                     return {
                         buildSteps: Array.isArray(config.build) ? config.build : (config.build ? [config.build] : []),
                         startCommand: config.start || "",
                         runtime: "config-file",
                         port: config.port,
+                        domain: config.domain,
                         env: config.env
                     };
                 }
@@ -365,8 +429,9 @@ export async function importRepo(options: ImportOptions): Promise<{
             };
         }
 
-        // Use detected port if not provided
+        // Use detected settings if not provided
         const finalPort = options.port || detectedConfig.port;
+        const finalDomain = options.domain || detectedConfig.domain;
 
         // Override with explicit options
         if (options.buildSteps?.length) {
@@ -391,19 +456,15 @@ export async function importRepo(options: ImportOptions): Promise<{
         // Run build steps
         if (detectedConfig.buildSteps.length > 0) {
             console.log("🔨 Running build steps...");
-            const originalDir = process.cwd();
-            process.chdir(repoDir);
 
             for (const step of detectedConfig.buildSteps) {
                 console.log(`  → ${step}`);
-                const buildResult = await runCommand("bash", ["-c", step]);
+                // Use bash -c to handle composite commands, running in repoDir
+                const buildResult = await runCommand("bash", ["-c", step], repoDir);
                 if (buildResult.exitCode !== 0) {
-                    process.chdir(originalDir);
                     return { success: false, message: `Build failed: ${step}\n${buildResult.stderr}` };
                 }
             }
-
-            process.chdir(originalDir);
         }
 
         // Create the okastr8 app
@@ -415,9 +476,10 @@ export async function importRepo(options: ImportOptions): Promise<{
             workingDirectory: repoDir,
             user: process.env.USER || "root",
             port: finalPort,
-            domain: options.domain,
+            domain: finalDomain,
             gitRepo: repo.clone_url,
             gitBranch: branch,
+            buildSteps: detectedConfig.buildSteps,
             env: detectedConfig.env, // Pass environment variables
         });
 
@@ -426,9 +488,19 @@ export async function importRepo(options: ImportOptions): Promise<{
         }
 
         // Setup webhook if requested
+        // Setup webhook if requested
+        // Setup webhook if requested
         if (options.setupWebhook) {
             console.log("🔗 Setting up webhook...");
-            // Webhook setup will be implemented separately
+            const ghConfig = await getGitHubConfig();
+            if (ghConfig.accessToken) {
+                const webhookSuccess = await createWebhook(repo.full_name, ghConfig.accessToken);
+                if (!webhookSuccess) {
+                    console.warn("⚠️ Webhook setup failed. You can create it manually.");
+                }
+            } else {
+                console.warn("⚠️ Cannot setup webhook: No GitHub token found.");
+            }
         }
 
         return {
@@ -443,12 +515,18 @@ export async function importRepo(options: ImportOptions): Promise<{
 }
 
 // Disconnect GitHub
+// Disconnect GitHub
 export async function disconnectGitHub(): Promise<void> {
-    const config = await getConfig();
-    delete config.github?.accessToken;
-    delete config.github?.username;
-    delete config.github?.connectedAt;
-    await saveConfig(config);
+    // Reset runtime github data, keep client ID/Secret
+    await saveSystemConfig({
+        manager: {
+            github: {
+                access_token: undefined,
+                username: undefined,
+                connected_at: undefined
+            }
+        }
+    });
 }
 
 // Check connection status
@@ -466,4 +544,87 @@ export async function getConnectionStatus(): Promise<{
         };
     }
     return { connected: false };
+}
+
+// Webhook Helpers
+export async function ensureWebhookSecret(): Promise<string> {
+    const config = await getSystemConfig();
+    if (config.manager?.github?.webhook_secret) {
+        return config.manager.github.webhook_secret;
+    }
+
+    // Generate new secret
+    const secret = randomBytes(32).toString('hex');
+    await saveSystemConfig({
+        manager: {
+            github: { webhook_secret: secret }
+        }
+    });
+    return secret;
+}
+
+export async function createWebhook(repoFullName: string, accessToken: string): Promise<boolean> {
+    try {
+        const config = await getSystemConfig();
+        const baseUrl = config.tunnel?.url;
+
+        if (!baseUrl) {
+            console.error("Cannot create webhook: Tunnel URL not configured in system.yaml (tunnel.url)");
+            return false;
+        }
+
+        const webhookUrl = `${baseUrl}/api/github/webhook`;
+        const secret = await ensureWebhookSecret();
+
+        // Check existing hooks
+        const hooksRes = await fetch(`${GITHUB_API}/repos/${repoFullName}/hooks`, {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                Accept: "application/vnd.github.v3+json"
+            }
+        });
+
+        if (hooksRes.ok) {
+            const hooks = await hooksRes.json() as any[];
+            const exists = hooks.find((h: any) => h.config.url === webhookUrl);
+            if (exists) {
+                console.log("Webhook already exists");
+                return true;
+            }
+        }
+
+        console.log(`Creating webhook for ${webhookUrl}...`);
+
+        // Create Hook
+        const res = await fetch(`${GITHUB_API}/repos/${repoFullName}/hooks`, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                name: "web",
+                active: true,
+                events: ["push"],
+                config: {
+                    url: webhookUrl,
+                    content_type: "json",
+                    secret: secret,
+                    insecure_ssl: "0"
+                }
+            })
+        });
+
+        if (!res.ok) {
+            const err = await res.text();
+            console.error("Failed to create webhook:", err);
+            return false;
+        }
+
+        console.log("✅ Webhook created successfully");
+        return true;
+    } catch (e) {
+        console.error("Webhook creation error:", e);
+        return false;
+    }
 }

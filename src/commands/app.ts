@@ -15,8 +15,6 @@ const PROJECT_ROOT = join(__dirname, "..", "..");
 // App directory structure
 const OKASTR8_HOME = join(homedir(), ".okastr8");
 const APPS_DIR = join(OKASTR8_HOME, "apps");
-const CONFIG_FILE = join(OKASTR8_HOME, "config.json");
-const DEPLOYMENT_FILE = join(OKASTR8_HOME, "deployment.json");
 
 // Systemd scripts
 const SYSTEMD_SCRIPTS = {
@@ -41,6 +39,7 @@ export interface AppConfig {
     domain?: string;
     gitRepo?: string;
     gitBranch?: string;
+    buildSteps?: string[];
     env?: Record<string, string>;
 }
 
@@ -113,11 +112,11 @@ WantedBy=multi-user.target
         );
 
         // Use the create script to install the service
-        // Pass unit file content path instead of params since we now have env vars which script might not handle
-        // For now, we'll write the unit file directly to /etc/systemd/system/ (requires sudo)
-        // OR we can update the create script. simpler: just use "sudo cp" since we already generated the valid unit file.
+        // Deploy to standard /etc/systemd/system/ directory
+        // Services are identified by okastr8- prefix (e.g., okastr8-myapp.service)
+        const SYSTEMD_DIR = "/etc/systemd/system";
 
-        const result = await runCommand("sudo", ["cp", unitFilePath, `/etc/systemd/system/${config.name}.service`]);
+        const result = await runCommand("sudo", ["cp", unitFilePath, `${SYSTEMD_DIR}/${config.name}.service`]);
 
         if (result.exitCode === 0) {
             await runCommand("sudo", ["systemctl", "daemon-reload"]);
@@ -257,6 +256,66 @@ export async function restartApp(appName: string) {
         success: result.exitCode === 0,
         message: result.stdout || result.stderr,
     };
+}
+
+export async function getAppMetadata(appName: string): Promise<AppConfig & { repoDir: string }> {
+    const appDir = join(APPS_DIR, appName);
+    const metadataPath = join(appDir, "app.json");
+    try {
+        const content = await readFile(metadataPath, "utf-8");
+        return JSON.parse(content);
+    } catch {
+        throw new Error(`App ${appName} not found or corrupted`);
+    }
+}
+
+export async function updateApp(appName: string) {
+    try {
+        const metadata = await getAppMetadata(appName);
+
+        if (!metadata.gitRepo || !metadata.repoDir) {
+            throw new Error("Not a git-linked application");
+        }
+
+        console.log(`📡 Updating ${appName} from git...`);
+
+        // 1. Git Pull
+        const pullResult = await runCommand("git", ["pull"], metadata.repoDir);
+        if (pullResult.exitCode !== 0) {
+            throw new Error(`Git pull failed: ${pullResult.stderr}`);
+        }
+        if (pullResult.stdout.includes("Already up to date")) {
+            return { success: true, message: "Already up to date" };
+        }
+
+        // 2. Build Steps
+        if (metadata.buildSteps && metadata.buildSteps.length > 0) {
+            console.log(`🔨 Running build steps for ${appName}...`);
+            for (const step of metadata.buildSteps) {
+                // Split command and args (naive splitting, assumes 'npm install', etc)
+                // For safety/simplicity let's use the shell via runCommand? 
+                // runCommand uses execFile style [cmd, args].
+                // We'll trust our simple parser or just run via bun shell if needed.
+                // Let's assume standard "cmd arg1 arg2" format.
+                if (!step.trim()) continue;
+                console.log(`🔨 Running build step: ${step}`);
+
+                // Use bash -c to handle composite commands (like 'npm install && npm run build')
+                const buildRes = await runCommand("bash", ["-c", step], metadata.repoDir);
+                if (buildRes.exitCode !== 0) {
+                    throw new Error(`Build step '${step}' failed: ${buildRes.stderr}`);
+                }
+            }
+        }
+
+        // 3. Restart Service
+        await restartApp(appName);
+
+        return { success: true, message: "App updated and restarted successfully" };
+    } catch (error) {
+        console.error(`Error updating app ${appName}:`, error);
+        throw error;
+    }
 }
 
 // Commander Integration

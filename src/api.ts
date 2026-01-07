@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { createHmac, timingSafeEqual } from 'crypto';
 import {
     createUser,
     deleteUser,
@@ -587,6 +588,36 @@ api.get('/github/repos', async (c) => {
     }
 });
 
+api.post('/github/branches', async (c) => {
+    try {
+        const { getGitHubConfig, listBranches } = await import('./commands/github');
+        const config = await getGitHubConfig();
+        if (!config.accessToken) return c.json(apiResponse(false, 'Not connected'));
+
+        const { repoFullName } = await c.req.json();
+        const branches = await listBranches(config.accessToken, repoFullName);
+        return c.json(apiResponse(true, 'Branches fetched', { branches }));
+    } catch (error: any) {
+        console.error("API /github/branches Error:", error);
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
+api.post('/github/check-config', async (c) => {
+    try {
+        const { getGitHubConfig, checkRepoConfig } = await import('./commands/github');
+        const config = await getGitHubConfig();
+        if (!config.accessToken) return c.json(apiResponse(false, 'Not connected'));
+
+        const { repoFullName, ref } = await c.req.json();
+        const hasConfig = await checkRepoConfig(config.accessToken, repoFullName, ref);
+        return c.json(apiResponse(true, 'Check complete', { hasConfig }));
+    } catch (error: any) {
+        console.error("API /github/check-config Error:", error);
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
 api.post('/github/import', async (c) => {
     console.log('API: /github/import hit');
     try {
@@ -612,6 +643,92 @@ api.post('/github/disconnect', async (c) => {
     } catch (error: any) {
         console.error('API: /github/disconnect error:', error);
         return c.json(apiResponse(false, error.message || 'Internal Server Error'));
+    }
+});
+
+// GitHub Webhook Handler
+api.post('/github/webhook', async (c) => {
+    try {
+        const { getSystemConfig } = await import('./config');
+        const { listApps, updateApp } = await import('./commands/app');
+
+        const config = await getSystemConfig();
+        const secret = config.manager?.github?.webhook_secret;
+
+        if (!secret) {
+            return c.text('Webhook secret not configured', 500);
+        }
+
+        const signature = c.req.header('X-Hub-Signature-256');
+        if (!signature) {
+            return c.text('Signature missing', 401);
+        }
+
+        const payload = await c.req.text();
+
+        // Verify Signature
+        const hmac = createHmac('sha256', secret);
+        const digest = 'sha256=' + hmac.update(payload).digest('hex');
+
+        const sigBuffer = Buffer.from(signature);
+        const digestBuffer = Buffer.from(digest);
+
+        if (sigBuffer.length !== digestBuffer.length || !timingSafeEqual(sigBuffer, digestBuffer)) {
+            console.error('Webhook signature mismatch');
+            return c.text('Invalid signature', 401);
+        }
+
+        const event = JSON.parse(payload);
+
+        // Only handle push events for now
+        const githubEvent = c.req.header('X-GitHub-Event');
+        if (githubEvent !== 'push') {
+            return c.json({ ignored: true, message: 'Not a push event' });
+        }
+
+        const repoUrl = event.repository?.clone_url;
+        const repoName = event.repository?.full_name;
+
+        if (!repoUrl) return c.json({ ignored: true, message: 'No repository info' });
+
+        // Look for matching app
+        // Apps store `gitRepo`. We match against that.
+        const { apps } = await listApps();
+
+        // Simple matching strategy
+        // TODO: We should probably store repo ID to be precise, but clone_url is fine unique identifier usually.
+        const targetApp = apps.find(a =>
+            a.gitRepo === repoUrl ||
+            (a.gitRepo && a.gitRepo.includes(repoName))
+        );
+
+        if (targetApp) {
+            console.log(`🚀 Webhook trigger: Auto-deploying ${targetApp.name}...`);
+
+            // Check branch if possible
+            if (targetApp.gitBranch && event.ref) {
+                const pushRef = event.ref; // e.g., "refs/heads/main"
+                const appRef = `refs/heads/${targetApp.gitBranch}`;
+                if (!pushRef.endsWith(targetApp.gitBranch)) {
+                    console.log(`Webhook ignored: Push to ${pushRef} does not match app branch ${targetApp.gitBranch}`);
+                    return c.json({ ignored: true, message: `Branch mismatch: ${pushRef} != ${targetApp.gitBranch}` });
+                }
+            }
+
+            // Trigger Update (async)
+            updateApp(targetApp.name)
+                .then(res => console.log(`✅ Auto-deploy ${targetApp.name} complete:`, res.message))
+                .catch(err => console.error(`❌ Auto-deploy ${targetApp.name} failed:`, err));
+
+            return c.json({ success: true, app: targetApp.name, message: 'Deployment triggered' });
+        }
+
+        console.log(`Webhook ignored: No app found matching ${repoName}`);
+        return c.json({ ignored: true, message: `No app found for ${repoName}` });
+
+    } catch (error: any) {
+        console.error('API: /github/webhook error:', error);
+        return c.text(error.message, 500);
     }
 });
 
