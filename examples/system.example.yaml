@@ -31,3 +31,20 @@ tunnel:
   port: 8788
   url: "https://your-app.ngrok-free.app"
   auth_token: "your-ngrok-token"
+
+# Runtime environments (auto-detected via 'okastr8 env scan')
+environments:
+  node:
+    installed: true
+    version: "20.10.0"
+    path: "/usr/bin/node"
+  python:
+    installed: false
+  go:
+    installed: false
+  bun:
+    installed: true
+    version: "1.2.17"
+    path: "/usr/local/bin/bun"
+  deno:
+    installed: false

@@ -17,6 +17,14 @@ export const OKASTR8_HOME = join(getHomeDir(), '.okastr8');
 export const CONFIG_FILE = join(OKASTR8_HOME, 'system.yaml');
 
 // Types for the Unified Config
+export type RuntimeName = 'node' | 'python' | 'go' | 'bun' | 'deno';
+
+export interface RuntimeInfo {
+    installed: boolean;
+    version?: string;
+    path?: string;
+}
+
 export interface SystemConfig {
     setup?: {
         user?: {
@@ -49,6 +57,13 @@ export interface SystemConfig {
         port?: string | number;
         url?: string;
         auth_token?: string;
+    };
+    environments?: {
+        node?: RuntimeInfo;
+        python?: RuntimeInfo;
+        go?: RuntimeInfo;
+        bun?: RuntimeInfo;
+        deno?: RuntimeInfo;
     };
     deployments?: any[];
 }

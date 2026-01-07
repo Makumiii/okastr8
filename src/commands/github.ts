@@ -1,7 +1,8 @@
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { homedir } from "os";
-import { readFile, writeFile, mkdir } from "fs/promises";
+import { readFile, writeFile, mkdir, rm } from "fs/promises";
+import { existsSync } from "fs";
 import { runCommand } from "../utils/command";
 import { randomBytes } from "crypto";
 
@@ -354,6 +355,22 @@ export async function detectProjectConfig(repoPath: string): Promise<DetectedCon
             };
         } catch { }
 
+        // Check for deno.json or deno.jsonc (Deno)
+        try {
+            let denoConfig;
+            try {
+                denoConfig = JSON.parse(await readFile(join(repoPath, "deno.json"), "utf-8"));
+            } catch {
+                denoConfig = JSON.parse(await readFile(join(repoPath, "deno.jsonc"), "utf-8"));
+            }
+
+            return {
+                buildSteps: [],
+                startCommand: denoConfig.tasks?.start ? "deno task start" : "deno run --allow-all main.ts",
+                runtime: "deno",
+            };
+        } catch { }
+
         // Check for Dockerfile
         try {
             await readFile(join(repoPath, "Dockerfile"));
@@ -447,6 +464,25 @@ export async function importRepo(options: ImportOptions): Promise<{
                 message: "Could not detect start command. Please provide one.",
                 config: detectedConfig,
             };
+        }
+
+        // Validate runtime is installed
+        const supportedRuntimes = ['node', 'python', 'go', 'bun', 'deno'];
+        if (supportedRuntimes.includes(detectedConfig.runtime)) {
+            const { checkRuntimeInstalled, formatMissingRuntimeError } = await import("./env");
+            const isInstalled = await checkRuntimeInstalled(detectedConfig.runtime);
+
+            if (!isInstalled) {
+                // Cleanup on failure
+                if (appDir && existsSync(appDir)) {
+                    await rm(appDir, { recursive: true, force: true });
+                }
+                return {
+                    success: false,
+                    message: formatMissingRuntimeError(detectedConfig.runtime as any),
+                    config: detectedConfig,
+                };
+            }
         }
 
         console.log(`🔧 Detected runtime: ${detectedConfig.runtime}`);

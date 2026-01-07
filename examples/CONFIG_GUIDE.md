@@ -42,6 +42,7 @@ tunnel:
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | string | App name override. |
+| `runtime` | string | Required runtime: `node`, `python`, `go`, `bun`, `deno`. |
 | `build` | string[] | List of build commands. |
 | `start` | string | Start command (e.g. `npm start`). |
 | `port` | number | Internal port the app listens on. |
@@ -51,6 +52,7 @@ tunnel:
 **Example:**
 ```yaml
 name: my-app
+runtime: node
 build:
   - npm install
   - npm run build
@@ -58,4 +60,37 @@ start: npm start
 port: 3000
 env:
   NODE_ENV: production
+```
+
+---
+
+## 3. Runtime Environments
+
+okastr8 automatically detects installed runtimes and stores them in `system.yaml`.
+
+**Supported Runtimes:**
+- `node` - Node.js
+- `python` - Python 3
+- `go` - Go/Golang
+- `bun` - Bun runtime
+- `deno` - Deno runtime
+
+**Scan for runtimes:**
+```bash
+okastr8 env scan
+```
+
+**How it works:**
+1. During deploy, okastr8 reads the `runtime` field from your `okastr8.yaml`
+2. It checks if that runtime is installed on the server
+3. If missing, the deploy fails with helpful install instructions
+
+**Example output when runtime is missing:**
+```
+❌ Runtime 'python' is required but not installed.
+
+To install python:
+  sudo dnf install python3
+
+After installing, run: okastr8 env scan
 ```

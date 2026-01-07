@@ -4,6 +4,10 @@
 name: my-node-app
 description: "A sample Node.js application deployed with okastr8"
 
+# Required runtime (node, python, go, bun, deno)
+# If not installed, deploy will fail with install instructions
+runtime: node
+
 build:
   - npm install
   - npm run build
