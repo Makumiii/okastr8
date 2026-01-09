@@ -14,7 +14,7 @@ const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, "..", "..");
 
 // Paths
-const OKASTR8_HOME = join(homedir(), ".okastr8");
+import { OKASTR8_HOME } from "../config";
 const APPS_DIR = join(OKASTR8_HOME, "apps");
 const DEPLOYMENT_FILE = join(OKASTR8_HOME, "deployment.json");
 
@@ -61,68 +61,60 @@ export async function runHealthCheck(
 }
 
 export async function deployApp(options: DeployOptions) {
-    const { appName, branch, buildSteps = [], healthCheck, skipHealthCheck } = options;
-    const appDir = join(APPS_DIR, appName);
-    const repoDir = join(appDir, "repo");
+    const { appName, branch, skipHealthCheck } = options;
 
     console.log(`🚀 Starting deployment for ${appName}...`);
 
     try {
-        // Step 1: Pull latest code
-        console.log(`📥 Step 1: Pulling latest code...`);
-        const pullResult = await gitPull(repoDir, branch);
-        if (pullResult.exitCode !== 0) {
-            throw new Error(`Git pull failed: ${pullResult.stderr}`);
-        }
-        console.log(pullResult.stdout);
+        // Check for branch mismatch and warn user
+        const { getAppMetadata, updateApp } = await import('./app');
 
-        // Step 2: Run build steps
-        if (buildSteps.length > 0) {
-            console.log(`🔨 Step 2: Running ${buildSteps.length} build steps...`);
-            const originalDir = process.cwd();
-            process.chdir(repoDir);
+        if (branch) {
+            try {
+                const metadata = await getAppMetadata(appName);
+                if (metadata.gitBranch && metadata.gitBranch !== branch) {
+                    console.log(`\n⚠️  WARNING: Branch change detected!`);
+                    console.log(`   Current branch: ${metadata.gitBranch}`);
+                    console.log(`   Requested branch: ${branch}`);
+                    console.log(`   Webhooks will only trigger for the new branch.\n`);
 
-            for (const step of buildSteps) {
-                console.log(`  → ${step}`);
-                const buildResult = await runCommand("bash", ["-c", step]);
-                if (buildResult.exitCode !== 0) {
-                    process.chdir(originalDir);
-                    throw new Error(`Build step failed: ${step}\n${buildResult.stderr}`);
+                    // Ask for confirmation
+                    const readline = await import('readline');
+                    const rl = readline.createInterface({
+                        input: process.stdin,
+                        output: process.stdout,
+                    });
+
+                    const answer = await new Promise<string>((resolve) => {
+                        rl.question('Continue with branch change? (y/N): ', resolve);
+                    });
+                    rl.close();
+
+                    if (answer.toLowerCase() !== 'y' && answer.toLowerCase() !== 'yes') {
+                        console.log('Deployment cancelled.');
+                        return { success: false, message: 'Deployment cancelled by user' };
+                    }
+
+                    console.log(`Proceeding with deployment to ${branch}...`);
                 }
+            } catch {
+                // App doesn't exist yet, no warning needed
             }
-            process.chdir(originalDir);
         }
 
-        // Step 3: Restart service
-        console.log(`🔄 Step 3: Restarting service...`);
-        const restartResult = await runCommand("sudo", [SCRIPTS.restart, appName]);
-        if (restartResult.exitCode !== 0) {
-            throw new Error(`Service restart failed: ${restartResult.stderr}`);
+        // Use V2 immutable deployment logic (same as webhook/API)
+        // This creates a new release, clones fresh, builds, and switches symlink
+        console.log(`\n📦 Using immutable deployment strategy (V2)...`);
+
+        const result = await updateApp(appName);
+
+        if (result.success) {
+            console.log(`\n✅ ${result.message}`);
+        } else {
+            console.error(`\n❌ ${result.message}`);
         }
 
-        // Step 4: Health check
-        if (!skipHealthCheck && healthCheck) {
-            console.log(`🏥 Step 4: Running health check...`);
-            const checkResult = await runHealthCheck(
-                healthCheck.method,
-                healthCheck.target,
-                healthCheck.timeout || 30
-            );
-            if (checkResult.exitCode !== 0) {
-                console.log(`❌ Health check failed! Rolling back...`);
-                // Attempt rollback - get last successful deployment
-                await autoRollback(appName);
-                throw new Error(`Health check failed: ${checkResult.stderr}`);
-            }
-            console.log(checkResult.stdout);
-        }
-
-        // Step 5: Record deployment
-        console.log(`📝 Recording deployment...`);
-        await recordDeployment(appName);
-
-        console.log(`\n✅ Deployment complete for ${appName}!`);
-        return { success: true, message: `Deployed ${appName} successfully` };
+        return result;
     } catch (error: any) {
         console.error(`❌ Deployment failed: ${error.message}`);
         return { success: false, message: error.message };
