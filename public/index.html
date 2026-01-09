@@ -21,6 +21,7 @@
                 <a href="#" class="active">Dashboard</a>
                 <a href="github.html">GitHub</a>
                 <a href="apps.html">Apps</a>
+                <a href="user.html">Users</a>
                 <a href="setup.html">Settings</a>
             </nav>
 
@@ -125,11 +126,13 @@
                             <div class="metric-big">${installedCount}</div>
                             
                             <div class="tags-container">
-                                ${Object.entries(envs).map(([name, info]) => `
-                                    <span class="tag ${info.installed ? 'active' : ''}">
-                                        ${name} ${info.version || ''}
-                                    </span>
-                                `).join('')}
+                                ${Object.entries(envs)
+                        .filter(([_, info]) => info.installed)
+                        .map(([name, info]) => `
+                                        <div class="runtime-badge">
+                                            ${name} <span class="version">${info.version || ''}</span>
+                                        </div>
+                                    `).join('')}
                             </div>
                         </div>
                         

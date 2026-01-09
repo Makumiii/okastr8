@@ -505,25 +505,88 @@ button[type="submit"]:hover {
     .bento-grid {
         grid-template-columns: repeat(2, 1fr);
     }
+
+    .welcome-card {
+        grid-column: span 2;
+    }
 }
 
 @media (max-width: 768px) {
     body {
-        padding: 10px;
+        padding: 16px;
     }
 
+    .container {
+        width: 100%;
+    }
+
+    /* Grid collapses to single column */
     .bento-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    /* Cards span full width */
+    .welcome-card,
+    .bento-card {
+        grid-column: span 1 !important;
+    }
+
+    /* Typography Adjustments */
+    .welcome-title {
+        font-size: 28px;
+    }
+
+    .metric-big {
+        font-size: 36px;
+    }
+
+    header h1 {
+        font-size: 20px;
+        padding: 8px 16px;
+    }
+
+    /* Header Layout */
+    header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .header-group {
+        width: 100%;
+    }
+
+    /* Navigation Stack */
+    nav {
+        width: 100%;
+        justify-content: flex-start;
+        overflow-x: auto;
+        padding: 4px;
+        scrollbar-width: none;
+        /* Hide scrollbar */
+        -ms-overflow-style: none;
+    }
+
+    nav::-webkit-scrollbar {
+        display: none;
+    }
+
+    nav a {
+        flex-shrink: 0;
+        padding: 8px 16px;
+        font-size: 13px;
+    }
+
+    /* Form Grid */
+    .form-grid {
         grid-template-columns: 1fr;
     }
 
-    header {
-        flex-direction: column;
-        gap: 20px;
-    }
-
-    nav {
-        width: 100%;
-        justify-content: center;
+    .modal-content {
+        padding: 24px;
+        width: 95%;
     }
 }
 
@@ -560,4 +623,30 @@ button[type="submit"]:hover {
 .back-arrow svg {
     width: 24px;
     height: 24px;
+}
+
+/* Runtime Badges */
+.tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: auto;
+}
+
+.runtime-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    background: #F3F4F6;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.runtime-badge .version {
+    font-weight: 400;
+    color: var(--text-secondary);
+    margin-left: 4px;
 }
