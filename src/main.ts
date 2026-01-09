@@ -5,6 +5,7 @@ import { addOrchestrateCommand } from './commands/orchestrate';
 import { addSetupCommands } from './commands/setup';
 import { addAppCommands } from './commands/app';
 import { addDeployCommands } from './commands/deploy';
+import { addGitHubCommands } from './commands/github-cli';
 
 const program = new Command();
 
@@ -19,6 +20,7 @@ addOrchestrateCommand(program);
 addSetupCommands(program);
 addAppCommands(program);
 addDeployCommands(program);
+addGitHubCommands(program);
 
 program.parse(process.argv);
 
