@@ -12,6 +12,7 @@ const PROJECT_ROOT = join(__dirname, "..", "..");
 
 const SCRIPTS = {
     setup: join(PROJECT_ROOT, "scripts", "setup.sh"),
+    sudoers: join(PROJECT_ROOT, "scripts", "setup-sudoers.sh"),
     hardenSsh: join(PROJECT_ROOT, "scripts", "ssh", "harden-ssh.sh"),
     changeSshPort: join(PROJECT_ROOT, "scripts", "ssh", "change-ssh-port.sh"),
     ufwDefaults: join(PROJECT_ROOT, "scripts", "ufw", "defaults.sh"),
@@ -127,6 +128,26 @@ export function addSetupCommands(program: Command) {
             const result = await orchestrateEnvironment();
             console.log(result.stdout || result.stderr);
             if (result.exitCode !== 0) {
+                process.exit(result.exitCode || 1);
+            }
+        });
+
+    setup
+        .command("sudoers")
+        .description("Configure passwordless sudo for okastr8 scripts (fixes permission issues)")
+        .action(async () => {
+            console.log("🔐 Configuring sudoers for passwordless script execution...\n");
+            console.log("This will allow okastr8 to run system commands without password prompts.");
+            console.log("You may be asked for your password once to apply the configuration.\n");
+
+            const result = await runCommand("sudo", [SCRIPTS.sudoers]);
+            console.log(result.stdout || result.stderr);
+
+            if (result.exitCode === 0) {
+                console.log("\n✅ Sudoers configured successfully!");
+                console.log("   All okastr8 operations should now run without password prompts.");
+            } else {
+                console.error("\n❌ Sudoers configuration failed.");
                 process.exit(result.exitCode || 1);
             }
         });

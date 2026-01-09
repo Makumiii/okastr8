@@ -193,24 +193,8 @@ else
   info "$SYMLINK_DIR is already in PATH."
 fi
 
-# --- 8. Create systemd service for GitHub Webhook Listener ---
-info "Creating systemd service for GitHub Webhook Listener..."
-BUN_PATH="/usr/local/bin/bun"
-WEBHOOK_EXEC_START="$BUN_PATH run $INSTALL_DIR/src/githubWebHook.ts"
-SERVICE_WORKING_DIR="$INSTALL_DIR"
-CURRENT_USER="$(whoami)"
-CREATE_SCRIPT_PATH="$INSTALL_DIR/scripts/systemd/create.sh"
+# --- 8. (Skipped) GitHub Webhook Listener is now integrated into Manager Server
 
-if [ ! -f "$CREATE_SCRIPT_PATH" ]; then
-  error "systemd create script not found at $CREATE_SCRIPT_PATH"
-fi
-
-# Always create/update the service file
-info "Creating systemd service '$WEBHOOK_SERVICE_NAME'."
-if ! sudo "$CREATE_SCRIPT_PATH" "$WEBHOOK_SERVICE_NAME" "$WEBHOOK_SERVICE_DESCRIPTION" "$WEBHOOK_EXEC_START" "$SERVICE_WORKING_DIR" "$CURRENT_USER" "multi-user.target" "true"; then
-  error "Failed to create systemd service for webhook listener."
-fi
-info "Systemd service '$WEBHOOK_SERVICE_NAME' created and enabled."
 
 # --- 9. Create systemd service for Manager Server ---
 info "Creating systemd service for Web Manager Server..."
@@ -222,6 +206,19 @@ if ! sudo "$CREATE_SCRIPT_PATH" "$MANAGER_SERVICE_NAME" "$MANAGER_SERVICE_DESCRI
   error "Failed to create systemd service for manager server."
 fi
 info "Systemd service '$MANAGER_SERVICE_NAME' created and enabled."
+
+# --- 9.5. Configure sudoers for passwordless script execution ---
+info "Configuring sudoers for passwordless script execution..."
+SUDOERS_SCRIPT="$INSTALL_DIR/scripts/setup-sudoers.sh"
+if [ -f "$SUDOERS_SCRIPT" ]; then
+  if sudo "$SUDOERS_SCRIPT"; then
+    info "Sudoers configuration complete."
+  else
+    info "Warning: Sudoers configuration failed. Some features may require password prompts."
+  fi
+else
+  info "Warning: setup-sudoers.sh not found. Skipping sudoers configuration."
+fi
 
 # --- 10. Start Ngrok Tunnel ---
 info "Starting Ngrok tunnel for manager server..."
@@ -239,7 +236,7 @@ info "Ngrok tunnel started in background (PID: $NGROK_TUNNEL_PID)."
 # --- Done ---
 info "🎉 Okastr8 installation complete!"
 info "Run 'okastr8 --help' to get started."
-info "Webhook listener service '$WEBHOOK_SERVICE_NAME' is running."
+
 info "Web Manager Server service '$MANAGER_SERVICE_NAME' is running."
-info "To check status, run: systemctl status \"$WEBHOOK_SERVICE_NAME\" and systemctl status \"$MANAGER_SERVICE_NAME\""
+info "To check status, run: systemctl status \"$MANAGER_SERVICE_NAME\""
 info "Ngrok tunnel is running. Check its output in the background or use 'fg' to bring it to foreground."
