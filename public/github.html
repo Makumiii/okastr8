@@ -724,6 +724,36 @@ manager:
             e.preventDefault();
 
             const resultEl = document.getElementById('deploy-result');
+            const formData = new FormData(e.target);
+            const repoFullName = formData.get('repoFullName');
+            const branch = formData.get('branch') || undefined;
+
+            // Check for branch change before deploying
+            try {
+                const branchCheck = await apiPost('/github/check-branch-change', {
+                    repoFullName,
+                    branch
+                });
+
+                if (branchCheck.success && branchCheck.data?.branchChanged) {
+                    // Show warning and get confirmation
+                    const confirmed = confirm(
+                        `⚠️ Branch Change Warning!\n\n` +
+                        `Current branch: ${branchCheck.data.currentBranch}\n` +
+                        `New branch: ${branchCheck.data.requestedBranch}\n\n` +
+                        `${branchCheck.data.warning}\n\n` +
+                        `Do you want to continue?`
+                    );
+
+                    if (!confirmed) {
+                        resultEl.innerHTML = `<div class="result-status result-warning"><span class="result-icon">⚠️</span><span class="result-message">Deployment cancelled - branch change not confirmed</span></div>`;
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.warn('Branch check failed, proceeding anyway:', err);
+            }
+
             // Create logs container
             resultEl.innerHTML = `
                 <div class="deployment-logs-container" style="max-height: 400px; overflow-y: auto; background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 6px; font-family: 'Consolas', monospace; font-size: 13px; line-height: 1.6;">
@@ -732,13 +762,11 @@ manager:
             `;
             const logsContainer = resultEl.querySelector('.deployment-logs');
 
-            const formData = new FormData(e.target);
-
             try {
                 // Start deployment - config comes from okastr8.yaml
                 const res = await apiPost('/github/import', {
-                    repoFullName: formData.get('repoFullName'),
-                    branch: formData.get('branch') || undefined,
+                    repoFullName,
+                    branch,
                     setupWebhook: document.getElementById('deploy-webhook').checked,
                 });
 
