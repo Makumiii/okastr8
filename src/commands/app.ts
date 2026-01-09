@@ -4,6 +4,8 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { homedir } from "os";
 import { mkdir, rm, readdir, stat, readFile, writeFile } from "fs/promises";
+import { createVersion, removeVersion, getVersions, setCurrentVersion } from "./version";
+import { deployFromPath } from "./deploy-core";
 
 // Get the directory of this file (works in Bun and Node ESM)
 const __filename = fileURLToPath(import.meta.url);
@@ -13,7 +15,7 @@ const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, "..", "..");
 
 // App directory structure
-const OKASTR8_HOME = join(homedir(), ".okastr8");
+import { OKASTR8_HOME } from "../config";
 const APPS_DIR = join(OKASTR8_HOME, "apps");
 
 // Systemd scripts
@@ -61,67 +63,46 @@ export async function createApp(config: AppConfig) {
     try {
         const { appDir, repoDir, logsDir } = await ensureAppDirs(config.name);
 
-        // Generate environment variables string
-        let envVars = "";
+        // Prepare Start Command with Env Vars
+        let execStart = config.execStart;
         if (config.env) {
-            envVars = Object.entries(config.env)
-                .map(([key, value]) => `Environment="${key}=${value}"`)
-                .join("\n");
+            // Inject env vars as exports before the command
+            // Format: export KEY="VAL"; export KEY2="VAL2"; cmd
+            const envExports = Object.entries(config.env)
+                .map(([key, value]) => `export ${key}="${value}"`)
+                .join("; ");
+            execStart = `${envExports}; ${config.execStart}`;
         }
 
-        // Generate the systemd unit file content
-        const unitContent = `[Unit]
-Description=${config.description}
-After=network.target
-
-[Service]
-Type=simple
-User=${config.user}
-WorkingDirectory=${config.workingDirectory || repoDir}
-ExecStart=${config.execStart}
-${envVars}
-Restart=on-failure
-RestartSec=10
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=${config.name}
-
-[Install]
-WantedBy=multi-user.target
-`;
-
-        // Write unit file to app directory
-        const unitFilePath = join(appDir, `${config.name}.service`);
-        await writeFile(unitFilePath, unitContent);
-
-        // Deploy service to /etc/systemd/system/
-        const SYSTEMD_DIR = "/etc/systemd/system";
-        const result = await runCommand("sudo", ["cp", unitFilePath, `${SYSTEMD_DIR}/${config.name}.service`]);
+        // Use create.sh helper
+        // Usage: create.sh <name> <description> <exec_start> <work_dir> <user> <wanted_by> <auto_start>
+        // We set auto_start=true so it enables and starts it for us
+        const result = await runCommand("sudo", [
+            SYSTEMD_SCRIPTS.create,
+            config.name,
+            config.description,
+            execStart,
+            config.workingDirectory || repoDir,
+            config.user,
+            "multi-user.target",
+            "true"
+        ]);
 
         if (result.exitCode !== 0) {
-            return {
-                success: false,
-                appDir,
-                message: `Failed to copy service file: ${result.stderr}`,
-            };
+            // Cleanup app dir if service creation failed
+            await runCommand("sudo", ["rm", "-rf", appDir]);
+            throw new Error(`Failed to create systemd service: ${result.stderr}`);
         }
 
-        // Reload daemon, enable, and start the service
-        await runCommand("sudo", ["systemctl", "daemon-reload"]);
-        await runCommand("sudo", ["systemctl", "enable", config.name]);
-        const startResult = await runCommand("sudo", ["systemctl", "start", config.name]);
-
-        if (startResult.exitCode !== 0) {
-            return {
-                success: false,
-                appDir,
-                message: `Failed to start service: ${startResult.stderr}`,
-            };
-        }
+        // Service is now running.
+        // We verify deployment by creating app.json
 
         // ONLY NOW: Write app.json after service is running
         // This ensures app only appears in UI when fully operational
         const metadataPath = join(appDir, "app.json");
+
+        // We can't easily get unit file path from script, but can assume standard
+        const unitFilePath = `/etc/systemd/system/${config.name}.service`;
 
         let existingMetadata: any = {};
         try {
@@ -170,19 +151,12 @@ export async function deleteApp(appName: string) {
             console.error(`Systemd delete script failed: ${result.stderr}`);
         }
 
-        // Explicitly verify and remove service file as fallback
-        const serviceFile = `/etc/systemd/system/${appName}.service`;
-        console.log(`Ensuring service file is removed: ${serviceFile}`);
-        await runCommand("sudo", ["rm", "-f", serviceFile]);
-
-        // Reload systemd daemon to clear any cached state
-        console.log(`Reloading systemd daemon...`);
-        await runCommand("sudo", ["systemctl", "daemon-reload"]);
-
-        // Remove the app directory using sudo to handle permission issues
+        // remove app directory
+        // Since we are running as user, we shouldn't need sudo if ownership is correct.
+        // If files were created by root previously, this might fail, but that's what we want to fix (ownership).
         const appDir = join(APPS_DIR, appName);
         console.log(`Removing app directory: ${appDir}`);
-        await runCommand("sudo", ["rm", "-rf", appDir]);
+        await rm(appDir, { recursive: true, force: true });
 
         console.log(`Successfully deleted app: ${appName}`);
         return {
@@ -314,6 +288,8 @@ export async function getAppMetadata(appName: string): Promise<AppConfig & { rep
 }
 
 export async function updateApp(appName: string) {
+    let versionId: number = 0;
+    let releasePath: string = "";
     try {
         const metadata = await getAppMetadata(appName);
 
@@ -323,41 +299,63 @@ export async function updateApp(appName: string) {
 
         console.log(`📡 Updating ${appName} from git...`);
 
-        // 1. Git Pull
-        const pullResult = await runCommand("git", ["pull"], metadata.repoDir);
-        if (pullResult.exitCode !== 0) {
-            throw new Error(`Git pull failed: ${pullResult.stderr}`);
-        }
-        if (pullResult.stdout.includes("Already up to date")) {
-            return { success: true, message: "Already up to date" };
-        }
+        // 1. Create new version entry (V2 Logic)
+        const branch = metadata.gitBranch || "main";
+        // We use "HEAD" initially, and deployFromPath doesn't strictly require git hash for logic, 
+        // but ideally we'd get the hash traverse. 
+        const versionResult = await createVersion(appName, "HEAD", branch);
+        versionId = versionResult.versionId;
+        releasePath = versionResult.releasePath;
 
-        // 2. Build Steps
-        if (metadata.buildSteps && metadata.buildSteps.length > 0) {
-            console.log(`🔨 Running build steps for ${appName}...`);
-            for (const step of metadata.buildSteps) {
-                // Split command and args (naive splitting, assumes 'npm install', etc)
-                // For safety/simplicity let's use the shell via runCommand? 
-                // runCommand uses execFile style [cmd, args].
-                // We'll trust our simple parser or just run via bun shell if needed.
-                // Let's assume standard "cmd arg1 arg2" format.
-                if (!step.trim()) continue;
-                console.log(`🔨 Running build step: ${step}`);
+        console.log(`📦 Created release v${versionId} at ${releasePath}`);
 
-                // Use bash -c to handle composite commands (like 'npm install && npm run build')
-                const buildRes = await runCommand("bash", ["-c", step], metadata.repoDir);
-                if (buildRes.exitCode !== 0) {
-                    throw new Error(`Build step '${step}' failed: ${buildRes.stderr}`);
-                }
-            }
+        // 2. Clone code into release path (Fresh clone like importRepo)
+        // We use the gitRepo URL from metadata
+        const cloneUrl = metadata.gitRepo;
+
+        console.log(`⬇️ Cloning ${branch} into release...`);
+        const cloneResult = await runCommand("git", [
+            "clone",
+            "--depth", "1",
+            "--branch", branch,
+            cloneUrl,
+            releasePath
+        ]);
+
+        if (cloneResult.exitCode !== 0) {
+            throw new Error(`Clone failed: ${cloneResult.stderr}`);
         }
 
-        // 3. Restart Service
-        await restartApp(appName);
+        // 3. Deploy
+        console.log(`🚀 Deploying v${versionId}...`);
+        const deployResult = await deployFromPath({
+            appName,
+            releasePath,
+            versionId,
+            gitRepo: metadata.gitRepo,
+            gitBranch: branch,
+            onProgress: (msg) => console.log(msg)
+        });
 
-        return { success: true, message: "App updated and restarted successfully" };
-    } catch (error) {
+        if (!deployResult.success) {
+            // Cleanup on failure
+            console.log("⚠️ Deployment failed. Cleaning up...");
+            await rm(releasePath, { recursive: true, force: true });
+            await removeVersion(appName, versionId);
+            throw new Error(deployResult.message);
+        }
+
+        return { success: true, message: `App updated to v${versionId}` };
+
+    } catch (error: any) {
         console.error(`Error updating app ${appName}:`, error);
+        // Ensure cleanup if we created a version but failed before deployFromPath returned
+        if (versionId && releasePath) {
+            try {
+                await rm(releasePath, { recursive: true, force: true });
+                await removeVersion(appName, versionId);
+            } catch { }
+        }
         throw error;
     }
 }

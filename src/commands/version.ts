@@ -9,7 +9,7 @@ import { existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 
-const OKASTR8_HOME = join(homedir(), ".okastr8");
+import { OKASTR8_HOME } from "../config";
 const APPS_DIR = join(OKASTR8_HOME, "apps");
 
 export interface AppVersion {
@@ -215,11 +215,16 @@ export async function setCurrentVersion(appName: string, versionId: number): Pro
 
 /**
  * Rollback to a specific version
+ * Runs the FULL deploy process (build, service restart, health check)
+ * to ensure the version actually works
  */
 export async function rollback(
     appName: string,
-    versionId: number
+    versionId: number,
+    onProgress?: (msg: string) => void
 ): Promise<{ success: boolean; message: string }> {
+    const log = onProgress || ((msg: string) => console.log(msg));
+
     const data = await getVersions(appName);
     const version = data.versions.find(v => v.id === versionId);
 
@@ -228,7 +233,7 @@ export async function rollback(
     }
 
     if (version.status !== "success") {
-        return { success: false, message: `Cannot rollback to failed/pending version` };
+        return { success: false, message: `Cannot rollback to ${version.status} version` };
     }
 
     const releasePath = join(getReleasesDir(appName), `v${versionId}`);
@@ -236,10 +241,42 @@ export async function rollback(
         return { success: false, message: `Release artifact v${versionId} missing` };
     }
 
-    const success = await setCurrentVersion(appName, versionId);
-    return success
-        ? { success: true, message: `Rolled back to v${versionId}` }
-        : { success: false, message: "Failed to update symlink" };
+    log(`🔄 Rolling back ${appName} to v${versionId}...`);
+
+    // Use the deploy core to run the full deploy process
+    const { deployFromPath } = await import("./deploy-core");
+
+    const result = await deployFromPath({
+        appName,
+        releasePath,
+        versionId,
+        gitBranch: version.branch,
+        onProgress: log,
+    });
+
+    if (result.success) {
+        log(`✅ Rollback to v${versionId} complete!`);
+    } else {
+        log(`❌ Rollback failed: ${result.message}`);
+    }
+
+    return result;
+}
+
+/**
+ * Remove a specific version entry from history
+ */
+export async function removeVersion(appName: string, versionId: number): Promise<void> {
+    const data = await getVersions(appName);
+    const newVersions = data.versions.filter(v => v.id !== versionId);
+
+    // If we removed the current version (shouldn't happen for failed deploys, but safety check)
+    let newCurrent = data.current;
+    if (data.current === versionId) {
+        newCurrent = null;
+    }
+
+    await saveVersions(appName, newVersions, newCurrent);
 }
 
 /**
@@ -257,8 +294,9 @@ export async function cleanOldVersions(appName: string): Promise<void> {
         .slice(maxVersions)
         .filter(v => v.id !== data.current);
 
-    const failedVersions = data.versions
-        .filter(v => v.status === "failed" && successfulVersions.length > 0 && v.id < successfulVersions[0].id);
+    const failedVersions = successfulVersions.length > 0
+        ? data.versions.filter(v => v.status === "failed" && v.id < successfulVersions[0]!.id)
+        : [];
 
     const allToDelete = [...versionsToDelete, ...failedVersions];
 

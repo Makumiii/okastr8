@@ -22,63 +22,67 @@ export async function listGroups(username: string) {
 }
 
 export async function listUsers() {
-    return await runCommand(path.join(SCRIPT_BASE_PATH, 'listUsers.sh'), []);
+    return await runCommand('sudo', [path.join(SCRIPT_BASE_PATH, 'listUsers.sh')]);
 }
 
 export async function lockUser(username: string) {
     return await runCommand('sudo', [path.join(SCRIPT_BASE_PATH, 'lockUser.sh'), username]);
 }
 
+export async function unlockUser(username: string) {
+    return await runCommand('sudo', [path.join(SCRIPT_BASE_PATH, 'unlockUser.sh'), username]);
+}
+
 // Commander Integration
 export function addUserCommands(program: Command) {
-  const user = program.command('user').description('Manage system users');
+    const user = program.command('user').description('Manage system users');
 
-  user.command('create')
-    .description('Create a new system user')
-    .argument('<username>', 'Username for the new user')
-    .argument('[password]', 'Password for the new user (defaults to username)')
-    .option('-d, --distro <distro>', 'Distribution type (fedora or debian)')
-    .action(async (username, password, options) => {
-        const result = await createUser(username, password, options.distro);
-        console.log(result.stdout || result.stderr);
-    });
+    user.command('create')
+        .description('Create a new system user')
+        .argument('<username>', 'Username for the new user')
+        .argument('[password]', 'Password for the new user (defaults to username)')
+        .option('-d, --distro <distro>', 'Distribution type (fedora or debian)')
+        .action(async (username, password, options) => {
+            const result = await createUser(username, password, options.distro);
+            console.log(result.stdout || result.stderr);
+        });
 
-  user.command('delete')
-    .description('Delete a system user')
-    .argument('<username>', 'Username of the user to delete')
-    .action(async (username) => {
-        const result = await deleteUser(username);
-        console.log(result.stdout || result.stderr);
-    });
+    user.command('delete')
+        .description('Delete a system user')
+        .argument('<username>', 'Username of the user to delete')
+        .action(async (username) => {
+            const result = await deleteUser(username);
+            console.log(result.stdout || result.stderr);
+        });
 
-  user.command('last-login')
-    .description('Show last login time for a user')
-    .argument('<username>', 'Username to check last login for')
-    .action(async (username) => {
-        const result = await getLastLogin(username);
-        console.log(result.stdout || result.stderr);
-    });
+    user.command('last-login')
+        .description('Show last login time for a user')
+        .argument('<username>', 'Username to check last login for')
+        .action(async (username) => {
+            const result = await getLastLogin(username);
+            console.log(result.stdout || result.stderr);
+        });
 
-  user.command('list-groups')
-    .description('List groups for a user')
-    .argument('<username>', 'Username to list groups for')
-    .action(async (username) => {
-        const result = await listGroups(username);
-        console.log(result.stdout || result.stderr);
-    });
+    user.command('list-groups')
+        .description('List groups for a user')
+        .argument('<username>', 'Username to list groups for')
+        .action(async (username) => {
+            const result = await listGroups(username);
+            console.log(result.stdout || result.stderr);
+        });
 
-  user.command('list-users')
-    .description('List all normal system users')
-    .action(async () => {
-        const result = await listUsers();
-        console.log(result.stdout || result.stderr);
-    });
+    user.command('list-users')
+        .description('List all normal system users')
+        .action(async () => {
+            const result = await listUsers();
+            console.log(result.stdout || result.stderr);
+        });
 
-  user.command('lock')
-    .description('Lock a user account')
-    .argument('<username>', 'Username of the user to lock')
-    .action(async (username) => {
-        const result = await lockUser(username);
-        console.log(result.stdout || result.stderr);
-    });
+    user.command('lock')
+        .description('Lock a user account')
+        .argument('<username>', 'Username of the user to lock')
+        .action(async (username) => {
+            const result = await lockUser(username);
+            console.log(result.stdout || result.stderr);
+        });
 }
