@@ -7,6 +7,7 @@ import {
     listGroups,
     listUsers,
     lockUser,
+    unlockUser,
 } from './commands/user';
 import {
     createService,
@@ -63,7 +64,7 @@ api.get('/system/status', async (c) => {
 
         // Get okastr8 services status
         const services = [];
-        const serviceNames = ['okastr8-manager', 'okastr8-webhook'];
+        const serviceNames = ['okastr8-manager'];
         for (const name of serviceNames) {
             const result = await runCommand('systemctl', ['is-active', name]);
             services.push({
@@ -198,6 +199,18 @@ api.post('/user/lock', async (c) => {
         return c.json(apiResponse(result.exitCode === 0, result.stdout || result.stderr));
     } catch (error: any) {
         console.error('API: /user/lock error:', error);
+        return c.json(apiResponse(false, error.message || 'Internal Server Error'));
+    }
+});
+
+api.post('/user/unlock', async (c) => {
+    console.log('API: /user/unlock hit');
+    try {
+        const { username } = await c.req.json();
+        const result = await unlockUser(username);
+        return c.json(apiResponse(result.exitCode === 0, result.stdout || result.stderr));
+    } catch (error: any) {
+        console.error('API: /user/unlock error:', error);
         return c.json(apiResponse(false, error.message || 'Internal Server Error'));
     }
 });
@@ -559,6 +572,41 @@ api.post('/app/rollback', async (c) => {
     }
 });
 
+// Deploy history endpoint (parity with CLI `deploy history`)
+api.get('/deploy/history/:appName', async (c) => {
+    console.log('API: /deploy/history hit');
+    try {
+        const appName = c.req.param('appName');
+        const { getDeploymentHistory } = await import('./commands/deploy');
+
+        const result = await getDeploymentHistory(appName);
+        return c.json(apiResponse(true, `Deployment history for ${appName}`, { history: result.history }));
+    } catch (error: any) {
+        console.error('API: /deploy/history error:', error);
+        return c.json(apiResponse(false, error.message || 'Internal Server Error'));
+    }
+});
+
+// Health check endpoint (parity with CLI `deploy health`)
+api.post('/deploy/health', async (c) => {
+    console.log('API: /deploy/health hit');
+    try {
+        const { method, target, timeout = 30 } = await c.req.json();
+        const { runHealthCheck } = await import('./commands/deploy');
+
+        const result = await runHealthCheck(method, target, timeout);
+        const success = result.exitCode === 0;
+
+        return c.json(apiResponse(success, success ? 'Health check passed' : 'Health check failed', {
+            output: result.stdout || result.stderr,
+            exitCode: result.exitCode
+        }));
+    } catch (error: any) {
+        console.error('API: /deploy/health error:', error);
+        return c.json(apiResponse(false, error.message || 'Internal Server Error'));
+    }
+});
+
 // Deploy routes
 api.post('/deploy/trigger', async (c) => {
     console.log('API: /deploy/trigger hit');
@@ -713,6 +761,75 @@ api.get('/github/repos', async (c) => {
     }
 });
 
+// Setup SSH deploy key for autonomous deploys
+api.post('/github/setup-deploy-key', async (c) => {
+    console.log('API: /github/setup-deploy-key hit');
+    try {
+        const { getGitHubConfig, hasOkastr8DeployKey, createSSHKey } = await import('./commands/github');
+        const { runCommand } = await import('./utils/command');
+        const { existsSync } = await import('fs');
+        const { readFile } = await import('fs/promises');
+        const { homedir } = await import('os');
+        const { join } = await import('path');
+
+        const config = await getGitHubConfig();
+        if (!config.accessToken) {
+            return c.json(apiResponse(false, 'GitHub not connected'));
+        }
+
+        // Check if key already exists in GitHub
+        const keyExists = await hasOkastr8DeployKey(config.accessToken);
+        if (keyExists) {
+            return c.json(apiResponse(true, 'Deploy key already configured!', { alreadyExists: true }));
+        }
+
+        // Generate local key if it doesn't exist
+        const sshDir = join(homedir(), '.ssh');
+        const keyPath = join(sshDir, 'okastr8_deploy_key');
+        const pubKeyPath = `${keyPath}.pub`;
+
+        if (!existsSync(pubKeyPath)) {
+            console.log('Generating new SSH deploy key...');
+            // Create .ssh dir if needed
+            await runCommand('mkdir', ['-p', sshDir]);
+            await runCommand('chmod', ['700', sshDir]);
+
+            // Generate key without passphrase
+            const genResult = await runCommand('ssh-keygen', [
+                '-t', 'ed25519',
+                '-f', keyPath,
+                '-N', '',  // Empty passphrase
+                '-C', 'okastr8-deploy-key'
+            ]);
+
+            if (genResult.exitCode !== 0) {
+                return c.json(apiResponse(false, `Failed to generate key: ${genResult.stderr}`));
+            }
+        }
+
+        // Read public key
+        const publicKey = (await readFile(pubKeyPath, 'utf-8')).trim();
+
+        // Push to GitHub
+        const hostname = await runCommand('hostname', []);
+        const keyTitle = `Okastr8 Deploy Key (${hostname.stdout.trim()})`;
+
+        const result = await createSSHKey(config.accessToken, keyTitle, publicKey);
+
+        if (!result.success) {
+            return c.json(apiResponse(false, result.message));
+        }
+
+        // Configure Git to use SSH for GitHub
+        await runCommand('git', ['config', '--global', 'url.git@github.com:.insteadOf', 'https://github.com/']);
+
+        return c.json(apiResponse(true, 'Deploy key configured successfully! ✨', { publicKey }));
+    } catch (error: any) {
+        console.error('API: /github/setup-deploy-key error:', error);
+        return c.json(apiResponse(false, error.message || 'Internal Server Error'));
+    }
+});
+
 api.post('/github/branches', async (c) => {
     try {
         const { getGitHubConfig, listBranches } = await import('./commands/github');
@@ -739,6 +856,51 @@ api.post('/github/check-config', async (c) => {
         return c.json(apiResponse(true, 'Check complete', { hasConfig }));
     } catch (error: any) {
         console.error("API /github/check-config Error:", error);
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
+// Check if deploying to a different branch than originally configured
+api.post('/github/check-branch-change', async (c) => {
+    console.log('API: /github/check-branch-change hit');
+    try {
+        const { getAppMetadata } = await import('./commands/app');
+        const { repoFullName, branch, appName } = await c.req.json();
+
+        // Derive app name from repo if not provided
+        const derivedAppName = appName || repoFullName.split('/')[1]?.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+
+        if (!derivedAppName) {
+            return c.json(apiResponse(true, 'No app name derivable', { exists: false, branchChanged: false }));
+        }
+
+        try {
+            const metadata = await getAppMetadata(derivedAppName);
+
+            // App exists - check branch
+            if (metadata.gitBranch && metadata.gitBranch !== branch) {
+                return c.json(apiResponse(true, 'Branch change detected', {
+                    exists: true,
+                    branchChanged: true,
+                    currentBranch: metadata.gitBranch,
+                    requestedBranch: branch,
+                    appName: derivedAppName,
+                    warning: `This app is currently deployed from "${metadata.gitBranch}". You selected "${branch}". Webhooks will only trigger for the new branch.`
+                }));
+            }
+
+            return c.json(apiResponse(true, 'No branch change', {
+                exists: true,
+                branchChanged: false,
+                currentBranch: metadata.gitBranch,
+                appName: derivedAppName
+            }));
+        } catch {
+            // App doesn't exist yet
+            return c.json(apiResponse(true, 'New app', { exists: false, branchChanged: false, appName: derivedAppName }));
+        }
+    } catch (error: any) {
+        console.error("API /github/check-branch-change Error:", error);
         return c.json(apiResponse(false, error.message));
     }
 });

@@ -10,7 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PROJECT_ROOT = join(__dirname, "..", "..");
 
-const OKASTR8_HOME = join(homedir(), ".okastr8");
+import { OKASTR8_HOME } from "../config";
 const APPS_DIR = join(OKASTR8_HOME, "apps");
 
 // GitHub API base URL
@@ -52,7 +52,6 @@ export interface ImportOptions {
 }
 
 // Config helpers
-// Config helpers
 // Note: We now use the Unified Config Manager
 import { getSystemConfig, saveSystemConfig } from "../config";
 
@@ -84,7 +83,7 @@ export async function saveGitHubConfig(github: GitHubConfig): Promise<void> {
 
 // OAuth Functions
 export function getAuthUrl(clientId: string, callbackUrl: string): string {
-    const scopes = ["repo", "read:user", "admin:repo_hook"];
+    const scopes = ["repo", "read:user", "admin:repo_hook", "admin:public_key"];
     const params = new URLSearchParams({
         client_id: clientId,
         redirect_uri: callbackUrl,
@@ -138,6 +137,61 @@ export async function getGitHubUser(accessToken: string): Promise<any> {
     }
 
     return response.json();
+}
+
+// SSH Key Management Functions
+export async function listSSHKeys(accessToken: string): Promise<any[]> {
+    const response = await fetch(`${GITHUB_API}/user/keys`, {
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: "application/vnd.github.v3+json",
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error(`Failed to list SSH keys: ${response.statusText}`);
+    }
+
+    return response.json() as Promise<any[]>;
+}
+
+export async function hasOkastr8DeployKey(accessToken: string): Promise<boolean> {
+    const keys = await listSSHKeys(accessToken);
+    return keys.some((k: any) => k.title?.includes("okastr8") || k.title?.includes("Okastr8"));
+}
+
+export async function createSSHKey(
+    accessToken: string,
+    title: string,
+    publicKey: string
+): Promise<{ success: boolean; message: string }> {
+    try {
+        const response = await fetch(`${GITHUB_API}/user/keys`, {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                Accept: "application/vnd.github.v3+json",
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                title,
+                key: publicKey,
+            }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json() as { message?: string; errors?: { message?: string }[] };
+            // Key already exists
+            if (errorData.errors?.some((e) => e.message?.includes("already in use"))) {
+                return { success: true, message: "SSH key already added to GitHub" };
+            }
+            return { success: false, message: errorData.message || response.statusText };
+        }
+
+        return { success: true, message: "SSH key added to GitHub successfully!" };
+    } catch (error: any) {
+        return { success: false, message: error.message };
+    }
 }
 
 // Repository Functions
@@ -253,6 +307,7 @@ export async function checkRepoConfig(accessToken: string, fullName: string, ref
             headers: {
                 Authorization: `Bearer ${accessToken}`,
                 Accept: "application/vnd.github.v3+json",
+                // "X-GitHub-Api-Version": "2022-11-28" // Optional but good practice
             },
         });
 
@@ -284,7 +339,7 @@ export async function importRepo(
     config?: DetectedConfig;
 }> {
     const { createApp } = await import("./app");
-    const { createVersion, setCurrentVersion, cleanOldVersions, initializeVersioning, updateVersionStatus } = await import("./version");
+    const { createVersion, setCurrentVersion, cleanOldVersions, initializeVersioning, updateVersionStatus, removeVersion, getVersions } = await import("./version");
     const githubConfig = await getGitHubConfig();
 
     // Helper to log to both console and stream
@@ -341,6 +396,20 @@ export async function importRepo(
         // or we could fetch it via API but let's stick to clone first
         const { versionId, releasePath } = await createVersion(appName, "HEAD", branch);
 
+        // CLEANUP HELPER
+        const cleanupFailedDeployment = async (reason: string) => {
+            log(`🧹 Cleaning up: ${reason}`);
+            try { await rm(releasePath, { recursive: true, force: true }); } catch (e) { console.error("Error removing release path:", e); }
+            try { await removeVersion(appName, versionId); } catch (e) { console.error("Error removing version entry:", e); }
+            try {
+                const data = await getVersions(appName);
+                if (data.versions.length === 0 && !data.current) {
+                    log(`🗑️  No versions left. Removing ghost app directory: ${appDir}`);
+                    await rm(appDir, { recursive: true, force: true });
+                }
+            } catch (e) { console.error("Error checking ghost app:", e); }
+        };
+
         await updateVersionStatus(appName, versionId, "pending", "Cloning repository");
 
         log(`⬇️ Cloning into release v${versionId}...`);
@@ -363,6 +432,8 @@ export async function importRepo(
 
         if (cloneResult.exitCode !== 0) {
             await updateVersionStatus(appName, versionId, "failed", "Clone failed");
+            // Cleanup on clone failure
+            await cleanupFailedDeployment("Clone failed");
             return { success: false, message: `Clone failed: ${cloneResult.stderr}` };
         }
 
@@ -400,6 +471,8 @@ export async function importRepo(
             log(`✅ Configuration loaded from okastr8.yaml`);
         } catch (error: any) {
             await updateVersionStatus(appName, versionId, "failed", "Invalid okastr8.yaml");
+            // Cleanup on config parse failure
+            await cleanupFailedDeployment("Invalid configuration");
             return {
                 success: false,
                 message: `Failed to parse okastr8.yaml: ${error.message}`,
@@ -423,6 +496,8 @@ export async function importRepo(
 
         if (!detectedConfig.startCommand) {
             await updateVersionStatus(appName, versionId, "failed", "No start command");
+            // Cleanup on missing start command
+            await cleanupFailedDeployment("Missing start command");
             return {
                 success: false,
                 message: "No start command specified in okastr8.yaml or deployment options.",
@@ -439,7 +514,7 @@ export async function importRepo(
             if (!isInstalled) {
                 await updateVersionStatus(appName, versionId, "failed", "Runtime missing: " + detectedConfig.runtime);
                 // Cleanup release
-                await rm(releasePath, { recursive: true, force: true });
+                await cleanupFailedDeployment("Runtime missing");
                 return {
                     success: false,
                     message: formatMissingRuntimeError(detectedConfig.runtime as any),
@@ -462,6 +537,8 @@ export async function importRepo(
                 const buildResult = await runCommand("bash", ["-c", step], releasePath);
                 if (buildResult.exitCode !== 0) {
                     await updateVersionStatus(appName, versionId, "failed", "Build failed");
+                    // Cleanup on build failure
+                    await cleanupFailedDeployment("Build failed");
                     return { success: false, message: `Build failed: ${step}\n${buildResult.stderr}` };
                 }
             }
@@ -482,13 +559,15 @@ export async function importRepo(
             user: process.env.USER || "root",
             port: finalPort,
             domain: finalDomain,
-            gitRepo: repo.clone_url,
+            gitRepo: repo.ssh_url,  // Use SSH for webhook updates (HTTPS tokens expire)
             gitBranch: branch,
             buildSteps: detectedConfig.buildSteps,
             env: detectedConfig.env,
         });
 
         if (!appResult.success) {
+            // Cleanup on app creation failure
+            await cleanupFailedDeployment("Systemd creation failed");
             return { success: false, message: appResult.message };
         }
 
@@ -521,10 +600,8 @@ export async function importRepo(
             const appJsonPath = join(appDir, "app.json");
             await runCommand("rm", ["-f", appJsonPath]);
 
-            // 3. Remove failed release directory
-            await rm(releasePath, { recursive: true, force: true });
-
-            log("✅ Cleanup complete - failed deployment artifacts removed");
+            // 3. Smart Cleanup
+            await cleanupFailedDeployment("Service failed to start");
 
             return {
                 success: false,
@@ -564,7 +641,6 @@ export async function importRepo(
     }
 }
 
-// Disconnect GitHub
 // Disconnect GitHub
 export async function disconnectGitHub(): Promise<void> {
     // Reset runtime github data, keep client ID/Secret
