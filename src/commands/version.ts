@@ -264,9 +264,15 @@ export async function rollback(
 }
 
 /**
- * Remove a specific version entry from history
+ * Remove a specific version entry from history AND delete its folder
  */
 export async function removeVersion(appName: string, versionId: number): Promise<void> {
+    // Delete the release folder first
+    const releasePath = join(getReleasesDir(appName), `v${versionId}`);
+    try {
+        await rm(releasePath, { recursive: true, force: true });
+    } catch { }
+
     const data = await getVersions(appName);
     const newVersions = data.versions.filter(v => v.id !== versionId);
 

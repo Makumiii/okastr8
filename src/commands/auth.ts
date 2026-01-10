@@ -1,0 +1,588 @@
+/**
+ * Auth & Permissions System
+ * Token-based authentication with fine-grained permissions
+ */
+
+import { homedir } from 'os';
+import { join } from 'path';
+import { existsSync } from 'fs';
+import { readFile, writeFile, mkdir } from 'fs/promises';
+import { randomBytes, createHmac } from 'crypto';
+
+// ============ Types ============
+
+export interface User {
+    email: string;
+    permissions: string[];
+    createdAt: string;
+    createdBy: string;
+}
+
+export interface Token {
+    id: string;
+    userId: string;       // email or 'admin' for admin
+    permissions: string[];
+    expiresAt: string;
+    createdAt: string;
+    renewalAlertSent?: boolean;
+}
+
+export interface PendingApproval {
+    id: string;
+    userId: string;       // email of user requesting access
+    token: string;        // the validated token
+    requestedAt: string;
+    expiresAt: string;
+    status: 'pending' | 'approved' | 'rejected';
+}
+
+export interface AuthData {
+    admin: string;        // Linux username of admin
+    secret: string;       // Server secret for signing tokens
+    users: User[];
+    tokens: Token[];
+    pendingApprovals: PendingApproval[];
+}
+
+// ============ Paths ============
+
+const AUTH_FILE = join(homedir(), '.okastr8', 'auth.json');
+
+// ============ Storage ============
+
+export async function loadAuthData(): Promise<AuthData> {
+    try {
+        if (existsSync(AUTH_FILE)) {
+            const content = await readFile(AUTH_FILE, 'utf-8');
+            return JSON.parse(content);
+        }
+    } catch { }
+
+    // Default: current Linux user is admin
+    const adminUser = process.env.SUDO_USER || process.env.USER || 'root';
+    const secret = randomBytes(32).toString('hex');
+
+    return {
+        admin: adminUser,
+        secret,
+        users: [],
+        tokens: [],
+        pendingApprovals: []
+    };
+}
+
+export async function saveAuthData(data: AuthData): Promise<void> {
+    const dir = join(homedir(), '.okastr8');
+    if (!existsSync(dir)) {
+        await mkdir(dir, { recursive: true });
+    }
+    await writeFile(AUTH_FILE, JSON.stringify(data, null, 2));
+}
+
+// ============ Token Management ============
+
+/**
+ * Parse expiry string to milliseconds
+ */
+function parseExpiry(expiry: string): number {
+    const match = expiry.match(/^(\d+)(m|h|d|w)$/);
+    if (!match || !match[1] || !match[2]) {
+        throw new Error(`Invalid expiry format: ${expiry}. Use: 30m, 1h, 1d, 1w, 30d`);
+    }
+
+    const value = parseInt(match[1], 10);
+    const unit = match[2];
+
+    const multipliers: Record<string, number> = {
+        'm': 60 * 1000,           // minutes
+        'h': 60 * 60 * 1000,      // hours
+        'd': 24 * 60 * 60 * 1000, // days
+        'w': 7 * 24 * 60 * 60 * 1000 // weeks
+    };
+
+    return value * (multipliers[unit] || 0);
+}
+
+/**
+ * Generate a signed token
+ */
+export async function generateToken(
+    userId: string,
+    permissions: string[],
+    expiry: string = '1d'
+): Promise<{ token: string; expiresAt: string }> {
+    const data = await loadAuthData();
+    const durationMs = parseExpiry(expiry);
+    const MAX_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+    if (durationMs > MAX_DURATION_MS) {
+        throw new Error('Security restriction: Token duration cannot exceed 24 hours (1d).');
+    }
+
+    const tokenId = randomBytes(16).toString('hex');
+    const expiresAt = new Date(Date.now() + durationMs).toISOString();
+
+    // Create token payload
+    const payload = {
+        id: tokenId,
+        sub: userId,
+        perm: permissions,
+        exp: expiresAt
+    };
+
+    // Sign the payload
+    const payloadStr = JSON.stringify(payload);
+    const payloadB64 = Buffer.from(payloadStr).toString('base64url');
+    const signature = createHmac('sha256', data.secret)
+        .update(payloadB64)
+        .digest('base64url');
+
+    const token = `${payloadB64}.${signature}`;
+
+    // Store token record for revocation
+    data.tokens.push({
+        id: tokenId,
+        userId,
+        permissions,
+        expiresAt,
+        createdAt: new Date().toISOString()
+    });
+
+    // Clean up expired tokens
+    data.tokens = data.tokens.filter(t => new Date(t.expiresAt) > new Date());
+
+    await saveAuthData(data);
+
+    return { token, expiresAt };
+}
+
+/**
+ * Validate and decode a token
+ */
+export async function validateToken(token: string): Promise<{
+    valid: boolean;
+    userId?: string;
+    permissions?: string[];
+    error?: string;
+}> {
+    try {
+        const data = await loadAuthData();
+
+        const parts = token.split('.');
+        if (parts.length !== 2 || !parts[0] || !parts[1]) {
+            return { valid: false, error: 'Invalid token format' };
+        }
+
+        const payloadB64 = parts[0];
+        const signature = parts[1];
+
+        // Verify signature
+        const expectedSig = createHmac('sha256', data.secret)
+            .update(payloadB64)
+            .digest('base64url');
+
+        if (signature !== expectedSig) {
+            return { valid: false, error: 'Invalid signature' };
+        }
+
+        // Decode payload
+        const payloadStr = Buffer.from(payloadB64, 'base64url').toString('utf-8');
+        const payload = JSON.parse(payloadStr);
+
+        // Check expiry (Strict payload check)
+        if (new Date(payload.exp) < new Date()) {
+            return { valid: false, error: 'Token expired' };
+        }
+
+        // Check if token was revoked
+        const tokenRecord = data.tokens.find(t => t.id === payload.id);
+        if (!tokenRecord) {
+            return { valid: false, error: 'Token revoked or not found' };
+        }
+
+        return {
+            valid: true,
+            userId: payload.sub,
+            permissions: payload.perm
+        };
+    } catch (error: any) {
+        return { valid: false, error: error.message };
+    }
+}
+
+/**
+ * Renew/Extend a token's expiry
+ */
+export async function renewToken(userId: string, duration: string): Promise<{ success: boolean; expiresAt?: string; error?: string }> {
+    const data = await loadAuthData();
+    const ms = parseExpiry(duration);
+
+    // Find active or recently expired token for user
+    const tokenIdx = data.tokens.findIndex(t => t.userId === userId);
+
+    if (tokenIdx === -1) {
+        return { success: false, error: 'No token found for user' };
+    }
+
+    const newExpiry = new Date(Date.now() + ms).toISOString();
+
+    if (data.tokens[tokenIdx]) {
+        data.tokens[tokenIdx].expiresAt = newExpiry;
+    }
+
+    // Also clear any "renewal notification sent" flag if we add one in the future
+
+    await saveAuthData(data);
+    return { success: true, expiresAt: newExpiry };
+}
+
+/**
+ * Revoke a token by ID
+ */
+export async function revokeToken(tokenId: string): Promise<boolean> {
+    const data = await loadAuthData();
+    const initialLength = data.tokens.length;
+    data.tokens = data.tokens.filter(t => t.id !== tokenId);
+
+    if (data.tokens.length < initialLength) {
+        await saveAuthData(data);
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Revoke ALL tokens (Emergency Security Measure)
+ */
+export async function revokeAllTokens(): Promise<number> {
+    const data = await loadAuthData();
+    const count = data.tokens.length;
+    data.tokens = [];
+    await saveAuthData(data);
+    return count;
+}
+
+/**
+ * List all active tokens
+ */
+export async function listTokens(): Promise<Token[]> {
+    const data = await loadAuthData();
+    // Filter out expired tokens
+    return data.tokens.filter(t => new Date(t.expiresAt) > new Date());
+}
+
+// ============ User Management ============
+
+/**
+ * Add a new user with permissions
+ */
+export async function addUser(
+    email: string,
+    permissions: string[],
+    createdBy: string = 'admin'
+): Promise<User> {
+    const data = await loadAuthData();
+
+    // Check if user exists
+    if (data.users.find(u => u.email === email)) {
+        throw new Error(`User ${email} already exists`);
+    }
+
+    const user: User = {
+        email,
+        permissions,
+        createdAt: new Date().toISOString(),
+        createdBy
+    };
+
+    data.users.push(user);
+    await saveAuthData(data);
+
+    return user;
+}
+
+/**
+ * Remove a user
+ */
+export async function removeUser(email: string): Promise<boolean> {
+    const data = await loadAuthData();
+    const initialLength = data.users.length;
+    data.users = data.users.filter(u => u.email !== email);
+
+    // Also revoke all their tokens
+    data.tokens = data.tokens.filter(t => t.userId !== email);
+
+    if (data.users.length < initialLength) {
+        await saveAuthData(data);
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Update user permissions
+ */
+export async function updateUserPermissions(
+    email: string,
+    permissions: string[]
+): Promise<User | null> {
+    const data = await loadAuthData();
+    const user = data.users.find(u => u.email === email);
+
+    if (!user) return null;
+
+    user.permissions = permissions;
+    await saveAuthData(data);
+
+    return user;
+}
+
+/**
+ * List all users
+ */
+export async function listUsers(): Promise<User[]> {
+    const data = await loadAuthData();
+    return data.users;
+}
+
+/**
+ * Get user by email
+ */
+export async function getUser(email: string): Promise<User | null> {
+    const data = await loadAuthData();
+    return data.users.find(u => u.email === email) || null;
+}
+
+// ============ Permission Checks ============
+
+/**
+ * Check if permissions array grants access to required permission
+ */
+export function hasPermission(userPerms: string[], required: string): boolean {
+    // Wildcard grants everything
+    if (userPerms.includes('*')) return true;
+
+    // Exact match
+    if (userPerms.includes(required)) return true;
+
+    // Category wildcard: view:* matches view:logs
+    const [category] = required.split(':');
+    if (userPerms.includes(`${category}:*`)) return true;
+
+    // Specific app permission: deploy:my-app
+    // Required: deploy:my-app, has: deploy:*
+    if (required.includes(':')) {
+        const [reqCat] = required.split(':');
+        if (userPerms.includes(`${reqCat}:*`)) return true;
+    }
+
+    return false;
+}
+
+/**
+ * Get admin username
+ */
+export async function getAdminUser(): Promise<string> {
+    const data = await loadAuthData();
+    return data.admin;
+}
+
+/**
+ * Check if current Linux user is admin
+ */
+export async function isCurrentUserAdmin(): Promise<boolean> {
+    const data = await loadAuthData();
+    const currentUser = process.env.SUDO_USER || process.env.USER || '';
+    return currentUser === data.admin;
+}
+
+/**
+ * Generate admin token (only works if current user is admin)
+ */
+export async function generateAdminToken(expiry: string = '1d'): Promise<{ token: string; expiresAt: string }> {
+    const isAdmin = await isCurrentUserAdmin();
+    if (!isAdmin) {
+        throw new Error('Only the admin user can generate admin tokens');
+    }
+
+    const data = await loadAuthData();
+    return generateToken(data.admin, ['*'], expiry);
+}
+
+// ============ Login Approval System ============
+
+const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Create a pending approval request
+ */
+export async function createPendingApproval(
+    userId: string,
+    token: string
+): Promise<PendingApproval> {
+    const data = await loadAuthData();
+
+    // Clean up expired approvals first
+    const now = Date.now();
+    data.pendingApprovals = data.pendingApprovals.filter(
+        p => new Date(p.expiresAt).getTime() > now
+    );
+
+    // Check if already pending
+    const existing = data.pendingApprovals.find(
+        p => p.userId === userId && p.status === 'pending'
+    );
+    if (existing) {
+        return existing;
+    }
+
+    const approval: PendingApproval = {
+        id: randomBytes(8).toString('hex'),
+        userId,
+        token,
+        requestedAt: new Date().toISOString(),
+        expiresAt: new Date(now + APPROVAL_TIMEOUT_MS).toISOString(),
+        status: 'pending'
+    };
+
+    data.pendingApprovals.push(approval);
+    await saveAuthData(data);
+
+    return approval;
+}
+
+/**
+ * List all pending approvals
+ */
+export async function listPendingApprovals(): Promise<PendingApproval[]> {
+    const data = await loadAuthData();
+    const now = Date.now();
+
+    // Return only pending and not expired
+    return data.pendingApprovals.filter(
+        p => p.status === 'pending' && new Date(p.expiresAt).getTime() > now
+    );
+}
+
+/**
+ * Approve a pending request
+ */
+export async function approveRequest(requestId: string): Promise<{ success: boolean; userId?: string; error?: string }> {
+    const data = await loadAuthData();
+
+    const approval = data.pendingApprovals.find(
+        p => p.id.startsWith(requestId) && p.status === 'pending'
+    );
+
+    if (!approval) {
+        return { success: false, error: 'Pending request not found' };
+    }
+
+    if (new Date(approval.expiresAt).getTime() < Date.now()) {
+        return { success: false, error: 'Request has expired' };
+    }
+
+    approval.status = 'approved';
+    await saveAuthData(data);
+
+    return { success: true, userId: approval.userId };
+}
+
+/**
+ * Reject a pending request
+ */
+export async function rejectRequest(requestId: string): Promise<{ success: boolean; userId?: string; error?: string }> {
+    const data = await loadAuthData();
+
+    const approval = data.pendingApprovals.find(
+        p => p.id.startsWith(requestId) && p.status === 'pending'
+    );
+
+    if (!approval) {
+        return { success: false, error: 'Pending request not found' };
+    }
+
+    approval.status = 'rejected';
+    await saveAuthData(data);
+
+    return { success: true, userId: approval.userId };
+}
+
+/**
+ * Check approval status
+ */
+export async function checkApprovalStatus(requestId: string): Promise<{
+    found: boolean;
+    status?: 'pending' | 'approved' | 'rejected' | 'expired';
+    token?: string;
+}> {
+    const data = await loadAuthData();
+
+    const approval = data.pendingApprovals.find(p => p.id === requestId);
+
+    if (!approval) {
+        return { found: false };
+    }
+
+    // Check if expired
+    if (new Date(approval.expiresAt).getTime() < Date.now() && approval.status === 'pending') {
+        return { found: true, status: 'expired' };
+    }
+
+    return {
+        found: true,
+        status: approval.status,
+        token: approval.status === 'approved' ? approval.token : undefined
+    };
+}
+
+/**
+ * Check if login approval is required (reads from system.yaml)
+ */
+export async function isLoginApprovalRequired(): Promise<boolean> {
+    try {
+        const { parse: parseYaml } = await import('yaml');
+        const { readFile } = await import('fs/promises');
+        const { existsSync } = await import('fs');
+        const { join } = await import('path');
+        const { homedir } = await import('os');
+
+        const systemYamlPath = join(homedir(), '.okastr8', 'system.yaml');
+        if (!existsSync(systemYamlPath)) {
+            return false; // Default: no approval needed if not configured
+        }
+
+        const content = await readFile(systemYamlPath, 'utf-8');
+        const config = parseYaml(content);
+
+        return config?.security?.require_login_approval === true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Check if user is in trusted users list (skip approval)
+ */
+export async function isTrustedUser(email: string): Promise<boolean> {
+    try {
+        const { parse: parseYaml } = await import('yaml');
+        const { readFile } = await import('fs/promises');
+        const { existsSync } = await import('fs');
+        const { join } = await import('path');
+        const { homedir } = await import('os');
+
+        const systemYamlPath = join(homedir(), '.okastr8', 'system.yaml');
+        if (!existsSync(systemYamlPath)) {
+            return false;
+        }
+
+        const content = await readFile(systemYamlPath, 'utf-8');
+        const config = parseYaml(content);
+
+        const trustedUsers: string[] = config?.security?.trusted_users || [];
+        return trustedUsers.includes(email);
+    } catch {
+        return false;
+    }
+}

@@ -108,15 +108,38 @@ export async function deployApp(options: DeployOptions) {
 
         const result = await updateApp(appName);
 
+        // Dynamically import to avoid circular dep if any
+        const { sendDeploymentAlertEmail } = await import('../services/email');
+
         if (result.success) {
             console.log(`\n✅ ${result.message}`);
+            // Send Success Alert
+            const releaseId = (result as any).data?.releaseId || 'unknown';
+            await sendDeploymentAlertEmail(appName, 'success', `Deployment to ${branch || 'default branch'} successful.\nRelease ID: ${releaseId}`);
+
+            // Update Caddy Routing
+            try {
+                const { genCaddyFile } = await import('../utils/genCaddyFile');
+                await genCaddyFile();
+            } catch (err: any) {
+                console.error(`⚠️ Failed to update Caddy routing: ${err.message}`);
+            }
         } else {
             console.error(`\n❌ ${result.message}`);
+            // Send Failure Alert
+            await sendDeploymentAlertEmail(appName, 'failed', result.message);
         }
 
         return result;
     } catch (error: any) {
         console.error(`❌ Deployment failed: ${error.message}`);
+
+        // Send Failure Alert
+        try {
+            const { sendDeploymentAlertEmail } = await import('../services/email');
+            await sendDeploymentAlertEmail(appName, 'failed', error.message);
+        } catch { } // Ignore error sending alert if it fails
+
         return { success: false, message: error.message };
     }
 }

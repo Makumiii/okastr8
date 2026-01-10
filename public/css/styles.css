@@ -1,4 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+@font-face {
+    font-family: 'Mona Sans';
+    src: url('https://github.githubassets.com/static/fonts/mona-sans/MonaSans.woff2') format('woff2');
+    font-weight: 200 900;
+    font-style: normal;
+    font-display: swap;
+}
 
 /* Modern Bento Grid - Warm Aesthetic Design System */
 :root {
@@ -31,7 +37,7 @@
 
 body {
     background-color: var(--bg-color);
-    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: 'Mona Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     color: var(--text-primary);
     margin: 0;
     padding: 20px 40px;

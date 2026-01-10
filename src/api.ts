@@ -30,6 +30,8 @@ import {
     configureFirewall,
     configureFail2ban,
 } from './commands/setup';
+import { validateToken, hasPermission } from './commands/auth';
+import { getRoutePermission } from './permissions';
 
 const api = new Hono();
 
@@ -38,6 +40,68 @@ const apiResponse = (success: boolean, message: string, data?: any) => ({
     success,
     message,
     data,
+});
+
+// ============ Global Auth Middleware ============
+// Automatically enforces authentication and permissions on all routes
+
+// Routes that don't require authentication
+const PUBLIC_ROUTES = [
+    'POST:/auth/verify',
+    'POST:/auth/logout',
+    'GET:/auth/me',
+    'POST:/github/webhook', // Webhook has its own HMAC verification
+    // Dynamic routes handled in middleware, but explicitly allowing this pattern not possible here easily
+    // We will check for /auth/approval/ prefix in middleware
+];
+
+api.use('*', async (c, next) => {
+    const method = c.req.method;
+    const path = c.req.path.replace('/api', ''); // Remove /api prefix
+    const routeKey = `${method}:${path}`;
+
+    // Skip auth for public routes or approval status polling
+    if (PUBLIC_ROUTES.some(r => routeKey === r) || path === '/github/webhook' || path.startsWith('/auth/approval/')) {
+        return next();
+    }
+
+    // Extract token from cookie or header
+    let token: string | null = null;
+    const authHeader = c.req.header('Authorization');
+    if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.slice(7);
+    } else {
+        const cookie = c.req.header('Cookie');
+        if (cookie) {
+            const match = cookie.match(/okastr8_session=([^;]+)/);
+            if (match && match[1]) {
+                token = match[1];
+            }
+        }
+    }
+
+    // Require authentication
+    if (!token) {
+        return c.json(apiResponse(false, 'Authentication required'), 401);
+    }
+
+    // Validate token
+    const result = await validateToken(token);
+    if (!result.valid) {
+        return c.json(apiResponse(false, result.error || 'Invalid token'), 401);
+    }
+
+    // Store user info in context
+    c.set('userId', result.userId!);
+    c.set('permissions', result.permissions!);
+
+    // Check route-specific permission
+    const requiredPerm = getRoutePermission(method, path);
+    if (requiredPerm && !hasPermission(result.permissions!, requiredPerm)) {
+        return c.json(apiResponse(false, `Permission denied: requires '${requiredPerm}'`), 403);
+    }
+
+    return next();
 });
 
 // ============ System Status Endpoints ============
@@ -127,6 +191,17 @@ api.get('/logs/recent', async (c) => {
         const logs = getRecentLogs(count);
         return c.json(apiResponse(true, 'Recent logs', { logs }));
     } catch (error: any) {
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
+api.get('/system/metrics', async (c) => {
+    try {
+        const { collectMetrics } = await import('./commands/metrics');
+        const metrics = await collectMetrics();
+        return c.json(apiResponse(true, 'System metrics', metrics));
+    } catch (error: any) {
+        console.error('API /system/metrics error:', error);
         return c.json(apiResponse(false, error.message));
     }
 });
@@ -521,6 +596,19 @@ api.post('/app/stop', async (c) => {
         return c.json(apiResponse(result.success, result.message));
     } catch (error: any) {
         console.error('API: /app/stop error:', error);
+        return c.json(apiResponse(false, error.message || 'Internal Server Error'));
+    }
+});
+
+api.post('/app/webhook-toggle', async (c) => {
+    console.log('API: /app/webhook-toggle hit');
+    try {
+        const { setAppWebhookAutoDeploy } = await import('./commands/app');
+        const { name, enabled } = await c.req.json();
+        const result = await setAppWebhookAutoDeploy(name, enabled);
+        return c.json(apiResponse(result.success, result.message));
+    } catch (error: any) {
+        console.error('API: /app/webhook-toggle error:', error);
         return c.json(apiResponse(false, error.message || 'Internal Server Error'));
     }
 });
@@ -1086,6 +1174,12 @@ api.post('/github/webhook', async (c) => {
         );
 
         if (targetApp) {
+            // Check Auto-Deploy Flag
+            if (targetApp.webhookAutoDeploy === false) {
+                console.log(`⚠️ Auto-deploy disabled for ${targetApp.name}. Ignoring webhook.`);
+                return c.json({ ignored: true, message: 'Auto-deploy disabled for this app' });
+            }
+
             console.log(`🚀 Webhook trigger: Auto-deploying ${targetApp.name}...`);
 
             // Check branch if possible
@@ -1113,6 +1207,166 @@ api.post('/github/webhook', async (c) => {
         console.error('API: /github/webhook error:', error);
         return c.text(error.message, 500);
     }
+});
+
+// ============ Auth Endpoints ============
+
+// Verify token and set session cookie
+api.post('/auth/verify', async (c) => {
+    try {
+        const body = await c.req.json();
+        const { token } = body;
+
+        if (!token) {
+            return c.json(apiResponse(false, 'Token is required'), 400);
+        }
+
+        const {
+            validateToken,
+            isLoginApprovalRequired,
+            isTrustedUser,
+            createPendingApproval,
+            isCurrentUserAdmin,
+            getAdminUser
+        } = await import('./commands/auth');
+
+        const result = await validateToken(token);
+
+        if (!result.valid) {
+            return c.json(apiResponse(false, result.error || 'Invalid token'), 401);
+        }
+
+        // Check if login approval is needed
+        const needsApproval = await isLoginApprovalRequired();
+        const isAdmin = result.userId === (await getAdminUser()); // Basic check
+        const isTrusted = await isTrustedUser(result.userId || '');
+
+        if (needsApproval && !isAdmin && !isTrusted) {
+            console.log(`🔒 Login approval required for ${result.userId}`);
+
+            // Create pending approval
+            const approval = await createPendingApproval(result.userId!, token);
+
+            // Send email to admin
+            const { sendLoginApprovalEmail } = await import('./services/email');
+            await sendLoginApprovalEmail(
+                result.userId!,
+                approval.id,
+                new Date(approval.requestedAt).toLocaleString()
+            );
+
+            return c.json(apiResponse(true, 'Approval required', {
+                pendingApproval: true,
+                requestId: approval.id,
+                userId: result.userId
+            }));
+        }
+
+        // Set session cookie (httpOnly for security)
+        const cookieOpts = 'Path=/; HttpOnly; SameSite=Strict; Max-Age=86400';
+        c.header('Set-Cookie', `okastr8_session=${token}; ${cookieOpts}`);
+
+        return c.json(apiResponse(true, 'Authenticated', {
+            userId: result.userId,
+            permissions: result.permissions
+        }));
+    } catch (error: any) {
+        console.error('API /auth/verify error:', error);
+        return c.json(apiResponse(false, error.message), 500);
+    }
+});
+
+// Check approval status
+api.get('/auth/approval/:id', async (c) => {
+    try {
+        const requestId = c.req.param('id');
+        const { checkApprovalStatus } = await import('./commands/auth');
+
+        const result = await checkApprovalStatus(requestId);
+
+        if (!result.found) {
+            return c.json(apiResponse(false, 'Request not found'), 404);
+        }
+
+        if (result.status === 'approved' && result.token) {
+            // Set session cookie
+            const cookieOpts = 'Path=/; HttpOnly; SameSite=Strict; Max-Age=86400';
+            c.header('Set-Cookie', `okastr8_session=${result.token}; ${cookieOpts}`);
+
+            return c.json(apiResponse(true, 'Approved', { status: 'approved' }));
+        }
+
+        return c.json(apiResponse(true, 'Status check', { status: result.status }));
+    } catch (error: any) {
+        return c.json(apiResponse(false, error.message), 500);
+    }
+});
+
+// Get current session info
+api.get('/auth/me', async (c) => {
+    try {
+        // Extract token from cookie
+        const cookie = c.req.header('Cookie');
+        let token = null;
+        if (cookie) {
+            const match = cookie.match(/okastr8_session=([^;]+)/);
+            if (match && match[1]) {
+                token = match[1];
+            }
+        }
+
+        if (!token) {
+            return c.json(apiResponse(false, 'Not authenticated'), 401);
+        }
+
+        const { validateToken } = await import('./commands/auth');
+        const result = await validateToken(token);
+
+        if (!result.valid) {
+            return c.json(apiResponse(false, result.error || 'Invalid session'), 401);
+        }
+
+        return c.json(apiResponse(true, 'Session valid', {
+            userId: result.userId,
+            permissions: result.permissions
+        }));
+    } catch (error: any) {
+        console.error('API /auth/me error:', error);
+        return c.json(apiResponse(false, error.message), 500);
+    }
+});
+
+// Logout (clear session cookie)
+api.post('/auth/logout', async (c) => {
+    c.header('Set-Cookie', 'okastr8_session=; Path=/; HttpOnly; Max-Age=0');
+    return c.json(apiResponse(true, 'Logged out'));
+});
+
+// Revoke all tokens (Emergency)
+api.post('/auth/revoke-all', async (c) => {
+    const { revokeAllTokens } = await import('./commands/auth');
+    const count = await revokeAllTokens();
+    return c.json(apiResponse(true, `Revoked ${count} tokens. All sessions invalidated.`));
+});
+
+// ================ Global Service Controls ================
+
+api.post('/services/start-all', async (c) => {
+    const { controlAllServices } = await import('./commands/system');
+    await controlAllServices('start');
+    return c.json(apiResponse(true, 'Initiated start sequence for all services'));
+});
+
+api.post('/services/stop-all', async (c) => {
+    const { controlAllServices } = await import('./commands/system');
+    await controlAllServices('stop');
+    return c.json(apiResponse(true, 'Initiated stop sequence for all services'));
+});
+
+api.post('/services/restart-all', async (c) => {
+    const { controlAllServices } = await import('./commands/system');
+    await controlAllServices('restart');
+    return c.json(apiResponse(true, 'Initiated restart sequence for all services'));
 });
 
 export default api;

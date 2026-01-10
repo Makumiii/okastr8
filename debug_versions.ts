@@ -14,11 +14,12 @@ async function main() {
         try {
             JSON.parse(c);
             console.log("JSON is VALID");
-        } catch (e) {
+        } catch (e: any) {
             console.log("JSON PARSE ERROR:", e.message);
         }
-    } catch (e) {
-        console.error("Read error:", e.message);
+    } catch (e: any) {
+        console.error(`Error checking versions: ${e.message}`);
+        // console.error(e);
     }
 }
 

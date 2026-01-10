@@ -58,6 +58,27 @@ export interface SystemConfig {
         url?: string;
         auth_token?: string;
     };
+    notifications?: {
+        brevo?: {
+            api_key?: string;
+            sender_email?: string;
+            sender_name?: string;
+            admin_email?: string;
+        };
+        alerts?: {
+            deployment_failed?: boolean;
+            deployment_success?: boolean;
+            service_down?: boolean;
+            login_approval?: boolean;
+            resources?: {
+                enabled?: boolean;
+                interval?: string;
+                cpu_threshold?: number;
+                ram_threshold?: number;
+                disk_threshold?: number;
+            };
+        };
+    };
     environments?: {
         node?: RuntimeInfo;
         python?: RuntimeInfo;

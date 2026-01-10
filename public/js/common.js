@@ -254,34 +254,80 @@ async function generateNewApiKey() {
     }
 }
 
-// Auth status check
+// Auth status check (session-based)
 async function checkAuthStatus() {
+    // Skip auth check on login page
+    if (window.location.pathname === '/login.html') {
+        return;
+    }
+
     try {
-        const response = await fetch('/auth/status');
+        const response = await fetch('/api/auth/me');
         const data = await response.json();
 
+        if (!data.success) {
+            // Not authenticated - redirect to login
+            window.location.href = '/login.html';
+            return;
+        }
+
+        // Store permissions in sessionStorage for UI
+        sessionStorage.setItem('okastr8_user', data.data.userId);
+        sessionStorage.setItem('okastr8_permissions', JSON.stringify(data.data.permissions));
+
+        // Show auth indicator if present
         const authIndicator = document.getElementById('auth-status');
         if (authIndicator) {
-            if (data.authEnabled) {
-                if (cachedApiKey) {
-                    authIndicator.innerHTML = '🔐 Authenticated';
-                    authIndicator.className = 'auth-status auth-ok';
-                } else {
-                    authIndicator.innerHTML = '🔒 API Key Required';
-                    authIndicator.className = 'auth-status auth-required';
-                }
-            } else {
-                authIndicator.innerHTML = '⚠️ Open Access';
-                authIndicator.className = 'auth-status auth-open';
-            }
-            authIndicator.onclick = showApiKeyModal;
+            authIndicator.innerHTML = `🔐 ${data.data.userId}`;
+            authIndicator.className = 'auth-status auth-ok';
+            authIndicator.onclick = showLogoutConfirm;
         }
     } catch (error) {
-        console.error('Failed to check auth status:', error);
+        console.error('Auth check failed:', error);
+        // On error, redirect to login
+        window.location.href = '/login.html';
     }
+}
+
+// Check if user has permission
+function hasPermission(permission) {
+    const permsJson = sessionStorage.getItem('okastr8_permissions');
+    if (!permsJson) return false;
+
+    try {
+        const perms = JSON.parse(permsJson);
+        if (perms.includes('*')) return true;
+        if (perms.includes(permission)) return true;
+
+        // Check category wildcard
+        const [category] = permission.split(':');
+        if (perms.includes(`${category}:*`)) return true;
+
+        return false;
+    } catch {
+        return false;
+    }
+}
+
+// Logout confirmation
+function showLogoutConfirm() {
+    if (confirm('Are you sure you want to log out?')) {
+        logout();
+    }
+}
+
+// Logout
+async function logout() {
+    try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+    } catch { }
+    sessionStorage.removeItem('okastr8_user');
+    sessionStorage.removeItem('okastr8_permissions');
+    window.location.href = '/login.html';
 }
 
 // Initialize on load
 document.addEventListener('DOMContentLoaded', () => {
     checkAuthStatus();
 });
+

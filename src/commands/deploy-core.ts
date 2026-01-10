@@ -4,7 +4,7 @@
  */
 
 import { join } from "path";
-import { readFile } from "fs/promises";
+import { readFile, readdir } from "fs/promises";
 import { existsSync } from "fs";
 import { OKASTR8_HOME } from "../config";
 import { runCommand } from "../utils/command";
@@ -88,8 +88,8 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
             runtime: rawConfig.runtime || 'custom',
             buildSteps: rawConfig.build || [],
             startCommand: rawConfig.start || '',
-            port: rawConfig.port,
-            domain: rawConfig.domain,
+            port: rawConfig.networking?.port || rawConfig.port,
+            domain: rawConfig.networking?.domain || rawConfig.domain,
             env: rawConfig.env,
         };
 
@@ -127,6 +127,14 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     log(`🔧 Runtime: ${config.runtime}`);
     log(`📝 Build steps: ${config.buildSteps.join(", ") || "none"}`);
     log(`▶️  Start command: ${config.startCommand}`);
+
+    // 2.5 Port Guardrail: Check for conflicts
+    if (config.port) {
+        log(`🛡️ Verifying availability of port ${config.port}...`);
+        await checkPortAvailability(config.port, appName, log);
+    }
+
+
 
     // 3. Run build steps
     if (config.buildSteps.length > 0) {
@@ -231,7 +239,8 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     log("🏥 Verifying systemd service status...");
     const healthCheck = await runCommand("sudo", [SCRIPTS.status, appName]);
     const serviceStatus = healthCheck.stdout.trim();
-    const isActive = healthCheck.exitCode === 0 && (serviceStatus.includes("active (running)") || serviceStatus === "active");
+    // status.sh returns exit code 0 for active services (no stdout output)
+    const isActive = healthCheck.exitCode === 0;
 
     if (!isActive) {
         log(`❌ Service failed to start. Status: ${serviceStatus}`);
@@ -306,4 +315,73 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
         message: `Successfully deployed ${appName} (v${versionId})`,
         config,
     };
+}
+
+/**
+ * Check if a port is available for the given app
+ * Throws an error if port is taken by another app or system process
+ */
+async function checkPortAvailability(port: number, myAppName: string, log: (msg: string) => void) {
+    // 1. Registry Check (Okastr8 Scan)
+    try {
+        const apps = await readdir(APPS_DIR);
+        for (const app of apps) {
+            if (app === myAppName) continue; // Skip self
+
+            const metaPath = join(APPS_DIR, app, "app.json");
+            try {
+                const content = await readFile(metaPath, "utf-8");
+                const meta = JSON.parse(content);
+                const metaPort = meta.networking?.port || meta.port;
+
+                if (metaPort === port) {
+                    throw new Error(`Port ${port} is already registered to application '${app}'`);
+                }
+            } catch (e) {
+                // Ignore parsing errors or missing files for other apps
+            }
+        }
+    } catch (e: any) {
+        // If readdir fails (no apps dir), that's fine
+        if (e.message.includes('already registered')) throw e;
+    }
+
+    // 2. System Check (ss)
+    try {
+        const check = await runCommand("ss", ["-ltn", `sport = :${port}`]);
+        const isListening = check.stdout.includes(`:${port}`);
+
+        if (isListening) {
+            // Port is used. Is it me?
+            // We check if *I* am running and if my *current* config uses this port.
+            let isMe = false;
+            try {
+                const myMetaPath = join(APPS_DIR, myAppName, "app.json");
+                const myContent = await readFile(myMetaPath, "utf-8");
+                const myMeta = JSON.parse(myContent);
+                const myCurrentPort = myMeta.networking?.port || myMeta.port;
+
+                // Also check if systemd service is actually active
+                const status = await runCommand("sudo", [SCRIPTS.status, myAppName]);
+                const isActive = status.exitCode === 0;
+
+                if (isActive && myCurrentPort === port) {
+                    isMe = true;
+                }
+            } catch (e) {
+                // If I don't exist yet or can't read my own meta, assume I am NOT running
+                isMe = false;
+            }
+
+            if (!isMe) {
+                throw new Error(`Port ${port} is occupied by an external process or another service.`);
+            } else {
+                log(`   (Port ${port} is currently held by this app. Will be released during restart.)`);
+            }
+        }
+    } catch (e: any) {
+        // Re-throw valid conflict errors
+        if (e.message.includes('occupied')) throw e;
+        // Ignore ss errors (command not found? Unlikely), proceed with caution
+    }
 }

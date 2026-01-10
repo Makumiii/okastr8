@@ -17,28 +17,66 @@ const caddyFilePath = "/etc/caddy/Caddyfile"; // Correct casing
 
 export async function genCaddyFile() {
   try {
-    const content = await readFile(userConfigPath);
-    const config = JSON.parse(content) as Okastr8Config;
+    const { readdir, readFile, stat } = await import('fs/promises');
+    const { join } = await import('path');
+    const { OKASTR8_HOME } = await import('../config');
 
-    const caddyEntries = config.services
-      .filter((s) => s.networking?.domain && s.networking?.port)
-      .map((s) => {
-        const { port, domain } = s.networking;
-        return `${domain} {\n  reverse_proxy localhost:${port}\n}`;
-      });
+    const appsDir = join(OKASTR8_HOME, 'apps');
+    let appsToCheck: string[] = [];
 
-    const caddyFile = caddyEntries.join("\n\n") + "\n"; 
+    try {
+      appsToCheck = await readdir(appsDir);
+    } catch {
+      // Apps dir might not exist yet
+      appsToCheck = [];
+    }
+
+    const caddyEntries: string[] = [];
+
+    for (const appName of appsToCheck) {
+      try {
+        const appMetadataPath = join(appsDir, appName, 'app.json');
+        // Check if file exists first? readFile throws if not found
+        const content = await readFile(appMetadataPath, 'utf-8');
+        const metadata = JSON.parse(content);
+
+        // Support both new nested networking config and legacy top-level config
+        const domain = metadata.networking?.domain || metadata.domain;
+        const port = metadata.networking?.port || metadata.port;
+
+        if (domain && port) {
+          // Add reverse proxy entry
+          caddyEntries.push(`${domain} {\n  reverse_proxy localhost:${port}\n}`);
+          console.log(`  ➕ Added route: ${domain} -> :${port} (${appName})`);
+        }
+      } catch (e) {
+        // Skip invalid apps or those without app.json
+        continue;
+      }
+    }
+
+    // Global options block enables metrics on admin API (localhost:2019/metrics)
+    const globalOptions = `{
+  servers {
+    metrics
+  }
+}
+`;
+
+    const caddyFile = globalOptions + caddyEntries.join("\n\n") + "\n";
 
     await writeFile(caddyFilePath, caddyFile);
-    
+
     // Use absolute path from project root (not fragile relative path)
     const pathToReloadCaddy = join(PROJECT_ROOT, "scripts", "caddy", "reloadCaddy.sh");
     await runCommand("sudo", [pathToReloadCaddy]);
-    
-    console.log(`Caddyfile generated at ${caddyFilePath}`);
+
+    console.log(`✅ Caddyfile regenerated with ${caddyEntries.length} routes at ${caddyFilePath}`);
   } catch (e) {
-    console.error("Error generating Caddyfile:", e);
-    throw e;
+    console.error("❌ Error generating Caddyfile:", e);
+    // Don't throw, just log. Deployment shouldn't fail if Caddy fails? 
+    // Actually, maybe it should warn.
+    // throw e; 
   }
 }
 

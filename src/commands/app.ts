@@ -43,6 +43,7 @@ export interface AppConfig {
     gitBranch?: string;
     buildSteps?: string[];
     env?: Record<string, string>;
+    webhookAutoDeploy?: boolean;
 }
 
 // Ensure the app directory structure exists
@@ -121,7 +122,8 @@ export async function createApp(config: AppConfig) {
                     logsDir,
                     // Preserve versioning data
                     versions: existingMetadata.versions || [],
-                    currentVersionId: existingMetadata.currentVersionId || null
+                    currentVersionId: existingMetadata.currentVersionId || null,
+                    webhookAutoDeploy: config.webhookAutoDeploy ?? true
                 },
                 null,
                 2
@@ -360,6 +362,20 @@ export async function updateApp(appName: string) {
     }
 }
 
+export async function setAppWebhookAutoDeploy(appName: string, enabled: boolean) {
+    const appDir = join(APPS_DIR, appName);
+    const metadataPath = join(appDir, "app.json");
+    try {
+        const content = await readFile(metadataPath, "utf-8");
+        const metadata = JSON.parse(content);
+        metadata.webhookAutoDeploy = enabled;
+        await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+        return { success: true, message: `Webhook auto-deploy ${enabled ? 'enabled' : 'disabled'} for ${appName}` };
+    } catch {
+        throw new Error(`App ${appName} not found or corrupted`);
+    }
+}
+
 // Commander Integration
 export function addAppCommands(program: Command) {
     const app = program
@@ -507,5 +523,22 @@ export function addAppCommands(program: Command) {
             console.log(`🔄 Restarting ${name}...`);
             const result = await restartApp(name);
             console.log(result.message);
+        });
+
+    app
+        .command("webhook")
+        .description("Enable or disable auto-deploy webhooks for an app")
+        .argument("<name>", "Application name")
+        .argument("<state>", "State (enable/disable, on/off, true/false)")
+        .action(async (name, state) => {
+            const enabled = ['enable', 'on', 'true', '1'].includes(state.toLowerCase());
+            console.log(`${enabled ? '🔌 Enabling' : '🔌 Disabling'} webhooks for ${name}...`);
+            try {
+                const result = await setAppWebhookAutoDeploy(name, enabled);
+                console.log(result.message);
+            } catch (error: any) {
+                console.error(`❌ Failed:`, error.message);
+                process.exit(1);
+            }
         });
 }

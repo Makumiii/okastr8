@@ -711,6 +711,12 @@
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><path d="M12 20v-6M6 20V10M18 20V4"></path></svg>
                                     Version History
                                 </button>
+                                <button class="dropdown-item" onclick="toggleWebhook('${app.name}', ${app.webhookAutoDeploy === false})">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                                    </svg>
+                                    ${app.webhookAutoDeploy !== false ? 'Disable Auto-Deploy' : 'Enable Auto-Deploy'}
+                                </button>
                                 <button class="dropdown-item danger" onclick="deleteApp('${app.name}')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                                     Delete App
@@ -912,6 +918,20 @@
                 }
             });
         });
+
+        async function toggleWebhook(name, enable) {
+            try {
+                const res = await apiPost('/app/webhook-toggle', { name, enabled: enable });
+                if (res.success) {
+                    showToast(res.message, 'success');
+                    loadApps(); // Reload to update UI
+                } else {
+                    showToast(res.message, 'error');
+                }
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
     </script>
 </body>
 

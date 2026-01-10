@@ -32,6 +32,35 @@ tunnel:
   url: "https://your-app.ngrok-free.app"
   auth_token: "your-ngrok-token"
 
+# Email notifications via Brevo
+notifications:
+  brevo:
+    api_key: "xkeysib-your-api-key"
+    sender_email: "robot@yourdomain.com"
+    sender_name: "okastr8"
+    admin_email: "you@example.com"
+  
+  # What triggers notifications
+  alerts:
+    login_approval: true      # Email when someone requests access
+    deployment_failed: true   # Email on deploy failure
+    deployment_success: false # Email on successful deploy
+    service_down: true        # Email when service goes down
+    
+    # Resource monitoring thresholds (percentage)
+    resources:
+      enabled: true
+      interval: 5m            # Check every 5 minutes
+      cpu_threshold: 90       # Alert if CPU > 90%
+      ram_threshold: 85       # Alert if RAM > 85%
+      disk_threshold: 90      # Alert if Disk > 90%
+
+# Security settings
+security:
+  require_login_approval: true   # Admin must approve every login
+  approval_timeout: 300          # 5 minutes to approve
+  trusted_users: []              # Users who skip approval (emails)
+
 # Runtime environments (auto-detected via 'okastr8 env scan')
 environments:
   node:
