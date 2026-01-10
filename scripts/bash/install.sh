@@ -220,23 +220,13 @@ else
   info "Warning: setup-sudoers.sh not found. Skipping sudoers configuration."
 fi
 
-# --- 10. Start Ngrok Tunnel ---
-info "Starting Ngrok tunnel for manager server..."
-NGROK_TUNNEL_SCRIPT="$INSTALL_DIR/scripts/tunnel.sh"
-
-if [ ! -f "$NGROK_TUNNEL_SCRIPT" ]; then
-  error "Ngrok tunnel script not found at $NGROK_TUNNEL_SCRIPT"
-fi
-
-# Run in background so install.sh can complete
-"$NGROK_TUNNEL_SCRIPT" &
-NGROK_TUNNEL_PID=$!
-info "Ngrok tunnel started in background (PID: $NGROK_TUNNEL_PID)."
+# --- 10. Start Cloudflare Tunnel (Optional/Manual) ---
+# We no longer auto-start tunnels. The user should run 'okastr8 tunnel setup <token>'
 
 # --- Done ---
 info "🎉 Okastr8 installation complete!"
 info "Run 'okastr8 --help' to get started."
+info "Run 'okastr8 setup full' to initialize your system."
 
 info "Web Manager Server service '$MANAGER_SERVICE_NAME' is running."
 info "To check status, run: systemctl status \"$MANAGER_SERVICE_NAME\""
-info "Ngrok tunnel is running. Check its output in the background or use 'fg' to bring it to foreground."
