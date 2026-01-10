@@ -9,6 +9,7 @@ import { addGitHubCommands } from './commands/github-cli';
 import { addMetricsCommands } from './commands/metrics-cli';
 import { addAuthCommands } from './commands/auth-cli';
 import { addAccessUserCommands } from './commands/user-cli';
+import { addTunnelCommands } from './commands/tunnel';
 
 const program = new Command();
 
@@ -27,6 +28,7 @@ addGitHubCommands(program);
 addMetricsCommands(program);
 addAuthCommands(program);        // Token management
 addAccessUserCommands(program);  // Access user management
+addTunnelCommands(program);
 
 import { addSystemCommands } from './commands/system';
 addSystemCommands(program);      // Global service & nuke (Must be last)

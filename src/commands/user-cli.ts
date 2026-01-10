@@ -452,14 +452,85 @@ ${getPermissionHelp()}`)
                 }
 
                 if (userTokens.length > 0) {
-                    console.log(`\nActive tokens: ${userTokens.length}`);
-                    for (const t of userTokens) {
-                        console.log(`  • ${t.id.slice(0, 12)}... expires ${new Date(t.expiresAt).toLocaleString()}`);
-                    }
+                    console.log(`\nActive token:`);
+                    // Single token policy: user should only have one
+                    const t = userTokens[0]!;
+                    console.log(`  • ${t.id.slice(0, 12)}... expires ${new Date(t.expiresAt).toLocaleString()}`);
                 } else {
-                    console.log('\nNo active tokens');
+                    console.log('\nNo active token');
                 }
                 console.log('');
+            } catch (error: any) {
+                console.error(`❌ Error: ${error.message}`);
+                process.exit(1);
+            }
+        });
+
+    // List all active tokens globally
+    user
+        .command('active')
+        .description('List all active access tokens')
+        .action(async () => {
+            try {
+                const isAdmin = await isCurrentUserAdmin();
+                if (!isAdmin) {
+                    console.error('❌ Only admin can view active tokens');
+                    process.exit(1);
+                }
+
+                const tokens = await listTokens();
+                if (tokens.length === 0) {
+                    console.log('No active tokens.');
+                    return;
+                }
+
+                console.log('\n🔐 Active Tokens\n');
+                console.log('User'.padEnd(30) + 'Token ID'.padEnd(20) + 'Expires');
+                console.log('─'.repeat(75));
+
+                // Sort by user
+                tokens.sort((a, b) => a.userId.localeCompare(b.userId));
+
+                for (const t of tokens) {
+                    // Calculate remaining time
+                    const expires = new Date(t.expiresAt);
+                    const now = new Date();
+                    const hoursLeft = Math.round((expires.getTime() - now.getTime()) / (1000 * 60 * 60));
+                    const timeStr = hoursLeft > 24 ? `${Math.floor(hoursLeft / 24)}d left` : `${hoursLeft}h left`;
+
+                    console.log(`${t.userId.padEnd(30)}${t.id.slice(0, 12)}...     ${timeStr} (${expires.toLocaleTimeString()})`);
+                }
+                console.log('');
+            } catch (error: any) {
+                console.error(`❌ Error: ${error.message}`);
+                process.exit(1);
+            }
+        });
+
+    // Revoke access for a specific user (Single Token Policy)
+    user
+        .command('revoke <email>')
+        .description('Revoke active token for a user')
+        .action(async (email) => {
+            try {
+                const isAdmin = await isCurrentUserAdmin();
+                if (!isAdmin) {
+                    console.error('❌ Only admin can revoke tokens');
+                    process.exit(1);
+                }
+
+                const tokens = await listTokens();
+                const userToken = tokens.find(t => t.userId === email);
+
+                if (!userToken) {
+                    console.error(`⚠️  No active token found for ${email}`);
+                    return;
+                }
+
+                const { revokeToken } = await import('./auth');
+                await revokeToken(userToken.id);
+                console.log(`✅ Revoked active token for ${email}`);
+
             } catch (error: any) {
                 console.error(`❌ Error: ${error.message}`);
                 process.exit(1);

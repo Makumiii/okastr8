@@ -139,17 +139,22 @@ export async function generateToken(
 
     const token = `${payloadB64}.${signature}`;
 
-    // Store token record for revocation
+    // 1. Strict Cleanup: Remove expired tokens globally
+    const now = new Date();
+    data.tokens = data.tokens.filter(t => new Date(t.expiresAt) > now);
+
+    // 2. Single Token Policy: Remove ANY existing tokens for this user
+    // (A user can only have one active token at a time)
+    data.tokens = data.tokens.filter(t => t.userId !== userId);
+
+    // 3. Add new token
     data.tokens.push({
         id: tokenId,
         userId,
         permissions,
         expiresAt,
-        createdAt: new Date().toISOString()
+        createdAt: now.toISOString()
     });
-
-    // Clean up expired tokens
-    data.tokens = data.tokens.filter(t => new Date(t.expiresAt) > new Date());
 
     await saveAuthData(data);
 

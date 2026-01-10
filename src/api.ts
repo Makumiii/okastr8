@@ -1368,5 +1368,110 @@ api.post('/services/restart-all', async (c) => {
     await controlAllServices('restart');
     return c.json(apiResponse(true, 'Initiated restart sequence for all services'));
 });
+// ================ Tunnel Controls ================
+
+api.get('/tunnel/status', async (c) => {
+    try {
+        const { getTunnelStatus } = await import('./commands/tunnel');
+        const status = await getTunnelStatus();
+        return c.json(apiResponse(true, 'Tunnel status', status));
+    } catch (error: any) {
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
+api.post('/tunnel/setup', async (c) => {
+    try {
+        const { installTunnel } = await import('./commands/tunnel');
+        const { token } = await c.req.json();
+
+        if (!token) return c.json(apiResponse(false, 'Token is required'));
+
+        const result = await installTunnel(token);
+        return c.json(apiResponse(result.success, result.message));
+    } catch (error: any) {
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
+api.post('/tunnel/uninstall', async (c) => {
+    try {
+        const { uninstallTunnel } = await import('./commands/tunnel');
+        const result = await uninstallTunnel();
+        return c.json(apiResponse(result.success, result.message));
+    } catch (error: any) {
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
+// ================ Access User Management ================
+
+api.get('/access/list', async (c) => {
+    try {
+        const { listUsers } = await import('./commands/auth');
+        const users = await listUsers();
+        // Hide tokens if present in basic list, return safe view
+        const safeUsers = users.map(u => ({
+            email: u.email,
+            permissions: u.permissions,
+            createdAt: u.createdAt,
+            createdBy: u.createdBy
+        }));
+        return c.json(apiResponse(true, 'Access Users', { users: safeUsers }));
+    } catch (error: any) {
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
+api.get('/access/tokens', async (c) => {
+    try {
+        const { listTokens } = await import('./commands/auth');
+        const tokens = await listTokens();
+        const tokenList = tokens.map(t => ({
+            userId: t.userId,
+            tokenId: t.id,
+            expiresAt: t.expiresAt
+        }));
+        return c.json(apiResponse(true, 'Active Tokens', { tokens: tokenList }));
+    } catch (error: any) {
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
+api.post('/access/revoke-token', async (c) => {
+    try {
+        const { revokeToken } = await import('./commands/auth');
+        const { tokenId } = await c.req.json();
+        const success = await revokeToken(tokenId);
+        return c.json(apiResponse(success, success ? 'Token revoked' : 'Token not found'));
+    } catch (error: any) {
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
+// Revoke all tokens for a user (wrapper around removing user basically, or filtering listTokens)
+api.post('/access/revoke-user', async (c) => {
+    try {
+        const { listTokens, revokeToken } = await import('./commands/auth');
+        const { email } = await c.req.json();
+
+        const allTokens = await listTokens();
+        const userTokens = allTokens.filter(t => t.userId === email);
+
+        if (userTokens.length === 0) {
+            return c.json(apiResponse(false, 'No active tokens found for user'));
+        }
+
+        let count = 0;
+        for (const t of userTokens) {
+            await revokeToken(t.id);
+            count++;
+        }
+
+        return c.json(apiResponse(true, `Revoked ${count} tokens for ${email}`));
+    } catch (error: any) {
+        return c.json(apiResponse(false, error.message));
+    }
+});
 
 export default api;

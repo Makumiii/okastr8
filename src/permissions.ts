@@ -158,6 +158,17 @@ export const ROUTE_PERMISSIONS: Record<string, string> = {
     // Setup
     'POST:/setup': 'system:setup',
     'POST:/orchestrate': 'system:orchestrate',
+
+    // Tunnel
+    'GET:/tunnel/status': 'system:control',
+    'POST:/tunnel/setup': 'system:control',
+    'POST:/tunnel/uninstall': 'system:control',
+
+    // Access Users
+    'GET:/access/list': 'users:access',
+    'GET:/access/tokens': 'users:access',
+    'POST:/access/revoke-token': 'users:access',
+    'POST:/access/revoke-user': 'users:access',
 };
 
 /**
