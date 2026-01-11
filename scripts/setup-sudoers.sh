@@ -77,6 +77,7 @@ SCRIPTS=(
   
   # Caddy/reverse proxy
   "scripts/caddy/reloadCaddy.sh"
+  "scripts/caddy/writeCaddyfile.sh"
   
   # Tunnels
   "scripts/tunnel.sh"

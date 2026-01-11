@@ -112,6 +112,12 @@ export async function getSystemConfig(): Promise<SystemConfig> {
     return await loadSystemConfig();
 }
 
+// Force reload from disk, bypassing cache (for polling scenarios)
+export async function reloadSystemConfig(): Promise<SystemConfig> {
+    configCache = null;
+    return await loadSystemConfig();
+}
+
 export async function saveSystemConfig(newConfig: Partial<SystemConfig>): Promise<void> {
     await mkdir(OKASTR8_HOME, { recursive: true });
 

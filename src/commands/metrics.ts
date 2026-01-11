@@ -128,7 +128,7 @@ async function getServiceMetrics(serviceName: string): Promise<ServiceMetrics | 
             // Get detailed properties
             const showResult = await runCommand('systemctl', [
                 'show', serviceName,
-                '--property=MainPID,CPUUsageNSec,MemoryCurrent,ActiveEnterTimestamp'
+                '--property=MainPID,CPUUsageNSec,MemoryCurrent,ActiveEnterTimestampMonotonic'
             ]);
 
             const props: Record<string, string> = {};
@@ -177,12 +177,16 @@ async function getServiceMetrics(serviceName: string): Promise<ServiceMetrics | 
                 }
             }
 
-            // Parse uptime from ActiveEnterTimestamp
-            if (props.ActiveEnterTimestamp && props.ActiveEnterTimestamp !== '') {
+            // Parse uptime from ActiveEnterTimestampMonotonic (microseconds)
+            if (props.ActiveEnterTimestampMonotonic && props.ActiveEnterTimestampMonotonic !== '0') {
                 try {
-                    const activeTime = new Date(props.ActiveEnterTimestamp).getTime();
-                    const now = Date.now();
-                    uptimeSeconds = Math.floor((now - activeTime) / 1000);
+                    const startMonotonicUSec = parseInt(props.ActiveEnterTimestampMonotonic, 10);
+                    const systemUptimeSec = osUptime();
+                    // System uptime is in seconds, convert to microseconds roughly or just compare seconds
+                    // Actually, simple math: uptime = system_uptime - (start_monotonic / 1M)
+                    if (!isNaN(startMonotonicUSec)) {
+                        uptimeSeconds = Math.max(0, Math.floor(systemUptimeSec - (startMonotonicUSec / 1000000)));
+                    }
                 } catch { }
             }
         }

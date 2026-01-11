@@ -312,8 +312,15 @@ export async function updateApp(appName: string) {
         console.log(`📦 Created release v${versionId} at ${releasePath}`);
 
         // 2. Clone code into release path (Fresh clone like importRepo)
-        // We use the gitRepo URL from metadata
-        const cloneUrl = metadata.gitRepo;
+        // Inject OAuth token for HTTPS URLs to avoid password prompts
+        let cloneUrl = metadata.gitRepo;
+        if (cloneUrl.startsWith('https://github.com/')) {
+            const { getGitHubConfig } = await import('./github');
+            const ghConfig = await getGitHubConfig();
+            if (ghConfig.accessToken) {
+                cloneUrl = cloneUrl.replace('https://github.com/', `https://${ghConfig.accessToken}@github.com/`);
+            }
+        }
 
         console.log(`⬇️ Cloning ${branch} into release...`);
         const cloneResult = await runCommand("git", [
@@ -527,15 +534,23 @@ export function addAppCommands(program: Command) {
 
     app
         .command("webhook")
-        .description("Enable or disable auto-deploy webhooks for an app")
+        .description("Show or set auto-deploy webhook status for an app")
         .argument("<name>", "Application name")
-        .argument("<state>", "State (enable/disable, on/off, true/false)")
+        .argument("[state]", "State (enable/disable, on/off) - omit to show current status")
         .action(async (name, state) => {
-            const enabled = ['enable', 'on', 'true', '1'].includes(state.toLowerCase());
-            console.log(`${enabled ? '🔌 Enabling' : '🔌 Disabling'} webhooks for ${name}...`);
             try {
-                const result = await setAppWebhookAutoDeploy(name, enabled);
-                console.log(result.message);
+                if (!state) {
+                    // Show current status
+                    const config = await getAppMetadata(name);
+                    const enabled = config?.webhookAutoDeploy ?? true;
+                    console.log(`🔌 Webhook auto-deploy for ${name}: ${enabled ? '✅ ENABLED' : '⏹️  DISABLED'}`);
+                } else {
+                    // Set status
+                    const enabled = ['enable', 'on', 'true', '1'].includes(state.toLowerCase());
+                    console.log(`${enabled ? '🔌 Enabling' : '🔌 Disabling'} webhooks for ${name}...`);
+                    const result = await setAppWebhookAutoDeploy(name, enabled);
+                    console.log(result.message);
+                }
             } catch (error: any) {
                 console.error(`❌ Failed:`, error.message);
                 process.exit(1);

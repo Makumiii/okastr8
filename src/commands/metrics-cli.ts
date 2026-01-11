@@ -105,34 +105,53 @@ function renderFooter(): string {
     return `\n${DIM}Press Ctrl+C to exit • Refreshing every 1s${RESET}\n`;
 }
 
+// TUI State Management
+const CURSOR_HIDE = `${ESC}[?25l`;
+const CURSOR_SHOW = `${ESC}[?25h`;
+const CLEAR_SCREEN = `${ESC}[2J`;
+const CURSOR_HOME = `${ESC}[H`;
+
 async function runMetricsLoop(): Promise<void> {
     let running = true;
 
-    // Handle Ctrl+C gracefully
-    process.on('SIGINT', () => {
+    // Hide cursor for cleaner look
+    process.stdout.write(CURSOR_HIDE);
+
+    // cleanup on exit
+    const cleanup = () => {
         running = false;
+        process.stdout.write(CURSOR_SHOW);
         console.log(`\n${GREEN}Exiting metrics view...${RESET}`);
         process.exit(0);
-    });
+    };
+
+    process.on('SIGINT', cleanup);
+    process.on('SIGTERM', cleanup);
 
     while (running) {
         try {
             const metrics = await collectMetrics();
 
-            // Clear screen and move cursor to top
-            process.stdout.write(CLEAR);
+            // Buffer output to prevent flickering
+            let output = '';
+
+            // Clear screen + scrollback buffer + move cursor home
+            // [2J clears visible screen, [3J clears scrollback, [H moves cursor
+            output += `${ESC}[2J${ESC}[3J${ESC}[H`;
 
             // Header
-            console.log(`${BOLD}${BLUE}okastr8 metrics${RESET} ${DIM}${new Date().toLocaleTimeString()}${RESET}\n`);
+            output += `${BOLD}${BLUE}okastr8 metrics${RESET} ${DIM}${new Date().toLocaleTimeString()}${RESET}\n\n`;
 
             // System overview
-            console.log(renderSystemOverview(metrics.system));
+            output += renderSystemOverview(metrics.system) + '\n';
 
             // Services table
-            console.log(renderServicesTable(metrics.services));
+            output += renderServicesTable(metrics.services) + '\n';
 
             // Footer
-            console.log(renderFooter());
+            output += renderFooter();
+
+            process.stdout.write(output);
 
         } catch (error: any) {
             console.error(`${RED}Error collecting metrics: ${error.message}${RESET}`);

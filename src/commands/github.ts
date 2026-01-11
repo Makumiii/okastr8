@@ -53,7 +53,7 @@ export interface ImportOptions {
 
 // Config helpers
 // Note: We now use the Unified Config Manager
-import { getSystemConfig, saveSystemConfig } from "../config";
+import { getSystemConfig, saveSystemConfig, reloadSystemConfig } from "../config";
 
 export async function getGitHubConfig(): Promise<GitHubConfig> {
     const config = await getSystemConfig();
@@ -149,7 +149,25 @@ export async function listSSHKeys(accessToken: string): Promise<any[]> {
     });
 
     if (!response.ok) {
-        throw new Error(`Failed to list SSH keys: ${response.statusText}`);
+        if (response.status === 404 || response.status === 403) {
+            throw new Error(
+                `OAuth token lacks 'admin:public_key' permission.
+
+Your GitHub token can authenticate but cannot manage SSH keys.
+
+HOW TO FIX:
+1. Go to: https://github.com/settings/tokens
+2. Find your okastr8 token and edit it
+3. Check the 'admin:public_key' scope
+4. Save and reconnect okastr8 to GitHub
+
+OR use manual workaround:
+   ssh-keygen -t ed25519 -f ~/.ssh/okastr8_deploy_key -N "" -C "okastr8"
+   cat ~/.ssh/okastr8_deploy_key.pub
+   # Then add the key manually at: https://github.com/settings/keys`
+            );
+        }
+        throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
     }
 
     return response.json() as Promise<any[]>;
@@ -559,7 +577,7 @@ export async function importRepo(
             user: process.env.USER || "root",
             port: finalPort,
             domain: finalDomain,
-            gitRepo: repo.ssh_url,  // Use SSH for webhook updates (HTTPS tokens expire)
+            gitRepo: repo.ssh_url || repo.clone_url || repo.html_url,  // Fallback if SSH URL is missing
             gitBranch: branch,
             buildSteps: detectedConfig.buildSteps,
             env: detectedConfig.env,
@@ -655,18 +673,20 @@ export async function disconnectGitHub(): Promise<void> {
     });
 }
 
-// Check connection status
+// Check connection status (always reload from disk)
 export async function getConnectionStatus(): Promise<{
     connected: boolean;
     username?: string;
     connectedAt?: string;
 }> {
-    const github = await getGitHubConfig();
-    if (github.accessToken) {
+    // Force reload to see changes from other processes (e.g., manager server)
+    const config = await reloadSystemConfig();
+    const gh = config.manager?.github || {};
+    if (gh.access_token) {
         return {
             connected: true,
-            username: github.username,
-            connectedAt: github.connectedAt,
+            username: gh.username,
+            connectedAt: gh.connected_at,
         };
     }
     return { connected: false };

@@ -45,8 +45,9 @@ export async function genCaddyFile() {
         const port = metadata.networking?.port || metadata.port;
 
         if (domain && port) {
-          // Add reverse proxy entry
-          caddyEntries.push(`${domain} {\n  reverse_proxy localhost:${port}\n}`);
+          // Use http:// prefix for localhost domains to avoid auto-HTTPS
+          const scheme = domain.endsWith('.localhost') ? 'http://' : '';
+          caddyEntries.push(`${scheme}${domain} {\n  reverse_proxy localhost:${port}\n}`);
           console.log(`  ➕ Added route: ${domain} -> :${port} (${appName})`);
         }
       } catch (e) {
@@ -65,7 +66,13 @@ export async function genCaddyFile() {
 
     const caddyFile = globalOptions + caddyEntries.join("\n\n") + "\n";
 
-    await writeFile(caddyFilePath, caddyFile);
+    // Write Caddyfile using sudo helper script to avoid permission issues
+    const pathToWriteCaddyfile = join(PROJECT_ROOT, "scripts", "caddy", "writeCaddyfile.sh");
+    const writeResult = await runCommand("sudo", [pathToWriteCaddyfile], undefined, caddyFile);
+
+    if (writeResult.exitCode !== 0) {
+      throw new Error(`Failed to write Caddyfile: ${writeResult.stderr}`);
+    }
 
     // Use absolute path from project root (not fragile relative path)
     const pathToReloadCaddy = join(PROJECT_ROOT, "scripts", "caddy", "reloadCaddy.sh");

@@ -18,13 +18,16 @@ fi
 
 # Check if the service is active (running)
 if systemctl is-active --quiet "$SERVICE_NAME"; then
+  echo "✅ $SERVICE_NAME is running"
   exit 0
 fi
 
 # Check if the service has failed
 if systemctl is-failed --quiet "$SERVICE_NAME"; then
+  echo "❌ $SERVICE_NAME has failed"
   exit 2
 fi
 
-# If not active and not failed, it's considered not running
+# If not active and not failed, it's considered stopped
+echo "⏹️  $SERVICE_NAME is stopped"
 exit 3

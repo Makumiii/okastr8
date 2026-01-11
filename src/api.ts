@@ -51,6 +51,8 @@ const PUBLIC_ROUTES = [
     'POST:/auth/logout',
     'GET:/auth/me',
     'POST:/github/webhook', // Webhook has its own HMAC verification
+    'GET:/github/callback',  // OAuth callback - no auth yet!
+    'GET:/github/auth-url',  // Auth URL generation
     // Dynamic routes handled in middleware, but explicitly allowing this pattern not possible here easily
     // We will check for /auth/approval/ prefix in middleware
 ];

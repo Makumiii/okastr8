@@ -657,7 +657,7 @@ manager:
             document.getElementById('deploy-repo-name').value = repoFullName;
 
             // Set app name display
-            const appName = repoName.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+            const appName = repoName.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
             document.getElementById('deploy-app-name-text').textContent = appName;
 
             const branchSelect = document.getElementById('deploy-branch');
