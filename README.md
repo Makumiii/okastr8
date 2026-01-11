@@ -1,5 +1,7 @@
 # Okastr8
 
+![Okastr8 Logo](assets/logo-light.png)
+
 **The Open-Source PaaS for Your Own Servers**
 
 Deploy, manage, and monitor your applications with a beautiful dashboard and powerful CLI.
