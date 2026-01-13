@@ -1,7 +1,9 @@
-import { Command } from "commander";
-import { runCommand } from "../utils/command";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { Command } from "commander";
+import { runCommand } from "../utils/command";
+// @ts-ignore
+import { prompt } from "enquirer";
 
 // Get the directory of this file (works in Bun and Node ESM)
 const __filename = fileURLToPath(import.meta.url);
@@ -18,6 +20,7 @@ const SCRIPTS = {
     ufwDefaults: join(PROJECT_ROOT, "scripts", "ufw", "defaults.sh"),
     fail2ban: join(PROJECT_ROOT, "scripts", "fail2ban", "fail2ban.sh"),
     orchestrate: join(PROJECT_ROOT, "scripts", "ochestrateEnvironment.sh"),
+    createUser: join(PROJECT_ROOT, "scripts", "user", "create-user.sh"),
 };
 
 // Core Functions
@@ -71,7 +74,7 @@ export function addSetupCommands(program: Command) {
         .command("ssh-harden")
         .description("Harden SSH configuration (disable password auth, root login, etc)")
         .option("-p, --port <port>", "Optionally change SSH port")
-        .action(async (options) => {
+        .action(async (options: any) => {
             console.log("Hardening SSH configuration...");
             const port = options.port ? parseInt(options.port, 10) : undefined;
             const result = await hardenSsh(port);
@@ -85,7 +88,7 @@ export function addSetupCommands(program: Command) {
         .command("ssh-port")
         .description("Change the SSH port")
         .argument("<port>", "New SSH port number")
-        .action(async (port) => {
+        .action(async (port: string) => {
             console.log(`Changing SSH port to ${port}...`);
             const result = await changeSshPort(parseInt(port, 10));
             console.log(result.stdout || result.stderr);
@@ -98,7 +101,7 @@ export function addSetupCommands(program: Command) {
         .command("firewall")
         .description("Configure UFW firewall with secure defaults")
         .option("-p, --ssh-port <port>", "SSH port to allow (default: 2222)")
-        .action(async (options) => {
+        .action(async (options: any) => {
             console.log("Configuring firewall...");
             const sshPort = options.sshPort ? parseInt(options.sshPort, 10) : undefined;
             const result = await configureFirewall(sshPort);
@@ -150,6 +153,51 @@ export function addSetupCommands(program: Command) {
             } else {
                 console.error("\n❌ Sudoers configuration failed.");
                 process.exit(result.exitCode || 1);
+            }
+        });
+
+    setup
+        .command("user")
+        .description("Interactively create a new non-root user with sudo and docker access")
+        .action(async () => {
+            console.log("👤 New User Setup\n");
+
+            try {
+                const response = await prompt([
+                    {
+                        type: 'input',
+                        name: 'username',
+                        message: 'Enter username for the new user:',
+                        validate: (val: string) => val.length > 0
+                    },
+                    {
+                        type: 'password',
+                        name: 'password',
+                        message: 'Enter password for the new user:',
+                        validate: (val: string) => val.length > 0
+                    }
+                ]) as any;
+
+                console.log(`\nCreating user '${response.username}'...`);
+
+                const result = await runCommand("sudo", [
+                    SCRIPTS.createUser,
+                    response.username,
+                    response.password
+                ]);
+
+                console.log(result.stdout || result.stderr);
+
+                if (result.exitCode === 0) {
+                    console.log("\n✅ User created successfully!");
+                    console.log(`   You can now switch to the new user: su - ${response.username}`);
+                    console.log("   From there, you can run 'okastr8 setup full' to complete the installation.");
+                } else {
+                    console.error("\n❌ Failed to create user.");
+                    process.exit(1);
+                }
+            } catch (e) {
+                console.log("\nUser setup cancelled.");
             }
         });
 }

@@ -38,4 +38,18 @@ else
   usermod -aG sudo "$USERNAME" && echo "✅ Added to 'sudo' group (Debian-based)."
 fi
 
+# Add to docker group if it exists
+if getent group docker >/dev/null; then
+  usermod -aG docker "$USERNAME" && echo "✅ Added to 'docker' group."
+fi
+
+# Initialize .ssh directory
+USER_HOME=$(eval echo "~$USERNAME")
+mkdir -p "$USER_HOME/.ssh"
+touch "$USER_HOME/.ssh/authorized_keys"
+chmod 700 "$USER_HOME/.ssh"
+chmod 600 "$USER_HOME/.ssh/authorized_keys"
+chown -R "$USERNAME:$USERNAME" "$USER_HOME/.ssh"
+echo "🔐 SSH directory initialized for '$USERNAME'."
+
 echo "🎉 User '$USERNAME' created."

@@ -40,6 +40,8 @@ export interface AppConfig {
     buildSteps?: string[];
     env?: Record<string, string>;
     webhookAutoDeploy?: boolean;
+    database?: string;
+    cache?: string;
     deploymentType?: "docker" | "systemd"; // Backwards compat or new default
 }
 
@@ -366,6 +368,8 @@ export function addAppCommands(program: Command) {
         .option("--domain <domain>", "Domain for Caddy reverse proxy")
         .option("--git-repo <url>", "Git repository URL")
         .option("--git-branch <branch>", "Git branch to track", "main")
+        .option("--database <type:version>", "Database service (e.g., 'postgres:15')")
+        .option("--cache <type:version>", "Cache service (e.g., 'redis:7')")
         .action(async (name: string, execStart: string, options: any) => {
             console.log(`Creating app '${name}'...`);
             try {
@@ -379,6 +383,8 @@ export function addAppCommands(program: Command) {
                     domain: options.domain,
                     gitRepo: options.gitRepo,
                     gitBranch: options.gitBranch,
+                    database: options.database,
+                    cache: options.cache
                 });
                 console.log(result.message);
                 console.log(`App created at ${result.appDir}`);

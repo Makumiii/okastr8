@@ -19,6 +19,12 @@ CONFIG_DIR="$HOME/.okastr8"
 CONFIG_FILE="$CONFIG_DIR/config.json"
 DEPLOYMENT_FILE="$CONFIG_DIR/deployment.json"
 
+# Systemd Integration
+BUN_PATH="/usr/local/bin/bun"
+CREATE_SCRIPT_PATH="$INSTALL_DIR/scripts/systemd/create.sh"
+SERVICE_WORKING_DIR="$INSTALL_DIR"
+CURRENT_USER=$(whoami)
+
 # --- Helper Functions ---
 info() {
   echo "INFO: $1"
@@ -108,8 +114,90 @@ fi
 # --- Pre-flight Checks ---
 info "Starting Okastr8 installation..."
 
+# --- Root Onboarding ---
 if [[ $EUID -eq 0 ]]; then
-  error "This script should not be run as root. It will use 'sudo' when necessary."
+  echo "🛡️  Okastr8 Security: Running as root is not recommended."
+  echo "We will now create a dedicated administrative user and harden your server."
+  echo ""
+
+  # 1. Gather User Details
+  while true; do
+    read -p "👤 Enter username for new admin (default: okastr8): " NEW_USER < /dev/tty
+    NEW_USER=${NEW_USER:-okastr8}
+    if [[ "$NEW_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then break; fi
+    echo "❌ Invalid username. Use lowercase letters, numbers, and underscores."
+  done
+
+  while true; do
+    read -s -p "🔐 Enter password for $NEW_USER: " NEW_PASS < /dev/tty
+    echo ""
+    if [[ -n "$NEW_PASS" ]]; then break; fi
+    echo "❌ Password cannot be empty."
+  done
+
+  # 2. Setup Scripts
+  SCRIPTS_URL_BASE="https://raw.githubusercontent.com/Makumiii/okastr8/main/scripts"
+  
+  info "Downloading setup tools..."
+  curl -sSL "$SCRIPTS_URL_BASE/user/create-user.sh" -o "/tmp/create-user.sh"
+  curl -sSL "$SCRIPTS_URL_BASE/ssh/harden-ssh.sh" -o "/tmp/harden-ssh.sh"
+  chmod +x /tmp/create-user.sh /tmp/harden-ssh.sh
+
+  # 3. Create User
+  info "Creating user '$NEW_USER'..."
+  /tmp/create-user.sh "$NEW_USER" "$NEW_PASS"
+
+  # 4. SSH Key Management
+  NEW_USER_HOME=$(eval echo "~$NEW_USER")
+  
+  # Migrate root keys if they exist
+  if [ -f "/root/.ssh/authorized_keys" ]; then
+    info "Migrating existing SSH keys to '$NEW_USER'..."
+    cat "/root/.ssh/authorized_keys" >> "$NEW_USER_HOME/.ssh/authorized_keys"
+    chown "$NEW_USER:$NEW_USER" "$NEW_USER_HOME/.ssh/authorized_keys"
+  fi
+
+  # Always generate a fresh Okastr8 key
+  info "Generating fresh SSH key for '$NEW_USER'..."
+  SSH_KEY_FILE="/tmp/okastr8_admin_key"
+  rm -f "$SSH_KEY_FILE"
+  ssh-keygen -t ed25519 -f "$SSH_KEY_FILE" -N "" -q
+  cat "${SSH_KEY_FILE}.pub" >> "$NEW_USER_HOME/.ssh/authorized_keys"
+  
+  PRIVATE_KEY=$(cat "$SSH_KEY_FILE")
+  
+  echo ""
+  echo "----------------------------------------------------------------"
+  echo "🔑 NEW PRIVATE KEY (okastr8_admin.pem)"
+  echo "Save this content to a file on your local machine to login."
+  echo "----------------------------------------------------------------"
+  echo "$PRIVATE_KEY"
+  echo "----------------------------------------------------------------"
+  
+  # Clipboard Injection (OSC 52)
+  printf "\033]52;c;$(printf "%s" "$PRIVATE_KEY" | base64 | tr -d '\n')\a"
+  echo "💡 Tip: If your terminal supports OSC 52, it's already in your clipboard!"
+  echo ""
+
+  while true; do
+    read -p "👉 Type 'SAVED' when you have safely stored your key: " CONFIRM < /dev/tty
+    if [[ "$CONFIRM" == "SAVED" ]]; then break; fi
+  done
+
+  # 5. Lockdown
+  info "Locking root account and hardening SSH..."
+  passwd -l root
+  /tmp/harden-ssh.sh
+  
+  rm -f "$SSH_KEY_FILE" "${SSH_KEY_FILE}.pub" "/tmp/create-user.sh" "/tmp/harden-ssh.sh"
+
+  echo ""
+  info "✅ User created and server hardened."
+  echo "Please switch to your new user to finish the installation:"
+  echo ""
+  echo "   su - $NEW_USER -c 'curl -fsSL https://raw.githubusercontent.com/Makumiii/okastr8/main/scripts/bash/install.sh | bash'"
+  echo ""
+  exit 0
 fi
 
 # Call clean_install at the beginning to ensure a fresh state
