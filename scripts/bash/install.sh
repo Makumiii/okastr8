@@ -357,8 +357,16 @@ MANAGER_EXEC_START="$BUN_PATH run $INSTALL_DIR/src/managerServer.ts"
 # Always create/update the service file
 info "Creating systemd service '$MANAGER_SERVICE_NAME'."
 
-# Check if systemd is even available before trying
-if ! command -v systemctl &> /dev/null || ! systemctl is-system-running &> /dev/null; then
+# Check if systemd is available - we check if systemctl exists AND if PID 1 is systemd
+SYSTEMD_AVAILABLE=false
+if command -v systemctl &> /dev/null; then
+  # Check if init system is systemd (PID 1)
+  if [ -d /run/systemd/system ]; then
+    SYSTEMD_AVAILABLE=true
+  fi
+fi
+
+if [ "$SYSTEMD_AVAILABLE" = "false" ]; then
   info "Systemd not available (container environment?); skipping service creation."
   info "You can run okastr8 manually with: $BUN_PATH run $INSTALL_DIR/src/managerServer.ts"
 else
@@ -370,6 +378,8 @@ else
 
   if [ "$status" -eq 0 ]; then
     info "Systemd service '$MANAGER_SERVICE_NAME' created and enabled."
+  elif [ "$status" -eq 2 ]; then
+    info "Systemd not running; skipping service creation. You can run okastr8 manually."
   else
     info "Warning: Could not create systemd service (exit code: $status). You can run okastr8 manually."
   fi
