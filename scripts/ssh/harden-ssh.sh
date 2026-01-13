@@ -123,9 +123,9 @@ echo "🔄 Restarting SSH service..."
 
 # Detect init system and restart appropriately
 if command -v systemctl &> /dev/null; then
-  systemctl restart sshd || systemctl restart ssh
+  systemctl restart sshd || systemctl restart ssh || true
 elif command -v service &> /dev/null; then
-  service sshd restart || service ssh restart
+  service sshd restart || service ssh restart || true
 else
   echo "⚠️  Could not restart SSH service. Please restart manually." >&2
 fi
