@@ -44,17 +44,20 @@ if [ ! -f "$SSHD_CONFIG" ]; then
 fi
 
 # Check if at least one SSH key exists for the current user (or calling user)
-CALLING_USER=$(whoami)
-CALLING_USER_HOME=$(eval echo "~$CALLING_USER")
-AUTHORIZED_KEYS="$CALLING_USER_HOME/.ssh/authorized_keys"
+# Check if at least one SSH key exists for the current user (or calling user)
+if [[ "${SKIP_KEY_CHECK:-false}" != "true" ]]; then
+  CALLING_USER=$(whoami)
+  CALLING_USER_HOME=$(eval echo "~$CALLING_USER")
+  AUTHORIZED_KEYS="$CALLING_USER_HOME/.ssh/authorized_keys"
 
-if [ ! -f "$AUTHORIZED_KEYS" ] || [ ! -s "$AUTHORIZED_KEYS" ]; then
-  echo "⚠️  WARNING: No SSH authorized_keys found for user '$CALLING_USER'" >&2
-  echo "   If you disable password auth without SSH keys, you may be locked out!" >&2
-  read -p "   Continue anyway? (yes/no): " confirm
-  if [ "$confirm" != "yes" ]; then
-    echo "Aborted."
-    exit 1
+  if [ ! -f "$AUTHORIZED_KEYS" ] || [ ! -s "$AUTHORIZED_KEYS" ]; then
+    echo "⚠️  WARNING: No SSH authorized_keys found for user '$CALLING_USER'" >&2
+    echo "   If you disable password auth without SSH keys, you may be locked out!" >&2
+    read -p "   Continue anyway? (yes/no): " confirm
+    if [ "$confirm" != "yes" ]; then
+      echo "Aborted."
+      exit 1
+    fi
   fi
 fi
 

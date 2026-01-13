@@ -232,7 +232,7 @@ if [[ $EUID -eq 0 ]]; then
   # 5. Lockdown
   info "Locking root account and hardening SSH..."
   passwd -l root
-  /tmp/harden-ssh.sh
+  SKIP_KEY_CHECK=true /tmp/harden-ssh.sh
   
   rm -f "$SSH_KEY_FILE" "${SSH_KEY_FILE}.pub" "/tmp/create-user.sh" "/tmp/harden-ssh.sh"
 
