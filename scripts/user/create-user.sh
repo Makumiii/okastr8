@@ -2,8 +2,8 @@
 set -eou pipefail
 
 USERNAME=$1
-PASSWORD=$2
-DISTRO=$3
+PASSWORD=${2:-}
+DISTRO=${3:-}
 
 # Default password fallback
 if [[ -z "$PASSWORD" ]]; then
