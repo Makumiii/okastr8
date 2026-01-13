@@ -49,6 +49,8 @@ if [[ "$USE_FEDORA" == true ]]; then
   sudo systemctl enable firewalld
   sudo systemctl start firewalld
 else
+  # Remove any malformed Caddy list before apt update.
+  sudo rm -f /etc/apt/sources.list.d/caddy-stable.list
   sudo apt update
   sudo apt install -y "${DEBIAN_PACKAGES[@]}"
   sudo apt update
