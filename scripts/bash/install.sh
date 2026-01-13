@@ -183,8 +183,8 @@ if [[ $EUID -eq 0 ]]; then
   SCRIPTS_URL_BASE="https://raw.githubusercontent.com/Makumiii/okastr8/docker-support/scripts"
   
   info "Downloading setup tools..."
-  curl -sSL "$SCRIPTS_URL_BASE/user/create-user.sh" -o "/tmp/create-user.sh"
-  curl -sSL "$SCRIPTS_URL_BASE/ssh/harden-ssh.sh" -o "/tmp/harden-ssh.sh"
+  curl -sSL "$SCRIPTS_URL_BASE/user/create-user.sh?v=$(date +%s)" -o "/tmp/create-user.sh"
+  curl -sSL "$SCRIPTS_URL_BASE/ssh/harden-ssh.sh?v=$(date +%s)" -o "/tmp/harden-ssh.sh"
   chmod +x /tmp/create-user.sh /tmp/harden-ssh.sh
 
   # 3. Create User

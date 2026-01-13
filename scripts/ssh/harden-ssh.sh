@@ -44,7 +44,7 @@ if [ ! -f "$SSHD_CONFIG" ]; then
 fi
 
 # Check if at least one SSH key exists for the current user (or calling user)
-CALLING_USER="${SUDO_USER:-${USER:-$(whoami)}}"
+CALLING_USER=$(whoami)
 CALLING_USER_HOME=$(eval echo "~$CALLING_USER")
 AUTHORIZED_KEYS="$CALLING_USER_HOME/.ssh/authorized_keys"
 
