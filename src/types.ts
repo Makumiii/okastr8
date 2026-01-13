@@ -71,3 +71,28 @@ export type OrchestrateEnvironment = {
 
     
 }
+
+export interface DeployConfig {
+    runtime?: string;        // Optional - will be auto-detected if not provided
+    buildSteps: string[];
+    startCommand: string;
+    port: number;            // Required for health checks
+    domain?: string;
+    database?: string;       // e.g., "postgres:15" | "mysql:8" | "mongodb:7"
+    cache?: string;          // e.g., "redis:7"
+}
+
+export interface DeployFromPathOptions {
+    appName: string;
+    releasePath: string;         // Path to version folder containing okastr8.yaml
+    versionId: number;
+    gitRepo?: string;            // Optional: for app.json metadata
+    gitBranch?: string;
+    onProgress?: (msg: string) => void;
+}
+
+export interface DeployResult {
+    success: boolean;
+    message: string;
+    config?: DeployConfig;
+}

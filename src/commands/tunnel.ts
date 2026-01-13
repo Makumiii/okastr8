@@ -21,7 +21,7 @@ async function isCloudflaredInstalled() {
 export async function installTunnel(token: string) {
     // 1. Install Binary if missing
     if (!await isCloudflaredInstalled()) {
-        console.log("⬇️ Installing Cloudflared...");
+        console.log("Installing Cloudflared...");
         const installResult = await runCommand("bash", [SCRIPTS.install]);
         if (installResult.exitCode !== 0) {
             throw new Error(`Failed to install cloudflared: ${installResult.stderr}`);
@@ -29,7 +29,7 @@ export async function installTunnel(token: string) {
     }
 
     // 2. Install Service
-    console.log("🔗 Registering Tunnel Service...");
+    console.log("Registering Tunnel Service...");
     // cloudflared service uninstall first to be safe
     await runCommand("sudo", ["cloudflared", "service", "uninstall"]);
 
@@ -50,7 +50,7 @@ export async function installTunnel(token: string) {
 }
 
 export async function uninstallTunnel() {
-    console.log("🔌 Removing Tunnel Service...");
+    console.log("Removing Tunnel Service...");
     const result = await runCommand("sudo", ["cloudflared", "service", "uninstall"]);
 
     // Ignore errors if service wasn't installed
@@ -92,13 +92,13 @@ export function addTunnelCommands(program: Command) {
         .description("Install and configure Cloudflare Tunnel")
         .argument("<token>", "Tunnel Token from Cloudflare Dashboard")
         .action(async (token) => {
-            console.log("🚇 Setting up Cloudflare Tunnel...");
+            console.log("Setting up Cloudflare Tunnel...");
             try {
                 const result = await installTunnel(token);
-                console.log("✅ " + result.message);
+                console.log(result.message);
                 console.log("   Your dashboard should now be accessible at your configured domain.");
             } catch (error: any) {
-                console.error("❌ Setup failed:", error.message);
+                console.error("Setup failed:", error.message);
                 process.exit(1);
             }
         });
@@ -109,9 +109,9 @@ export function addTunnelCommands(program: Command) {
         .action(async () => {
             try {
                 const result = await uninstallTunnel();
-                console.log("✅ " + result.message);
+                console.log(result.message);
             } catch (error: any) {
-                console.error("❌ Uninstall failed:", error.message);
+                console.error("Uninstall failed:", error.message);
                 process.exit(1);
             }
         });
@@ -122,11 +122,11 @@ export function addTunnelCommands(program: Command) {
         .action(async () => {
             const status = await getTunnelStatus();
             if (!status.installed) {
-                console.log("❌ cloudflared is not installed.");
+                console.log("cloudflared is not installed.");
             } else if (status.running) {
-                console.log("✅ Tunnel is RUNNING (active).");
+                console.log("Tunnel is RUNNING (active).");
             } else {
-                console.log("⚠️  Tunnel is INSTALLED but NOT RUNNING.");
+                console.log("Tunnel is INSTALLED but NOT RUNNING.");
             }
         });
 }

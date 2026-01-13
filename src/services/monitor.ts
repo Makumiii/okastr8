@@ -30,7 +30,7 @@ const state: MonitorState = {
 const ALERT_COOLDOWN_MS = 60 * 60 * 1000;
 
 export function startResourceMonitor() {
-    console.log('📊 Resource monitor started');
+    console.log('Resource monitor started');
 
     // Initial delay to let system settle
     setTimeout(runMonitorLoop, 10000);

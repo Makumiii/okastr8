@@ -59,7 +59,7 @@ export function addSetupCommands(program: Command) {
         .command("full")
         .description("Run complete server setup (installs dependencies, configures firewall, etc)")
         .action(async () => {
-            console.log("🚀 Running full server setup...");
+            console.log("Running full server setup...");
             const result = await runFullSetup();
             console.log(result.stdout || result.stderr);
             if (result.exitCode !== 0) {
@@ -72,7 +72,7 @@ export function addSetupCommands(program: Command) {
         .description("Harden SSH configuration (disable password auth, root login, etc)")
         .option("-p, --port <port>", "Optionally change SSH port")
         .action(async (options) => {
-            console.log("🔐 Hardening SSH configuration...");
+            console.log("Hardening SSH configuration...");
             const port = options.port ? parseInt(options.port, 10) : undefined;
             const result = await hardenSsh(port);
             console.log(result.stdout || result.stderr);
@@ -86,7 +86,7 @@ export function addSetupCommands(program: Command) {
         .description("Change the SSH port")
         .argument("<port>", "New SSH port number")
         .action(async (port) => {
-            console.log(`🔧 Changing SSH port to ${port}...`);
+            console.log(`Changing SSH port to ${port}...`);
             const result = await changeSshPort(parseInt(port, 10));
             console.log(result.stdout || result.stderr);
             if (result.exitCode !== 0) {
@@ -99,7 +99,7 @@ export function addSetupCommands(program: Command) {
         .description("Configure UFW firewall with secure defaults")
         .option("-p, --ssh-port <port>", "SSH port to allow (default: 2222)")
         .action(async (options) => {
-            console.log("🛡️  Configuring firewall...");
+            console.log("Configuring firewall...");
             const sshPort = options.sshPort ? parseInt(options.sshPort, 10) : undefined;
             const result = await configureFirewall(sshPort);
             console.log(result.stdout || result.stderr);
@@ -112,7 +112,7 @@ export function addSetupCommands(program: Command) {
         .command("fail2ban")
         .description("Configure fail2ban for DDoS/brute-force protection")
         .action(async () => {
-            console.log("🔒 Configuring fail2ban...");
+            console.log("Configuring fail2ban...");
             const result = await configureFail2ban();
             console.log(result.stdout || result.stderr);
             if (result.exitCode !== 0) {
@@ -124,7 +124,7 @@ export function addSetupCommands(program: Command) {
         .command("orchestrate")
         .description("Orchestrate complete environment from ~/.okastr8/environment.json")
         .action(async () => {
-            console.log("📋 Orchestrating environment...");
+            console.log("Orchestrating environment...");
             const result = await orchestrateEnvironment();
             console.log(result.stdout || result.stderr);
             if (result.exitCode !== 0) {
@@ -134,10 +134,10 @@ export function addSetupCommands(program: Command) {
 
     setup
         .command("sudoers")
-        .description("Configure passwordless sudo for okastr8 scripts (fixes permission issues)")
+        .description("Configure passwordless sudo for all okastr8 operations (including Docker)")
         .action(async () => {
-            console.log("🔐 Configuring sudoers for passwordless script execution...\n");
-            console.log("This will allow okastr8 to run system commands without password prompts.");
+            console.log("Configuring sudoers for passwordless operation...\n");
+            console.log("This will allow okastr8 and Docker to run without password prompts.");
             console.log("You may be asked for your password once to apply the configuration.\n");
 
             const result = await runCommand("sudo", [SCRIPTS.sudoers]);
@@ -145,7 +145,8 @@ export function addSetupCommands(program: Command) {
 
             if (result.exitCode === 0) {
                 console.log("\n✅ Sudoers configured successfully!");
-                console.log("   All okastr8 operations should now run without password prompts.");
+                console.log("   Okastr8 and Docker can now run system commands without password prompts.");
+                console.log("   Try running a deployment now—it should be fast and seamless.");
             } else {
                 console.error("\n❌ Sudoers configuration failed.");
                 process.exit(result.exitCode || 1);

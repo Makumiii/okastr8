@@ -104,7 +104,7 @@ async function getSystemMetrics(): Promise<SystemMetrics> {
 }
 
 /**
- * Get metrics for a single systemd service
+ * Get metrics for a single application or service
  */
 async function getServiceMetrics(serviceName: string): Promise<ServiceMetrics | null> {
     try {

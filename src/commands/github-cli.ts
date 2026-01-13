@@ -80,7 +80,7 @@ export function addGitHubCommands(program: Command) {
                 const { getAuthUrl } = await import('./github');
                 const authUrl = getAuthUrl(config.clientId, callbackUrl);
 
-                console.log("\n🔗 Open this URL in your browser:\n");
+                console.log("\nOpen this URL in your browser:\n");
                 console.log(`   ${authUrl}\n`);
 
                 // Try to open browser automatically
@@ -129,7 +129,7 @@ export function addGitHubCommands(program: Command) {
                     process.exit(1);
                 }
 
-                console.log("📦 Fetching repositories...\n");
+                console.log("Fetching repositories...\n");
                 const repos = await listRepos(config.accessToken);
 
                 if (repos.length === 0) {
@@ -157,7 +157,7 @@ export function addGitHubCommands(program: Command) {
                 // Plain mode - just list
                 if (options.plain) {
                     for (const repo of repos) {
-                        const privacyIcon = repo.private ? "🔒" : "🌐";
+                        const privacyIcon = repo.private ? "[PRIVATE]" : "[PUBLIC]";
                         const deployed = deployedRepos.get(repo.full_name.toLowerCase());
                         const status = deployed ? ` [✅ deployed: ${deployed.appName}@${deployed.branch}]` : '';
                         console.log(`${privacyIcon} ${repo.full_name}${status}`);
@@ -195,18 +195,18 @@ export function addGitHubCommands(program: Command) {
                 const deployed = deployedRepos.get(repo.full_name.toLowerCase());
 
                 // Show repo details
-                console.log(`\n📋 ${repo.full_name}`);
-                console.log(`   ${repo.private ? '🔒 Private' : '🌐 Public'}`);
+                console.log(`\n${repo.full_name}`);
+                console.log(`   ${repo.private ? 'Private' : 'Public'}`);
                 if (repo.description) console.log(`   ${repo.description}`);
                 console.log(`   Default Branch: ${repo.default_branch}`);
                 if (deployed) {
-                    console.log(`   🚀 Deployed as: ${deployed.appName} (branch: ${deployed.branch})`);
+                    console.log(`   Deployed as: ${deployed.appName} (branch: ${deployed.branch})`);
                 }
 
                 // Action menu
                 const actionChoices = deployed
-                    ? ['🔄 Redeploy', '📋 View Details', '🌐 Open on GitHub', '❌ Cancel']
-                    : ['📥 Import & Deploy', '📋 View Details', '🌐 Open on GitHub', '❌ Cancel'];
+                    ? ['Redeploy', 'View Details', 'Open on GitHub', 'Cancel']
+                    : ['Import and Deploy', 'View Details', 'Open on GitHub', 'Cancel'];
 
                 const actionResponse = await Enquirer.prompt({
                     type: 'select',
@@ -227,12 +227,12 @@ export function addGitHubCommands(program: Command) {
                     const openCmd = process.platform === 'darwin' ? 'open' :
                         process.platform === 'win32' ? 'start' : 'xdg-open';
                     exec(`${openCmd} "${repo.html_url}"`);
-                    console.log(`🌐 Opening ${repo.html_url}`);
+                    console.log(`Opening ${repo.html_url}`);
                     return;
                 }
 
                 if (action.includes('View Details')) {
-                    console.log(`\n📋 Full Details for ${repo.full_name}`);
+                    console.log(`\nFull Details for ${repo.full_name}`);
                     console.log(`   URL: ${repo.html_url}`);
                     console.log(`   Clone: ${repo.clone_url}`);
                     console.log(`   Language: ${repo.language || 'Unknown'}`);
@@ -279,7 +279,7 @@ export function addGitHubCommands(program: Command) {
                         appName = (nameResponse as any).appName;
                     }
 
-                    console.log(`\n🚀 ${deployed ? 'Redeploying' : 'Importing'} ${repo.full_name}...`);
+                    console.log(`\n${deployed ? 'Redeploying' : 'Importing'} ${repo.full_name}...`);
                     console.log(`   App: ${appName}`);
                     console.log(`   Branch: ${branch}\n`);
 
@@ -323,7 +323,7 @@ export function addGitHubCommands(program: Command) {
                     process.exit(1);
                 }
 
-                console.log(`\n🚀 Importing ${repo}...\n`);
+                console.log(`\nImporting ${repo}...\n`);
 
                 const result = await importRepo({
                     repoFullName: repo,
@@ -390,17 +390,17 @@ export function addGitHubCommands(program: Command) {
                 }
 
                 // Check if key already exists in GitHub
-                console.log("🔍 Checking existing keys...");
+                console.log("Checking existing keys...");
                 const keyExists = await hasOkastr8DeployKey(config.accessToken);
                 if (keyExists) {
-                    console.log("✅ Deploy key already configured in GitHub!");
+                    console.log("Deploy key already configured in GitHub!");
                     return;
                 }
 
                 // Generate local key if needed
                 const pubKeyPath = `${SSH_KEY_PATH}.pub`;
                 if (!existsSync(pubKeyPath)) {
-                    console.log("🔑 Generating new SSH deploy key...");
+                    console.log("Generating new SSH deploy key...");
                     const sshDir = join(homedir(), ".ssh");
                     await runCommand("mkdir", ["-p", sshDir]);
                     await runCommand("chmod", ["700", sshDir]);
@@ -434,7 +434,7 @@ export function addGitHubCommands(program: Command) {
                 }
 
                 // Configure Git
-                console.log("🔧 Configuring Git to use SSH...");
+                console.log("Configuring Git to use SSH...");
                 await runCommand("git", ["config", "--global", "url.git@github.com:.insteadOf", "https://github.com/"]);
 
                 console.log("\n✅ Deploy key configured successfully!");

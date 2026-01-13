@@ -34,12 +34,12 @@ export function addAuthCommands(program: Command): void {
 
                 const { token, expiresAt } = await generateAdminToken(options.expiry);
 
-                console.log('\n🔐 Admin Access Token Generated\n');
+                console.log('\nAdmin Access Token Generated\n');
                 console.log('━'.repeat(50));
                 console.log(`Token: ${token}`);
                 console.log('━'.repeat(50));
                 console.log(`\nExpires: ${new Date(expiresAt).toLocaleString()}`);
-                console.log('\n📋 Use this token to log in to the okastr8 UI');
+                console.log('\nUse this token to log in to the okastr8 UI');
                 console.log('   Paste it in the login page to get access.\n');
             } catch (error: any) {
                 console.error(`❌ Error: ${error.message}`);
@@ -66,7 +66,7 @@ export function addAuthCommands(program: Command): void {
                     return;
                 }
 
-                console.log('\n📋 Active Tokens\n');
+                console.log('\nActive Tokens\n');
                 console.log('ID'.padEnd(16) + 'User'.padEnd(25) + 'Expires'.padEnd(25) + 'Permissions');
                 console.log('─'.repeat(80));
 
@@ -129,7 +129,7 @@ export function addAuthCommands(program: Command): void {
                     process.exit(1);
                 }
 
-                console.log('📧 Sending test email...');
+                console.log('Sending test email...');
                 const { testEmailConfig } = await import('../services/email');
                 const result = await testEmailConfig();
 

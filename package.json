@@ -1,6 +1,6 @@
 {
   "name": "okastr8",
-  "module": "index.ts",
+  "module": "main.ts",
   "type": "module",
   "private": true,
   "devDependencies": {

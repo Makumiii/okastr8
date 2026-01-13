@@ -241,7 +241,7 @@ export async function rollback(
         return { success: false, message: `Release artifact v${versionId} missing` };
     }
 
-    log(`🔄 Rolling back ${appName} to v${versionId}...`);
+    log(`Rolling back ${appName} to v${versionId}...`);
 
     // Use the deploy core to run the full deploy process
     const { deployFromPath } = await import("./deploy-core");

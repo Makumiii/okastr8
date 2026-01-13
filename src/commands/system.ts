@@ -12,7 +12,7 @@ import * as readline from 'readline';
 // ============ Global Service Controls ============
 
 export async function controlAllServices(action: 'start' | 'stop' | 'restart') {
-    console.log(`🚀 ${action.toUpperCase()}ING all services...`);
+    console.log(`${action.toUpperCase()}ING all services...`);
     const { apps } = await listApps();
 
     if (apps.length === 0) {
@@ -34,7 +34,7 @@ export async function controlAllServices(action: 'start' | 'stop' | 'restart') {
         }
     }
 
-    console.log('\n✅ Operation complete.');
+    console.log('\nOperation complete.');
 }
 
 // ============ Nuke Protocol ============
@@ -49,7 +49,7 @@ This action is IRREVERSIBLE.
 
 The following will happen:
 1. All okastr8 applications will be STOPPED and DELETED.
-2. All systemd services managed by okastr8 will be REMOVED.
+2. All services and containers managed by okastr8 will be REMOVED.
 3. The ~/.okastr8 configuration directory will be ERASED.
 4. Database, logs, and user data will be LOST FOREVER.
 `);
@@ -67,14 +67,14 @@ The following will happen:
     rl.close();
 
     if (answer !== phrase) {
-        console.log('\n❌ Confirmation failed. Aborting nuke protocol.');
+        console.log('\nConfirmation failed. Aborting nuke protocol.');
         return;
     }
 
-    console.log('\n🧨 NUKE CONFIRMED. DESTRUCTION IMMINENT in 5 seconds...');
+    console.log('\nNUKE CONFIRMED. DESTRUCTION IMMINENT in 5 seconds...');
     await new Promise(r => setTimeout(r, 5000));
 
-    console.log('\n🗑️  Step 1: Destroying Applications...');
+    console.log('\nStep 1: Destroying Applications...');
     const { apps } = await listApps();
     for (const app of apps) {
         process.stdout.write(`  Killing ${app.name}... `);
@@ -83,13 +83,13 @@ The following will happen:
             try { await disableService(app.name); } catch { }
             // Use deleteApp to clean up unit files and directories
             await deleteApp(app.name);
-            console.log('💀');
+            process.stdout.write('Done\n');
         } catch (e) {
             console.log(`Failed (Ignored): ${e}`);
         }
     }
 
-    console.log('\n🛑 Step 2: Stopping Manager Service...');
+    console.log('\nStep 2: Stopping Manager Service...');
     try {
         await stopService('okastr8-manager');
         await disableService('okastr8-manager');
@@ -102,13 +102,13 @@ The following will happen:
         console.log('   (Manager service not running or not found)');
     }
 
-    console.log('\n🔥 Step 3: Incinerating Configuration...');
+    console.log('\nStep 3: Incinerating Configuration...');
     if (existsSync(OKASTR8_HOME)) {
         await fs.rm(OKASTR8_HOME, { recursive: true, force: true });
         console.log(`   Deleted ${OKASTR8_HOME}`);
     }
 
-    console.log('\n☠️  SYSTEM NUKED. Okastr8 has been reset to factory application state.');
+    console.log('\nSYSTEM NUKED. Okastr8 has been reset to factory application state.');
 }
 
 // ============ Uninstall Helper ============
@@ -118,7 +118,7 @@ async function uninstallOkastr8() {
 
     console.log(`
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-         👋 UNINSTALLATION INSTRUCTIONS
+         UNINSTALLATION INSTRUCTIONS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 The system has been cleaned. To remove the CL tool, run:

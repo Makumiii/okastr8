@@ -79,10 +79,10 @@ export function addUserCommands(program: Command) {
             // Default password to username if still empty
             if (!password) {
                 password = username;
-                console.log(`ℹ️  No password provided, using username '${username}' as password.`);
+                console.log(`No password provided, using username '${username}' as password.`);
             }
 
-            console.log(`\n👷 Creating user '${username}'...`);
+            console.log(`\nCreating user '${username}'...`);
             const result = await createUser(username, password, options.distro);
             console.log(result.stdout || result.stderr);
         });
@@ -136,7 +136,7 @@ export function addUserCommands(program: Command) {
             if (options.plain) {
                 console.log('\n👥 System Users\n');
                 users.forEach(u => {
-                    const icon = u.status === 'locked' ? '🔒' : '✅';
+                    const icon = u.status === 'locked' ? '[LOCKED]' : '[ACTIVE]';
                     console.log(`${icon} ${u.username} (${u.status})`);
                 });
                 return;
@@ -159,8 +159,8 @@ export function addUserCommands(program: Command) {
                     name: 'user',
                     message: 'Select a user to manage',
                     choices: users.map(u => {
-                        let icon = u.status === 'locked' ? '🔒' : '✅';
-                        if (u.username === adminUser) icon = '👑'; // Admin Icon
+                        let icon = u.status === 'locked' ? '[LOCKED]' : '[ACTIVE]';
+                        if (u.username === adminUser) icon = '[ADMIN]';
 
                         return {
                             name: u.username,
@@ -174,7 +174,7 @@ export function addUserCommands(program: Command) {
 
                 // SPECIAL HANDLING: Admin Block
                 if (selectedUsername === adminUser) {
-                    console.log(`\n👑 Admin Account (${selectedUsername})`);
+                    console.log(`\nAdmin Account (${selectedUsername})`);
                     console.log('   This is the main system administrator.');
                     console.log('   Actions are restricted to prevent lockout.\n');
                     return;
@@ -187,10 +187,10 @@ export function addUserCommands(program: Command) {
                     choices: [
                         {
                             name: 'lock_unlock',
-                            message: selectedUser.status === 'locked' ? '🔓 Unlock Account' : '🔒 Lock Account'
+                            message: selectedUser.status === 'locked' ? 'Unlock Account' : 'Lock Account'
                         },
-                        { name: 'info', message: 'ℹ️  View Details (Groups, Last Login)' },
-                        { name: 'delete', message: '❌ Delete User' },
+                        { name: 'info', message: 'View Details (Groups, Last Login)' },
+                        { name: 'delete', message: 'Delete User' },
                         { name: 'cancel', message: '↩️  Cancel' }
                     ]
                 });
@@ -207,15 +207,15 @@ export function addUserCommands(program: Command) {
                     const login = await getLastLogin(selectedUsername);
                     const groups = await listGroups(selectedUsername);
 
-                    console.log('🕒 Last Login:');
+                    console.log('Last Login:');
                     console.log(login.stdout.trim() || 'Never');
-                    console.log('\n👥 Groups:');
+                    console.log('\nGroups:');
                     console.log(groups.stdout.trim());
                 }
 
                 if (action === 'lock_unlock') {
                     if (selectedUser.status === 'locked') {
-                        console.log(`🔓 Unlocking ${selectedUsername}...`);
+                        console.log(`Unlocking ${selectedUsername}...`);
                         await unlockUser(selectedUsername);
                         console.log('✅ User unlocked.');
                     } else {
@@ -228,7 +228,7 @@ export function addUserCommands(program: Command) {
                             return;
                         }
 
-                        console.log(`🔒 Locking ${selectedUsername}...`);
+                        console.log(`Locking ${selectedUsername}...`);
                         await lockUser(selectedUsername);
                         console.log('✅ User locked.');
                     }
@@ -250,7 +250,7 @@ export function addUserCommands(program: Command) {
                     });
 
                     if (await confirm.run()) {
-                        console.log(`🗑️  Deleting ${selectedUsername}...`);
+                        console.log(`Deleting ${selectedUsername}...`);
                         await deleteUser(selectedUsername);
                         console.log('✅ User deleted.');
                     } else {

@@ -1,13 +1,22 @@
+import { join, dirname } from "path";
+import { mkdir, writeFile, readFile, rm, readdir } from "fs/promises";
+import { existsSync } from "fs";
+import { fileURLToPath } from "url";
 import { Command } from "commander";
 import { runCommand } from "../utils/command";
-import { join, dirname } from "path";
-import { fileURLToPath } from "url";
-import { homedir } from "os";
-import { mkdir, rm, readdir, stat, readFile, writeFile } from "fs/promises";
-import { createVersion, removeVersion, getVersions, setCurrentVersion } from "./version";
 import { deployFromPath } from "./deploy-core";
+import { createVersion, removeVersion } from "./version";
+import {
+    containerStatus,
+    containerLogs,
+    runContainer,
+    stopContainer as stopDockerContainer,
+    restartContainer as restartDockerContainer,
+    removeContainer,
+    listContainers
+} from "./docker";
 
-// Get the directory of this file (works in Bun and Node ESM)
+// Helper to get __dirname in ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -17,19 +26,6 @@ const PROJECT_ROOT = join(__dirname, "..", "..");
 // App directory structure
 import { OKASTR8_HOME } from "../config";
 const APPS_DIR = join(OKASTR8_HOME, "apps");
-
-// Systemd scripts
-const SYSTEMD_SCRIPTS = {
-    create: join(PROJECT_ROOT, "scripts", "systemd", "create.sh"),
-    delete: join(PROJECT_ROOT, "scripts", "systemd", "delete.sh"),
-    start: join(PROJECT_ROOT, "scripts", "systemd", "start.sh"),
-    stop: join(PROJECT_ROOT, "scripts", "systemd", "stop.sh"),
-    restart: join(PROJECT_ROOT, "scripts", "systemd", "restart.sh"),
-    status: join(PROJECT_ROOT, "scripts", "systemd", "status.sh"),
-    logs: join(PROJECT_ROOT, "scripts", "systemd", "logs.sh"),
-    enable: join(PROJECT_ROOT, "scripts", "systemd", "enable.sh"),
-    disable: join(PROJECT_ROOT, "scripts", "systemd", "disable.sh"),
-};
 
 export interface AppConfig {
     name: string;
@@ -44,6 +40,7 @@ export interface AppConfig {
     buildSteps?: string[];
     env?: Record<string, string>;
     webhookAutoDeploy?: boolean;
+    deploymentType?: "docker" | "systemd"; // Backwards compat or new default
 }
 
 // Ensure the app directory structure exists
@@ -61,79 +58,34 @@ async function ensureAppDirs(appName: string) {
 
 // Core Functions
 export async function createApp(config: AppConfig) {
+    // Legacy support wrapper or direct redirect to deploy-core?
+    // In the new flow, "createApp" is mostly "register metadata" + "initial deploy"
+    // For now, we'll keep the metadata creation but use deployFromPath for the actual work
+    // However, createApp is often called by UI before code exists. 
+    // If this is just reserving the name:
+
     try {
         const { appDir, repoDir, logsDir } = await ensureAppDirs(config.name);
 
-        // Prepare Start Command with Env Vars
-        let execStart = config.execStart;
-        if (config.env) {
-            // Inject env vars as exports before the command
-            // Format: export KEY="VAL"; export KEY2="VAL2"; cmd
-            const envExports = Object.entries(config.env)
-                .map(([key, value]) => `export ${key}="${value}"`)
-                .join("; ");
-            execStart = `${envExports}; ${config.execStart}`;
-        }
-
-        // Use create.sh helper
-        // Usage: create.sh <name> <description> <exec_start> <work_dir> <user> <wanted_by> <auto_start>
-        // We set auto_start=true so it enables and starts it for us
-        const result = await runCommand("sudo", [
-            SYSTEMD_SCRIPTS.create,
-            config.name,
-            config.description,
-            execStart,
-            config.workingDirectory || repoDir,
-            config.user,
-            "multi-user.target",
-            "true"
-        ]);
-
-        if (result.exitCode !== 0) {
-            // Cleanup app dir if service creation failed
-            await runCommand("sudo", ["rm", "-rf", appDir]);
-            throw new Error(`Failed to create systemd service: ${result.stderr}`);
-        }
-
-        // Service is now running.
-        // We verify deployment by creating app.json
-
-        // ONLY NOW: Write app.json after service is running
-        // This ensures app only appears in UI when fully operational
+        // Write initial app.json
         const metadataPath = join(appDir, "app.json");
+        const metadata = {
+            ...config,
+            createdAt: new Date().toISOString(),
+            deploymentType: "docker", // Default to docker now
+            repoDir,
+            logsDir,
+            versions: [],
+            currentVersionId: null,
+            webhookAutoDeploy: config.webhookAutoDeploy ?? true
+        };
 
-        // We can't easily get unit file path from script, but can assume standard
-        const unitFilePath = `/etc/systemd/system/${config.name}.service`;
-
-        let existingMetadata: any = {};
-        try {
-            const content = await readFile(metadataPath, "utf-8");
-            existingMetadata = JSON.parse(content);
-        } catch { }
-
-        await writeFile(
-            metadataPath,
-            JSON.stringify(
-                {
-                    ...config,
-                    createdAt: existingMetadata.createdAt || new Date().toISOString(),
-                    unitFile: unitFilePath,
-                    repoDir,
-                    logsDir,
-                    // Preserve versioning data
-                    versions: existingMetadata.versions || [],
-                    currentVersionId: existingMetadata.currentVersionId || null,
-                    webhookAutoDeploy: config.webhookAutoDeploy ?? true
-                },
-                null,
-                2
-            )
-        );
+        await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
 
         return {
             success: true,
             appDir,
-            message: "App created and started",
+            message: "App registered. Please use deploy command or git push to start it.",
         };
     } catch (error) {
         console.error(`Error creating app ${config.name}:`, error);
@@ -145,31 +97,39 @@ export async function deleteApp(appName: string) {
     try {
         console.log(`Deleting app: ${appName}`);
 
-        // Stop and remove the systemd service
-        console.log(`Running systemd delete script for ${appName}...`);
-        const result = await runCommand("sudo", [SYSTEMD_SCRIPTS.delete, appName]);
+        // 1. Universal Docker Cleanup
+        // Stop both single container and possible Compose services
+        console.log(`🧹 Cleaning up Docker resources for ${appName}...`);
 
-        if (result.exitCode !== 0) {
-            console.error(`Systemd delete script failed: ${result.stderr}`);
+        // Stop single container (container name = app name)
+        await stopDockerContainer(appName).catch(() => { });
+        await removeContainer(appName).catch(() => { });
+
+        // Stop compose services if a compose file exists in the current deployment
+        const currentComposePath = join(APPS_DIR, appName, "current", "docker-compose.yml");
+        if (existsSync(currentComposePath)) {
+            const { composeDown } = await import("./docker");
+            await composeDown(currentComposePath, appName).catch(() => { });
         }
 
-        // remove app directory
-        // Since we are running as user, we shouldn't need sudo if ownership is correct.
-        // If files were created by root previously, this might fail, but that's what we want to fix (ownership).
+        // Remove app directory
         const appDir = join(APPS_DIR, appName);
         console.log(`Removing app directory: ${appDir}`);
         await rm(appDir, { recursive: true, force: true });
 
-        console.log(`Successfully deleted app: ${appName}`);
         return {
             success: true,
             message: `App '${appName}' deleted successfully`,
         };
     } catch (error) {
         console.error(`Error deleting app ${appName}:`, error);
+        // Even if docker fails (maybe already gone), try to remove files
+        const appDir = join(APPS_DIR, appName);
+        await rm(appDir, { recursive: true, force: true }).catch(() => { });
+
         return {
             success: false,
-            message: `Failed to delete app: ${error instanceof Error ? error.message : String(error)}`,
+            message: `Failed to delete app cleanly: ${error instanceof Error ? error.message : String(error)}`,
         };
     }
 }
@@ -180,15 +140,24 @@ export async function listApps() {
         const entries = await readdir(APPS_DIR, { withFileTypes: true });
         const apps = [];
 
+        // Get running containers to cross-reference status
+        const runningContainers = await listContainers();
+        const runningMap = new Map(runningContainers.map(c => [c.name, c.state]));
+
         for (const entry of entries) {
             if (entry.isDirectory()) {
                 const metadataPath = join(APPS_DIR, entry.name, "app.json");
                 try {
                     const metadata = JSON.parse(await readFile(metadataPath, "utf-8"));
-                    apps.push(metadata);
+                    // Check if running
+                    const state = runningMap.get(entry.name);
+                    apps.push({
+                        ...metadata,
+                        running: state === 'running',
+                        status: state || 'stopped'
+                    });
                 } catch {
-                    // No metadata, just include the name
-                    apps.push({ name: entry.name });
+                    apps.push({ name: entry.name, status: 'unknown' });
                 }
             }
         }
@@ -201,26 +170,28 @@ export async function listApps() {
 }
 
 export async function getAppStatus(appName: string) {
-    const result = await runCommand("sudo", [SYSTEMD_SCRIPTS.status, appName]);
-    return {
-        success: result.exitCode === 0,
-        message: result.stdout || result.stderr,
-    };
+    try {
+        const status = await containerStatus(appName);
+        return {
+            success: status.status !== 'not found' && status.running,
+            message: status.status,
+            details: status
+        };
+    } catch (e) {
+        return { success: false, message: e instanceof Error ? e.message : "Error checking status" };
+    }
 }
 
 export async function getAppLogs(appName: string, lines: number = 50) {
-    const result = await runCommand("sudo", [
-        "journalctl",
-        "-u",
-        appName,
-        "-n",
-        lines.toString(),
-        "--no-pager",
-    ]);
-    return {
-        success: result.exitCode === 0,
-        logs: result.stdout || result.stderr,
-    };
+    try {
+        const logs = await containerLogs(appName, lines);
+        return {
+            success: true,
+            logs: logs
+        };
+    } catch (e) {
+        return { success: false, logs: "Failed to retrieve logs", error: e };
+    }
 }
 
 export async function exportAppLogs(appName: string) {
@@ -232,22 +203,10 @@ export async function exportAppLogs(appName: string) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
         const logFile = join(logsDir, `${appName}-${timestamp}.log`);
 
-        // Export all logs for this service
-        const result = await runCommand("sudo", [
-            "journalctl",
-            "-u",
-            appName,
-            "--no-pager",
-            "-o",
-            "short-iso",
-        ]);
+        const logs = await containerLogs(appName, 10000); // Fetch a lot of logs for export
 
-        if (result.exitCode === 0 && result.stdout) {
-            await writeFile(logFile, result.stdout);
-            return { success: true, logFile, message: `Logs exported to ${logFile}` };
-        }
-
-        return { success: false, message: result.stderr || "No logs available" };
+        await writeFile(logFile, logs);
+        return { success: true, logFile, message: `Logs exported to ${logFile}` };
     } catch (error) {
         console.error(`Error exporting logs for ${appName}:`, error);
         throw error;
@@ -255,27 +214,33 @@ export async function exportAppLogs(appName: string) {
 }
 
 export async function startApp(appName: string) {
-    const result = await runCommand("sudo", [SYSTEMD_SCRIPTS.start, appName]);
-    return {
-        success: result.exitCode === 0,
-        message: result.stdout || result.stderr,
-    };
+    // For Docker, "starting" a stopped container is easy
+    // But if it was never built, we can't just "start" it without deployment info.
+    // Assuming the container exists but is stopped:
+    try {
+        await runCommand("sudo", ["docker", "start", appName]);
+        return { success: true, message: "Container started" };
+    } catch (e) {
+        return { success: false, message: "Failed to start container: " + e };
+    }
 }
 
 export async function stopApp(appName: string) {
-    const result = await runCommand("sudo", [SYSTEMD_SCRIPTS.stop, appName]);
-    return {
-        success: result.exitCode === 0,
-        message: result.stdout || result.stderr,
-    };
+    try {
+        await stopDockerContainer(appName);
+        return { success: true, message: "App stopped" };
+    } catch (e) {
+        return { success: false, message: "Failed to stop: " + e };
+    }
 }
 
 export async function restartApp(appName: string) {
-    const result = await runCommand("sudo", [SYSTEMD_SCRIPTS.restart, appName]);
-    return {
-        success: result.exitCode === 0,
-        message: result.stdout || result.stderr,
-    };
+    try {
+        await restartDockerContainer(appName);
+        return { success: true, message: "App restarted" };
+    } catch (e) {
+        return { success: false, message: "Failed to restart: " + e };
+    }
 }
 
 export async function getAppMetadata(appName: string): Promise<AppConfig & { repoDir: string }> {
@@ -295,11 +260,11 @@ export async function updateApp(appName: string) {
     try {
         const metadata = await getAppMetadata(appName);
 
-        if (!metadata.gitRepo || !metadata.repoDir) {
-            throw new Error("Not a git-linked application");
+        if (!metadata.gitRepo) {
+            throw new Error("Not a git-linked application (missing gitRepo)");
         }
 
-        console.log(`📡 Updating ${appName} from git...`);
+        console.log(`Updating ${appName} from git...`);
 
         // 1. Create new version entry (V2 Logic)
         const branch = metadata.gitBranch || "main";
@@ -309,7 +274,7 @@ export async function updateApp(appName: string) {
         versionId = versionResult.versionId;
         releasePath = versionResult.releasePath;
 
-        console.log(`📦 Created release v${versionId} at ${releasePath}`);
+        console.log(`Created release v${versionId} at ${releasePath}`);
 
         // 2. Clone code into release path (Fresh clone like importRepo)
         // Inject OAuth token for HTTPS URLs to avoid password prompts
@@ -322,7 +287,7 @@ export async function updateApp(appName: string) {
             }
         }
 
-        console.log(`⬇️ Cloning ${branch} into release...`);
+        console.log(`Cloning ${branch} into release...`);
         const cloneResult = await runCommand("git", [
             "clone",
             "--depth", "1",
@@ -336,7 +301,7 @@ export async function updateApp(appName: string) {
         }
 
         // 3. Deploy
-        console.log(`🚀 Deploying v${versionId}...`);
+        console.log(`Deploying v${versionId}...`);
         const deployResult = await deployFromPath({
             appName,
             releasePath,
@@ -348,7 +313,7 @@ export async function updateApp(appName: string) {
 
         if (!deployResult.success) {
             // Cleanup on failure
-            console.log("⚠️ Deployment failed. Cleaning up...");
+            console.log("Deployment failed. Cleaning up...");
             await rm(releasePath, { recursive: true, force: true });
             await removeVersion(appName, versionId);
             throw new Error(deployResult.message);
@@ -391,7 +356,7 @@ export function addAppCommands(program: Command) {
 
     app
         .command("create")
-        .description("Create a new application with systemd service")
+        .description("Create a new application")
         .argument("<name>", "Application name")
         .argument("<exec_start>", "Command to run (e.g., 'bun run start')")
         .option("-d, --description <desc>", "Service description", "Okastr8 managed app")
@@ -401,8 +366,8 @@ export function addAppCommands(program: Command) {
         .option("--domain <domain>", "Domain for Caddy reverse proxy")
         .option("--git-repo <url>", "Git repository URL")
         .option("--git-branch <branch>", "Git branch to track", "main")
-        .action(async (name, execStart, options) => {
-            console.log(`📦 Creating app '${name}'...`);
+        .action(async (name: string, execStart: string, options: any) => {
+            console.log(`Creating app '${name}'...`);
             try {
                 const result = await createApp({
                     name,
@@ -416,25 +381,25 @@ export function addAppCommands(program: Command) {
                     gitBranch: options.gitBranch,
                 });
                 console.log(result.message);
-                console.log(`✅ App created at ${result.appDir}`);
+                console.log(`App created at ${result.appDir}`);
             } catch (error: any) {
-                console.error(`❌ Failed to create app:`, error.message);
+                console.error(`Failed to create app:`, error.message);
                 process.exit(1);
             }
         });
 
     app
         .command("delete")
-        .description("Delete an application and its systemd service")
+        .description("Delete an application")
         .argument("<name>", "Application name")
-        .action(async (name) => {
-            console.log(`🗑️  Deleting app '${name}'...`);
+        .action(async (name: string) => {
+            console.log(`Deleting app '${name}'...`);
             try {
                 const result = await deleteApp(name);
                 console.log(result.message);
-                console.log(`✅ App '${name}' deleted`);
+                console.log(`App '${name}' deleted`);
             } catch (error: any) {
-                console.error(`❌ Failed to delete app:`, error.message);
+                console.error(`Failed to delete app:`, error.message);
                 process.exit(1);
             }
         });
@@ -448,13 +413,13 @@ export function addAppCommands(program: Command) {
                 if (result.apps.length === 0) {
                     console.log("No apps found.");
                 } else {
-                    console.log("📋 Okastr8 Apps:");
+                    console.log("Okastr8 Apps:");
                     for (const app of result.apps) {
                         console.log(`  • ${app.name}${app.description ? ` - ${app.description}` : ""}`);
                     }
                 }
             } catch (error: any) {
-                console.error(`❌ Failed to list apps:`, error.message);
+                console.error(`Failed to list apps:`, error.message);
                 process.exit(1);
             }
         });
@@ -463,12 +428,12 @@ export function addAppCommands(program: Command) {
         .command("status")
         .description("Show status of an application")
         .argument("<name>", "Application name")
-        .action(async (name) => {
+        .action(async (name: string) => {
             try {
                 const result = await getAppStatus(name);
                 console.log(result.message);
             } catch (error: any) {
-                console.error(`❌ Failed to get status:`, error.message);
+                console.error(`Failed to get status:`, error.message);
                 process.exit(1);
             }
         });
@@ -478,12 +443,12 @@ export function addAppCommands(program: Command) {
         .description("Show logs for an application")
         .argument("<name>", "Application name")
         .option("-n, --lines <lines>", "Number of lines to show", "50")
-        .action(async (name, options) => {
+        .action(async (name: string, options: any) => {
             try {
                 const result = await getAppLogs(name, parseInt(options.lines, 10));
                 console.log(result.logs);
             } catch (error: any) {
-                console.error(`❌ Failed to get logs:`, error.message);
+                console.error(`Failed to get logs:`, error.message);
                 process.exit(1);
             }
         });
@@ -492,12 +457,12 @@ export function addAppCommands(program: Command) {
         .command("export-logs")
         .description("Export logs to app directory")
         .argument("<name>", "Application name")
-        .action(async (name) => {
+        .action(async (name: string) => {
             try {
                 const result = await exportAppLogs(name);
                 console.log(result.message);
             } catch (error: any) {
-                console.error(`❌ Failed to export logs:`, error.message);
+                console.error(`Failed to export logs:`, error.message);
                 process.exit(1);
             }
         });
@@ -506,17 +471,110 @@ export function addAppCommands(program: Command) {
         .command("start")
         .description("Start an application")
         .argument("<name>", "Application name")
-        .action(async (name) => {
-            console.log(`▶️  Starting ${name}...`);
+        .action(async (name: string) => {
+            console.log(`Starting ${name}...`);
             const result = await startApp(name);
             console.log(result.message);
+        });
+
+    // Environment variable management
+    const env = app.command('env')
+        .description('Manage environment variables for an app');
+
+    env.command('set')
+        .description('Set environment variables for an app')
+        .argument('<appName>', 'Name of the app')
+        .argument('<key=value...>', 'Environment variables in KEY=VALUE format')
+        .action(async (appName: string, keyValues: string[]) => {
+            try {
+                const { setEnvVar } = await import('../utils/env-manager');
+
+                for (const pair of keyValues) {
+                    const [key, ...valueParts] = pair.split('=');
+                    if (!key || valueParts.length === 0) {
+                        console.error(`Invalid format: ${pair}. Expected KEY=VALUE`);
+                        process.exit(1);
+                    }
+                    const value = valueParts.join('=');
+                    await setEnvVar(appName, key, value);
+                    console.log(`Set ${key}`);
+                }
+            } catch (error: any) {
+                console.error(`Error: ${error.message}`);
+                process.exit(1);
+            }
+        });
+
+    env.command('import')
+        .description('Import environment variables from a .env file')
+        .argument('<appName>', 'Name of the app')
+        .option('-f, --file <path>', 'Path to .env file', '.env')
+        .action(async (appName: string, options: any) => {
+            try {
+                const { importEnvFile } = await import('../utils/env-manager');
+                await importEnvFile(appName, options.file);
+                console.log(`✅ Imported environment variables from ${options.file}`);
+            } catch (error: any) {
+                console.error(`❌ Error: ${error.message}`);
+                process.exit(1);
+            }
+        });
+
+    env.command('list')
+        .description('List environment variable keys for an app')
+        .argument('<appName>', 'Name of the app')
+        .action(async (appName: string) => {
+            try {
+                const { listEnvVars } = await import('../utils/env-manager');
+                const keys = await listEnvVars(appName);
+
+                if (keys.length === 0) {
+                    console.log('No environment variables set');
+                } else {
+                    console.log('Environment variables:');
+                    keys.forEach(key => console.log(`  ${key}=••••••••`));
+                }
+            } catch (error: any) {
+                console.error(`❌ Error: ${error.message}`);
+                process.exit(1);
+            }
+        });
+
+    env.command('export')
+        .description('Export environment variables to a file')
+        .argument('<appName>', 'Name of the app')
+        .option('-f, --file <path>', 'Output file path', 'exported.env')
+        .action(async (appName: string, options: any) => {
+            try {
+                const { exportEnvFile } = await import('../utils/env-manager');
+                await exportEnvFile(appName, options.file);
+                console.log(`✅ Exported environment variables to ${options.file}`);
+            } catch (error: any) {
+                console.error(`❌ Error: ${error.message}`);
+                process.exit(1);
+            }
+        });
+
+    env.command('unset')
+        .description('Unset an environment variable')
+        .argument('<appName>', 'Name of the app')
+        .argument('<key>', 'Environment variable key to unset')
+        .action(async (appName: string, key: string) => {
+            try {
+                const { unsetEnvVar } = await import('../utils/env-manager');
+                await unsetEnvVar(appName, key);
+                console.log(`✅ Unset ${key}`);
+            } catch (error: any) {
+                console.error(`❌ Error: ${error.message}`);
+                process.exit(1);
+            }
         });
 
     app
         .command("stop")
         .description("Stop an application")
         .argument("<name>", "Application name")
-        .action(async (name) => {
+        .action(async (name: string) => {
             console.log(`⏹️  Stopping ${name}...`);
             const result = await stopApp(name);
             console.log(result.message);
@@ -526,8 +584,8 @@ export function addAppCommands(program: Command) {
         .command("restart")
         .description("Restart an application")
         .argument("<name>", "Application name")
-        .action(async (name) => {
-            console.log(`🔄 Restarting ${name}...`);
+        .action(async (name: string) => {
+            console.log(`Restarting ${name}...`);
             const result = await restartApp(name);
             console.log(result.message);
         });
@@ -537,17 +595,17 @@ export function addAppCommands(program: Command) {
         .description("Show or set auto-deploy webhook status for an app")
         .argument("<name>", "Application name")
         .argument("[state]", "State (enable/disable, on/off) - omit to show current status")
-        .action(async (name, state) => {
+        .action(async (name: string, state: string) => {
             try {
                 if (!state) {
                     // Show current status
                     const config = await getAppMetadata(name);
                     const enabled = config?.webhookAutoDeploy ?? true;
-                    console.log(`🔌 Webhook auto-deploy for ${name}: ${enabled ? '✅ ENABLED' : '⏹️  DISABLED'}`);
+                    console.log(`Webhook auto-deploy for ${name}: ${enabled ? 'ENABLED' : 'DISABLED'}`);
                 } else {
                     // Set status
                     const enabled = ['enable', 'on', 'true', '1'].includes(state.toLowerCase());
-                    console.log(`${enabled ? '🔌 Enabling' : '🔌 Disabling'} webhooks for ${name}...`);
+                    console.log(`${enabled ? 'Enabling' : 'Disabling'} webhooks for ${name}...`);
                     const result = await setAppWebhookAutoDeploy(name, enabled);
                     console.log(result.message);
                 }

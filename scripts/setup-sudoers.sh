@@ -83,6 +83,14 @@ SCRIPTS=(
   "scripts/tunnel.sh"
 )
 
+# Additional system commands to allow without password
+COMMANDS=(
+  "/usr/bin/docker"
+  "/usr/bin/docker-compose"
+  "/usr/local/bin/docker"
+  "/usr/local/bin/docker-compose"
+)
+
 echo "Configuring sudoers for user: $TARGET_USER"
 echo "Project root: $PROJECT_ROOT"
 
@@ -96,6 +104,16 @@ for SCRIPT in "${SCRIPTS[@]}"; do
     echo "  - Added: $FULL_SCRIPT_PATH"
   else
     echo "Warning: Script not found, skipping: $FULL_SCRIPT_PATH" >&2
+  fi
+done
+
+# Add system commands (like docker)
+echo ""
+echo "Adding system commands..."
+for CMD in "${COMMANDS[@]}"; do
+  if [ -f "$CMD" ]; then
+    SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $CMD *\n"
+    echo "  - Added: $CMD"
   fi
 done
 

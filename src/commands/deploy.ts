@@ -63,7 +63,7 @@ export async function runHealthCheck(
 export async function deployApp(options: DeployOptions) {
     const { appName, branch, skipHealthCheck } = options;
 
-    console.log(`🚀 Starting deployment for ${appName}...`);
+    console.log(`Starting deployment for ${appName}...`);
 
     try {
         // Check for branch mismatch and warn user
@@ -104,7 +104,7 @@ export async function deployApp(options: DeployOptions) {
 
         // Use V2 immutable deployment logic (same as webhook/API)
         // This creates a new release, clones fresh, builds, and switches symlink
-        console.log(`\n📦 Using immutable deployment strategy (V2)...`);
+        console.log(`\nUsing immutable deployment strategy (V2)...`);
 
         const result = await updateApp(appName);
 
@@ -237,7 +237,7 @@ export async function rollbackApp(appName: string, commitHash?: string) {
 }
 
 async function autoRollback(appName: string) {
-    console.log(`🔄 Auto-rollback initiated for ${appName}...`);
+    console.log(`Auto-rollback initiated for ${appName}...`);
     return await rollbackApp(appName);
 }
 
@@ -312,7 +312,7 @@ export function addDeployCommands(program: Command) {
             if (result.history.length === 0) {
                 console.log(`No deployment history for ${app}`);
             } else {
-                console.log(`📜 Deployment history for ${app}:`);
+                console.log(`Deployment history for ${app}:`);
                 for (const d of result.history.slice(-10).reverse()) {
                     const date = new Date(d.timeStamp).toLocaleString();
                     console.log(`  • ${d.gitHash.substring(0, 7)} - ${date}`);

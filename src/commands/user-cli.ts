@@ -73,11 +73,11 @@ async function interactivePermissionPicker(): Promise<string[]> {
         name: 'mode',
         message: 'How would you like to assign permissions?',
         choices: [
-            { name: 'viewer', message: '👁️  Viewer - Read-only access' },
-            { name: 'deployer', message: '🚀 Deployer - Deploy, restart, rollback' },
-            { name: 'developer', message: '👨‍💻 Developer - Full app management' },
-            { name: 'admin', message: '👑 Admin - Full access to everything' },
-            { name: 'custom', message: '🔧 Custom - Pick individual permissions' }
+            { name: 'viewer', message: 'Viewer - Read-only access' },
+            { name: 'deployer', message: 'Deployer - Deploy, restart, rollback' },
+            { name: 'developer', message: 'Developer - Full app management' },
+            { name: 'admin', message: 'Admin - Full access to everything' },
+            { name: 'custom', message: 'Custom - Pick individual permissions' }
         ]
     });
 
@@ -92,31 +92,19 @@ async function interactivePermissionPicker(): Promise<string[]> {
 
     // Custom mode - multiselect permissions
     const permChoices = [
-        // View permissions
-        { name: 'view:*', message: '👁️  view:* - All view permissions', value: 'view:*' },
-        { name: 'view:dashboard', message: '   view:dashboard - View main dashboard', value: 'view:dashboard' },
-        { name: 'view:metrics', message: '   view:metrics - View system metrics', value: 'view:metrics' },
-        { name: 'view:logs', message: '   view:logs - View application logs', value: 'view:logs' },
-        { name: 'view:deployments', message: '   view:deployments - View deploy history', value: 'view:deployments' },
-
-        // Deploy permissions
-        { name: 'deploy:*', message: '🚀 deploy:* - Deploy all apps', value: 'deploy:*' },
-
-        // App management
-        { name: 'app:*', message: '📦 app:* - All app permissions', value: 'app:*' },
-        { name: 'app:restart', message: '   app:restart - Restart apps', value: 'app:restart' },
-        { name: 'app:rollback', message: '   app:rollback - Rollback versions', value: 'app:rollback' },
-        { name: 'app:create', message: '   app:create - Create new apps', value: 'app:create' },
-        { name: 'app:delete', message: '   app:delete - Delete apps', value: 'app:delete' },
-
-        // GitHub
-        { name: 'github:*', message: '🐙 github:* - All GitHub permissions', value: 'github:*' },
-        { name: 'github:manage', message: '   github:manage - Manage GitHub settings', value: 'github:manage' },
-
-        // System
-        { name: 'system:*', message: '⚙️  system:* - All system permissions', value: 'system:*' },
-        { name: 'users:manage', message: '👥 users:manage - Manage Linux users', value: 'users:manage' },
-        { name: 'users:access', message: '🔐 users:access - Manage access users', value: 'users:access' },
+        { name: 'view:*', message: 'view:* - All view permissions', value: 'view:*' },
+        { name: 'apps:view', message: 'apps:view - List and view apps', value: 'apps:view' },
+        { name: 'apps:logs', message: 'apps:logs - View app logs', value: 'apps:logs' },
+        { name: 'apps:stats', message: 'apps:stats - View app stats', value: 'apps:stats' },
+        { name: 'deploy:*', message: 'deploy:* - Deploy all apps', value: 'deploy:*' },
+        { name: 'app:*', message: 'app:* - All app permissions', value: 'app:*' },
+        { name: 'apps:manage', message: 'apps:manage - Start, stop, restart apps', value: 'apps:manage' },
+        { name: 'apps:delete', message: 'apps:delete - Remove apps', value: 'apps:delete' },
+        { name: 'github:*', message: 'github:* - All GitHub permissions', value: 'github:*' },
+        { name: 'github:import', message: 'github:import - Import from GitHub', value: 'github:import' },
+        { name: 'github:webhooks', message: 'github:webhooks - Manage webhooks', value: 'github:webhooks' },
+        { name: 'users:manage', message: 'users:manage - Manage Linux users', value: 'users:manage' },
+        { name: 'users:access', message: 'users:access - Manage access users', value: 'users:access' },
     ];
 
     const permPrompt = new MultiSelect({
@@ -204,7 +192,7 @@ ${getPermissionHelp()}`)
                 const { token, expiresAt } = await generateToken(email, permissions, expiry);
 
                 // Send email
-                console.log('📧 Sending welcome email with token...');
+                console.log('Sending welcome email with token...');
                 const { sendWelcomeEmail } = await import('../services/email');
                 const emailResult = await sendWelcomeEmail(email, token, permissions);
 
@@ -215,7 +203,7 @@ ${getPermissionHelp()}`)
                     console.log('   Please send the token manually below:');
                 }
 
-                console.log(`\n🔐 Access Token (${options.expiry || '1d'})`);
+                console.log(`\nAccess Token (${options.expiry || '1d'})`);
                 console.log('━'.repeat(50));
                 console.log(`Token: ${token}`);
                 console.log('━'.repeat(50));
@@ -251,7 +239,7 @@ ${getPermissionHelp()}`)
 
                 const { token, expiresAt } = await generateToken(email, userData.permissions, options.expiry);
 
-                console.log(`\n🔐 Token Generated for ${email}\n`);
+                console.log(`\nToken Generated for ${email}\n`);
                 console.log('━'.repeat(50));
                 console.log(`Token: ${token}`);
                 console.log('━'.repeat(50));
@@ -282,11 +270,11 @@ ${getPermissionHelp()}`)
                     process.exit(1);
                 }
 
-                console.log(`🔄 Renewing access for ${email}...`);
+                console.log(`Renewing access for ${email}...`);
                 const { token, expiresAt } = await generateToken(email, userData.permissions, options.expiry);
 
                 // Send email
-                console.log('📧 Sending new token via email...');
+                console.log('Sending new token via email...');
                 const { sendWelcomeEmail } = await import('../services/email');
                 const emailResult = await sendWelcomeEmail(email, token, userData.permissions);
 
@@ -297,7 +285,7 @@ ${getPermissionHelp()}`)
                     console.log('   Please send the token manually below:');
                 }
 
-                console.log(`\n🔐 New Token (${options.expiry})`);
+                console.log(`\nNew Token (${options.expiry})`);
                 console.log('━'.repeat(50));
                 console.log(`Token: ${token}`);
                 console.log('━'.repeat(50));
@@ -328,7 +316,7 @@ ${getPermissionHelp()}`)
                     return;
                 }
 
-                console.log('\n👥 Users\n');
+                console.log('\nUsers\n');
                 console.log('Email'.padEnd(30) + 'Permissions'.padEnd(40) + 'Created');
                 console.log('─'.repeat(85));
 
@@ -443,7 +431,7 @@ ${getPermissionHelp()}`)
                 const allTokens = await listTokens();
                 const userTokens = allTokens.filter(t => t.userId === email);
 
-                console.log(`\n👤 User: ${userData.email}\n`);
+                console.log(`\nUser: ${userData.email}\n`);
                 console.log(`Created: ${new Date(userData.createdAt).toLocaleString()}`);
                 console.log(`Created by: ${userData.createdBy}`);
                 console.log(`\nPermissions:`);
@@ -484,7 +472,7 @@ ${getPermissionHelp()}`)
                     return;
                 }
 
-                console.log('\n🔐 Active Tokens\n');
+                console.log('\nActive Tokens\n');
                 console.log('User'.padEnd(30) + 'Token ID'.padEnd(20) + 'Expires');
                 console.log('─'.repeat(75));
 

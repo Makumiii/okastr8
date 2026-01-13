@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 import { Command } from 'commander';
 import { addSystemdCommands } from './commands/systemd';
 import { addUserCommands } from './commands/user';

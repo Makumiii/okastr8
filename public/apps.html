@@ -446,6 +446,77 @@
                 transform: rotate(360deg);
             }
         }
+
+        /* Environment Variables UI */
+        .env-drop-zone {
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            background: #f9fafb;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .env-drop-zone:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .env-drop-zone.dragover {
+            border-color: #667eea;
+            background: #e0e7ff;
+            box-shadow: 0 0 20px rgba(102, 126, 234, 0.2);
+        }
+
+        .env-var-item {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+
+        .env-var-item input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+        }
+
+        .env-var-item input:first-child {
+            flex: 0.4;
+            /* Key is smaller */
+        }
+
+        .env-var-item button {
+            padding: 6px 10px;
+            background: #fee2e2;
+            color: #dc2626;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.15s;
+        }
+
+        .env-var-item button:hover {
+            background: #fecaca;
+        }
+
+        .env-file-status {
+            margin-top: 12px;
+            padding: 10px 14px;
+            background: #dcfce7;
+            border: 1px solid #86efac;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #166534;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
     </style>
 </head>
 
@@ -539,6 +610,55 @@
                     <label>Run as User</label>
                     <input type="text" name="user" placeholder="Current user by default">
                 </div>
+
+                <!-- Environment Variables Section -->
+                <div class="form-group" style="border-top: 2px solid #f0f0f5; padding-top: 20px; margin-top: 20px;">
+                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            style="width: 18px; height: 18px;">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        Environment Variables
+                    </label>
+
+                    <!-- File Upload / Drag and Drop Area -->
+                    <div id="env-drop-zone" class="env-drop-zone">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            style="width: 32px; height: 32px; margin-bottom: 8px;">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <div>
+                            <strong>Drop .env file here</strong> or
+                            <label for="env-file-input"
+                                style="color: #667eea; cursor: pointer; text-decoration: underline;">browse</label>
+                        </div>
+                        <small style="color: #9ca3af; margin-top: 4px;">Supports .env format files</small>
+                        <input type="file" id="env-file-input" accept=".env,.txt" style="display: none;">
+                    </div>
+
+                    <!-- Manual Input Section -->
+                    <div style="margin-top: 16px;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-size: 13px; font-weight: 500; color: #6b7280;">Or add manually:</span>
+                            <button type="button" class="btn-link" onclick="addEnvVar()"
+                                style="font-size: 13px; color: #667eea; background: none; border: none; cursor: pointer; text-decoration: underline;">
+                                + Add Variable
+                            </button>
+                        </div>
+                        <div id="env-vars-list">
+                            <!-- Env var inputs will be added here -->
+                        </div>
+                    </div>
+
+                    <small style="color: #9ca3af; display: block; margin-top: 8px;">
+                        💡 Environment variables are stored securely on the server and never committed to your
+                        repository
+                    </small>
+                </div>
                 <!-- Other fields omitted for brevity -->
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
@@ -592,6 +712,51 @@
                 }
             });
 
+            // Environment Variables - Drag and Drop Functionality
+            const dropZone = document.getElementById('env-drop-zone');
+            const fileInput = document.getElementById('env-file-input');
+
+            // File input change
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) {
+                    handleEnvFile(e.target.files[0]);
+                }
+            });
+
+            // Click to browse
+            dropZone.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            // Drag and drop handlers
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => {
+                    dropZone.classList.add('dragover');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => {
+                    dropZone.classList.remove('dragover');
+                }, false);
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleEnvFile(files[0]);
+                }
+            }, false);
+
             // Create app form listeners
             document.getElementById('create-app-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
@@ -605,11 +770,32 @@
                 if (data.port) data.port = parseInt(data.port);
 
                 try {
+                    // Create the app first
                     const res = await apiPost('/app/create', data);
                     if (res.success) {
+                        // If we have environment variables, send them separately for security
+                        if (Object.keys(envVariables).length > 0) {
+                            try {
+                                // Send env vars using the CLI-style API
+                                const envPromises = Object.entries(envVariables).map(([key, value]) =>
+                                    apiPost('/app/env-set', {
+                                        appName: data.name,
+                                        key,
+                                        value
+                                    })
+                                );
+
+                                await Promise.all(envPromises);
+                                showToast(`App created with ${Object.keys(envVariables).length} environment variables!`, 'success');
+                            } catch (envError) {
+                                showToast('App created but failed to set some env vars: ' + envError.message, 'warning');
+                            }
+                        } else {
+                            showToast('App created successfully!', 'success');
+                        }
+
                         closeCreateModal();
                         loadApps();
-                        showToast('App created successfully!', 'success');
                     } else {
                         showToast(res.message, 'error');
                     }
@@ -873,6 +1059,91 @@
             }
         }
 
+        // Environment Variable Helper Functions
+        let envVariables = {}; // Store env vars
+
+        function handleEnvFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const content = e.target.result;
+                parseEnvFile(content);
+
+                // Show success message
+                const dropZone = document.getElementById('env-drop-zone');
+                const status = document.createElement('div');
+                status.className = 'env-file-status';
+                status.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                    Loaded ${Object.keys(envVariables).length} variables from ${file.name}
+                `;
+
+                // Remove existing status if any
+                const existing = dropZone.querySelector('.env-file-status');
+                if (existing) existing.remove();
+
+                dropZone.insertAdjacentElement('afterend', status);
+
+                // Update manual input list
+                renderEnvVars();
+            };
+            reader.readAsText(file);
+        }
+
+        function parseEnvFile(content) {
+            const lines = content.split('\n');
+            lines.forEach(line => {
+                line = line.trim();
+                // Skip empty lines and comments
+                if (!line || line.startsWith('#')) return;
+
+                const equalsIndex = line.indexOf('=');
+                if (equalsIndex > 0) {
+                    const key = line.substring(0, equalsIndex).trim();
+                    const value = line.substring(equalsIndex + 1).trim();
+                    // Remove quotes if present
+                    const cleanValue = value.replace(/^["']|["']$/g, '');
+                    envVariables[key] = cleanValue;
+                }
+            });
+        }
+
+        function addEnvVar() {
+            const key = prompt('Enter variable name (e.g., API_KEY):');
+            if (!key) return;
+
+            const value = prompt(`Enter value for ${key}:`);
+            if (value === null) return; // User canceled
+
+            envVariables[key] = value;
+            renderEnvVars();
+        }
+
+        function removeEnvVar(key) {
+            delete envVariables[key];
+            renderEnvVars();
+        }
+
+        function renderEnvVars() {
+            const list = document.getElementById('env-vars-list');
+            const keys = Object.keys(envVariables);
+
+            if (keys.length === 0) {
+                list.innerHTML = '<p style="text-align: center; color: #9ca3af; font-size: 13px; padding: 16px;">No variables set</p>';
+                return;
+            }
+
+            list.innerHTML = keys.map(key => `
+                <div class="env-var-item">
+                    <input type="text" value="${key}" readonly style="background: #f9fafb;">
+                    <input type="text" value="${envVariables[key]}" readonly style="background: #f9fafb;">
+                    <button type="button" onclick="removeEnvVar('${key}')">×</button>
+                </div>
+            `).join('');
+        }
+
         function openCreateModal() {
             document.getElementById('create-modal').classList.add('active');
             document.getElementById('create-app-form').reset();
@@ -880,6 +1151,13 @@
 
         function closeCreateModal() {
             document.getElementById('create-modal').classList.remove('active');
+            document.getElementById('create-app-form').reset();
+            // Reset env variables
+            envVariables = {};
+            renderEnvVars();
+            // Remove file status if exists
+            const status = document.querySelector('.env-file-status');
+            if (status) status.remove();
         }
 
         function closeVersionsModal() {

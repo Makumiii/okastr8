@@ -112,7 +112,7 @@ export async function detectAllRuntimes(): Promise<Record<RuntimeName, RuntimeIn
     const results: Record<string, RuntimeInfo> = {};
 
     for (const runtime of runtimes) {
-        console.log(`🔍 Checking ${runtime}...`);
+        console.log(`Checking ${runtime}...`);
         results[runtime] = await detectRuntime(runtime);
 
         if (results[runtime].installed) {
@@ -161,7 +161,7 @@ export async function getRuntimeInfo(name: RuntimeName): Promise<RuntimeInfo> {
  * Scan system for all runtimes and save to config
  */
 export async function scanAndSaveEnvironments(): Promise<Record<RuntimeName, RuntimeInfo>> {
-    console.log("🔧 Scanning for installed runtimes...\n");
+    console.log("Scanning for installed runtimes...\n");
 
     const environments = await detectAllRuntimes();
 

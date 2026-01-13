@@ -19,7 +19,7 @@ export async function genCaddyFile() {
   try {
     const { readdir, readFile, stat } = await import('fs/promises');
     const { join } = await import('path');
-    const { OKASTR8_HOME } = await import('../config');
+    const { OKASTR8_HOME } = await import('../config.ts');
 
     const appsDir = join(OKASTR8_HOME, 'apps');
     let appsToCheck: string[] = [];
@@ -48,7 +48,7 @@ export async function genCaddyFile() {
           // Use http:// prefix for localhost domains to avoid auto-HTTPS
           const scheme = domain.endsWith('.localhost') ? 'http://' : '';
           caddyEntries.push(`${scheme}${domain} {\n  reverse_proxy localhost:${port}\n}`);
-          console.log(`  ➕ Added route: ${domain} -> :${port} (${appName})`);
+          console.log(`  Added route: ${domain} -> :${port} (${appName})`);
         }
       } catch (e) {
         // Skip invalid apps or those without app.json
@@ -78,7 +78,7 @@ export async function genCaddyFile() {
     const pathToReloadCaddy = join(PROJECT_ROOT, "scripts", "caddy", "reloadCaddy.sh");
     await runCommand("sudo", [pathToReloadCaddy]);
 
-    console.log(`✅ Caddyfile regenerated with ${caddyEntries.length} routes at ${caddyFilePath}`);
+    console.log(`Caddyfile regenerated with ${caddyEntries.length} routes at ${caddyFilePath}`);
   } catch (e) {
     console.error("❌ Error generating Caddyfile:", e);
     // Don't throw, just log. Deployment shouldn't fail if Caddy fails? 

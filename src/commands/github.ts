@@ -381,7 +381,7 @@ export async function importRepo(
         const branch = options.branch || repo.default_branch;
 
         // CHECK FOR okastr8.yaml BEFORE CLONING (fail fast)
-        log("🔍 Checking for okastr8.yaml in repository...");
+        log("Checking for okastr8.yaml in repository...");
         const configExists = await checkFileExists(
             githubConfig.accessToken,
             repo.full_name,
@@ -407,22 +407,41 @@ export async function importRepo(
         // Ensure versioning is initialized (for existing apps)
         await initializeVersioning(appName);
 
-        log(`📦 Preparing deployment for ${repo.full_name} (${branch})...`);
+        log(`Preparing deployment for ${repo.full_name} (${branch})...`);
 
         // Create new version entry
         // We'll get the commit hash after cloning, so simpler to just use "HEAD" for now 
         // or we could fetch it via API but let's stick to clone first
         const { versionId, releasePath } = await createVersion(appName, "HEAD", branch);
 
-        // CLEANUP HELPER
+        // CLEANUP HELPER - ensures all artifacts are cleaned up atomically
         const cleanupFailedDeployment = async (reason: string) => {
             log(`🧹 Cleaning up: ${reason}`);
+
+            // 1. Stop and remove Docker container if it exists
+            try {
+                const { stopContainer, removeContainer, composeDown } = await import("./docker");
+                await stopContainer(appName).catch(() => { });
+                await removeContainer(appName).catch(() => { });
+
+                // Also try compose down in case it was a compose deployment
+                const composePath = join(releasePath, "docker-compose.yml");
+                if (existsSync(composePath)) {
+                    await composeDown(composePath, appName).catch(() => { });
+                }
+            } catch (e) { console.error("Error cleaning up Docker:", e); }
+
+            // 2. Remove release path
             try { await rm(releasePath, { recursive: true, force: true }); } catch (e) { console.error("Error removing release path:", e); }
+
+            // 3. Remove version entry
             try { await removeVersion(appName, versionId); } catch (e) { console.error("Error removing version entry:", e); }
+
+            // 4. Remove app directory if no versions left
             try {
                 const data = await getVersions(appName);
                 if (data.versions.length === 0 && !data.current) {
-                    log(`🗑️  No versions left. Removing ghost app directory: ${appDir}`);
+                    log(`No versions left. Removing ghost app directory: ${appDir}`);
                     await rm(appDir, { recursive: true, force: true });
                 }
             } catch (e) { console.error("Error checking ghost app:", e); }
@@ -468,7 +487,7 @@ export async function importRepo(
 
 
         // Load configuration from okastr8.yaml
-        log("📄 Loading okastr8.yaml configuration...");
+        log("Loading okastr8.yaml configuration...");
         const configPath = join(releasePath, "okastr8.yaml");
 
         let detectedConfig: DetectedConfig;
@@ -541,13 +560,13 @@ export async function importRepo(
             }
         }
 
-        log(`🔧 Detected runtime: ${detectedConfig.runtime}`);
-        log(`📝 Build steps: ${detectedConfig.buildSteps.join(", ") || "none"}`);
+        log(`Detected runtime: ${detectedConfig.runtime}`);
+        log(`Build steps: ${detectedConfig.buildSteps.join(", ") || "none"}`);
         log(`▶️  Start command: ${detectedConfig.startCommand}`);
 
         // Run build steps
         if (detectedConfig.buildSteps.length > 0) {
-            log("🔨 Running build steps...");
+            log("Running build steps...");
 
             for (const step of detectedConfig.buildSteps) {
                 log(`  → ${step}`);
@@ -562,81 +581,42 @@ export async function importRepo(
             }
         }
 
-        // Update symlink to new version BEFORE create app service (so service points to 'current')
-        log("🔄 Switching to new version...");
+        // Update symlink to new version BEFORE deployment
+        log("Switching to new version...");
         await setCurrentVersion(appName, versionId);
-        await updateVersionStatus(appName, versionId, "success", "Deployed");
 
-        // Create/Update the okastr8 app
-        log("📦 Configuring okastr8 app...");
-        const appResult = await createApp({
-            name: appName,
-            description: repo.description || `Deployed from ${repo.full_name}`,
-            execStart: detectedConfig.startCommand,
-            workingDirectory: join(appDir, "current"), // Point to current symlink
-            user: process.env.USER || "root",
-            port: finalPort,
-            domain: finalDomain,
-            gitRepo: repo.ssh_url || repo.clone_url || repo.html_url,  // Fallback if SSH URL is missing
+        // Deploy with Docker using deployFromPath
+        log("Deploying with Docker...");
+        const { deployFromPath } = await import("./deploy-core");
+        const deployResult = await deployFromPath({
+            appName,
+            releasePath,
+            versionId,
+            gitRepo: repo.ssh_url || repo.clone_url || repo.html_url,
             gitBranch: branch,
-            buildSteps: detectedConfig.buildSteps,
-            env: detectedConfig.env,
+            onProgress: log,
         });
 
-        if (!appResult.success) {
-            // Cleanup on app creation failure
-            await cleanupFailedDeployment("Systemd creation failed");
-            return { success: false, message: appResult.message };
-        }
-
-        // Post-deployment health check: Verify service is running
-        log("⏳ Waiting 5 seconds for service to stabilize...");
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        log("🏥 Verifying service health...");
-        const healthCheck = await runCommand("systemctl", ["is-active", appName]);
-        const serviceStatus = healthCheck.stdout.trim();
-
-        if (healthCheck.exitCode !== 0 || serviceStatus !== "active") {
-            log(`❌ Service failed to start. Status: ${serviceStatus}`);
-            await updateVersionStatus(appName, versionId, "failed", `Service ${serviceStatus}`);
-
-            // Get recent logs for debugging
-            const logsResult = await runCommand("journalctl", ["-u", appName, "-n", "30", "--no-pager"]);
-            const logs = logsResult.stdout || logsResult.stderr || "No logs available";
-
-            // CLEANUP: Remove all artifacts since deployment failed
-            log("🧹 Cleaning up failed deployment...");
-
-            // 1. Stop and remove service
-            await runCommand("sudo", ["systemctl", "stop", appName]);
-            await runCommand("sudo", ["systemctl", "disable", appName]);
-            await runCommand("sudo", ["rm", "-f", `/etc/systemd/system/${appName}.service`]);
-            await runCommand("sudo", ["systemctl", "daemon-reload"]);
-
-            // 2. Remove app.json (if it was created - though it shouldn't be due to createApp reorder)
-            const appJsonPath = join(appDir, "app.json");
-            await runCommand("rm", ["-f", appJsonPath]);
-
-            // 3. Smart Cleanup
-            await cleanupFailedDeployment("Service failed to start");
-
+        if (!deployResult.success) {
+            await updateVersionStatus(appName, versionId, "failed", deployResult.message);
+            await cleanupFailedDeployment(deployResult.message);
             return {
                 success: false,
-                message: `Deployment failed: Service is ${serviceStatus}. Check logs for details.\n\nRecent logs:\n${logs.slice(0, 500)}...`,
+                message: deployResult.message,
                 appName,
                 config: detectedConfig,
             };
         }
 
-        log("✅ Service is running successfully!");
+        await updateVersionStatus(appName, versionId, "success", "Deployed");
+        log("✅ Container is running successfully!");
 
         // Cleanup old versions
         await cleanOldVersions(appName);
 
         // Setup webhook if requested
         if (options.setupWebhook) {
-            log("🔗 Setting up webhook...");
+            log("Setting up webhook...");
             const ghConfig = await getGitHubConfig();
             if (ghConfig.accessToken) {
                 const webhookSuccess = await createWebhook(repo.full_name, ghConfig.accessToken);

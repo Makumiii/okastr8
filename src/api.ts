@@ -128,7 +128,7 @@ api.get('/system/status', async (c) => {
         // Get environments
         const environments = await detectAllRuntimes();
 
-        // Get okastr8 services status
+        // Get okastr8 manager service status (still uses systemd for manager itself)
         const services = [];
         const serviceNames = ['okastr8-manager'];
         for (const name of serviceNames) {
@@ -148,14 +148,15 @@ api.get('/system/status', async (c) => {
             apps = result.success && Array.isArray(result.apps) ? result.apps : [];
         } catch { }
 
-        // Check app service statuses
+        // Check Docker container statuses for apps
+        const { containerStatus } = await import('./commands/docker');
         for (const app of apps) {
             if (app && app.name) {
-                const result = await runCommand('systemctl', ['is-active', app.name]);
+                const status = await containerStatus(app.name);
                 services.push({
                     name: app.name,
-                    status: result.stdout.trim() || 'unknown',
-                    running: result.exitCode === 0,
+                    status: status.status,
+                    running: status.running,
                     isApp: true
                 });
             }
@@ -1182,7 +1183,7 @@ api.post('/github/webhook', async (c) => {
                 return c.json({ ignored: true, message: 'Auto-deploy disabled for this app' });
             }
 
-            console.log(`🚀 Webhook trigger: Auto-deploying ${targetApp.name}...`);
+            console.log(`Webhook trigger: Auto-deploying ${targetApp.name}...`);
 
             // Check branch if possible
             if (targetApp.gitBranch && event.ref) {
@@ -1244,7 +1245,7 @@ api.post('/auth/verify', async (c) => {
         const isTrusted = await isTrustedUser(result.userId || '');
 
         if (needsApproval && !isAdmin && !isTrusted) {
-            console.log(`🔒 Login approval required for ${result.userId}`);
+            console.log(`Login approval required for ${result.userId}`);
 
             // Create pending approval
             const approval = await createPendingApproval(result.userId!, token);
