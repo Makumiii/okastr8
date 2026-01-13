@@ -19559,7 +19559,7 @@ async function setAppWebhookAutoDeploy(appName, enabled) {
 }
 function addAppCommands(program2) {
   const app = program2.command("app").description("Manage okastr8 applications");
-  app.command("create").description("Create a new application").argument("<name>", "Application name").argument("<exec_start>", "Command to run (e.g., 'bun run start')").option("-d, --description <desc>", "Service description", "Okastr8 managed app").option("-u, --user <user>", "User to run as", process.env.USER || "root").option("-w, --working-dir <dir>", "Working directory").option("-p, --port <port>", "Application port").option("--domain <domain>", "Domain for Caddy reverse proxy").option("--git-repo <url>", "Git repository URL").option("--git-branch <branch>", "Git branch to track", "main").action(async (name, execStart, options) => {
+  app.command("create").description("Create a new application").argument("<name>", "Application name").argument("<exec_start>", "Command to run (e.g., 'bun run start')").option("-d, --description <desc>", "Service description", "Okastr8 managed app").option("-u, --user <user>", "User to run as", process.env.USER || "root").option("-w, --working-dir <dir>", "Working directory").option("-p, --port <port>", "Application port").option("--domain <domain>", "Domain for Caddy reverse proxy").option("--git-repo <url>", "Git repository URL").option("--git-branch <branch>", "Git branch to track", "main").option("--database <type:version>", "Database service (e.g., 'postgres:15')").option("--cache <type:version>", "Cache service (e.g., 'redis:7')").action(async (name, execStart, options) => {
     console.log(`Creating app '${name}'...`);
     try {
       const result = await createApp({
@@ -19571,7 +19571,9 @@ function addAppCommands(program2) {
         port: options.port ? parseInt(options.port, 10) : undefined,
         domain: options.domain,
         gitRepo: options.gitRepo,
-        gitBranch: options.gitBranch
+        gitBranch: options.gitBranch,
+        database: options.database,
+        cache: options.cache
       });
       console.log(result.message);
       console.log(`App created at ${result.appDir}`);
