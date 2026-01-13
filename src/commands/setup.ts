@@ -2,8 +2,9 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { Command } from "commander";
 import { runCommand } from "../utils/command";
-// @ts-ignore
-import { prompt } from "enquirer";
+// @ts-ignore - enquirer uses CommonJS exports
+import Enquirer from "enquirer";
+const { prompt } = Enquirer;
 
 // Get the directory of this file (works in Bun and Node ESM)
 const __filename = fileURLToPath(import.meta.url);
