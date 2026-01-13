@@ -9,9 +9,13 @@ cleanup_on_error() {
     echo "❌ ERROR: Installation failed at line $1." >&2
     echo "Cleaning up partially installed files..." >&2
     
+    # Remove newly created user if applicable
+    if [[ -n "${USER_CREATED:-}" ]]; then
+        echo "🗑️  Removing created user '$USER_CREATED'..." >&2
+        userdel -r "$USER_CREATED" || true
+    fi
+
     # Only remove the install dir if it was being created
-    # We don't want to run a full 'clean_install' if they just had a network error
-    # but we should ensure we aren't in a 'broken' state.
     if [ -f "$HOME/.okastr8/.installing" ]; then
         rm -rf "$INSTALL_DIR"
         rm -f "$HOME/.okastr8/.installing"
@@ -45,6 +49,9 @@ BUN_PATH="/usr/local/bin/bun"
 CREATE_SCRIPT_PATH="$INSTALL_DIR/scripts/systemd/create.sh"
 SERVICE_WORKING_DIR="$INSTALL_DIR"
 CURRENT_USER=$(whoami)
+
+# Tracking for cleanup
+USER_CREATED=""
 
 # --- Helper Functions ---
 info() {
@@ -142,11 +149,17 @@ if [[ $EUID -eq 0 ]]; then
   echo ""
 
   # 0. Install essential onboarding tools
-  info "Installing essential tools (openssh, sudo)..."
+  info "Installing essential onboarding tools (openssh, sudo)..."
+  export DEBIAN_FRONTEND=noninteractive
   if command -v apt-get &> /dev/null; then
-    apt-get update && apt-get install -y openssh-client sudo
+    apt-get update -qq && apt-get install -qq -y openssh-client sudo
   elif command -v dnf &> /dev/null; then
     dnf install -y openssh-clients sudo
+  fi
+  
+  # Verification
+  if ! command -v ssh-keygen &> /dev/null; then
+    error "Failed to install ssh-keygen. Please install 'openssh-client' manually."
   fi
 
   # 1. Gather User Details
@@ -175,6 +188,7 @@ if [[ $EUID -eq 0 ]]; then
   # 3. Create User
   info "Creating user '$NEW_USER'..."
   /tmp/create-user.sh "$NEW_USER" "$NEW_PASS"
+  USER_CREATED="$NEW_USER"
 
   # 4. SSH Key Management
   NEW_USER_HOME=$(eval echo "~$NEW_USER")
