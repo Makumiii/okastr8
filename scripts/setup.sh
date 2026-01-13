@@ -91,6 +91,7 @@ if [[ "$USE_FEDORA" == true ]]; then
 else
   sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-archive-keyring.gpg
+  sudo rm -f /etc/apt/sources.list.d/caddy-stable.list
   curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | \
     sed 's/^deb /deb [signed-by=\/usr\/share\/keyrings\/caddy-archive-keyring.gpg] /' | \
     sudo tee /etc/apt/sources.list.d/caddy-stable.list
