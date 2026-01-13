@@ -59,7 +59,7 @@ fi
 echo "🔧 Setting up Bun..."
 if ! command -v bun &> /dev/null; then
   echo "Bun installing..."
-  yes | curl -fsSL https://bun.sh/install | bash
+  curl -fsSL https://bun.sh/install | bash
   # Manually add to path for current session
   export BUN_INSTALL="$HOME/.bun"
   export PATH="$BUN_INSTALL/bin:$PATH"
