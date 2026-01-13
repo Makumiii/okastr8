@@ -1,5 +1,25 @@
-#!/usr/bin/env bash
 set -eou pipefail
+
+# --- Error Handling ---
+cleanup_on_error() {
+  local exit_code=$?
+  if [ $exit_code -ne 0 ]; then
+    echo ""
+    echo "❌ ERROR: Installation failed at line $1." >&2
+    echo "Cleaning up partially installed files..." >&2
+    
+    # Only remove the install dir if it was being created
+    # We don't want to run a full 'clean_install' if they just had a network error
+    # but we should ensure we aren't in a 'broken' state.
+    if [ -f "$HOME/.okastr8/.installing" ]; then
+        rm -rf "$INSTALL_DIR"
+        rm -f "$HOME/.okastr8/.installing"
+    fi
+    exit $exit_code
+  fi
+}
+
+trap 'cleanup_on_error $LINENO' ERR
 
 # --- Configuration ---
 REPO_URL="https://github.com/Makumiii/okastr8.git"
@@ -203,6 +223,10 @@ fi
 # Call clean_install at the beginning to ensure a fresh state
 clean_install
 
+# Mark installation as in-progress
+mkdir -p "$CONFIG_DIR"
+touch "$CONFIG_DIR/.installing"
+
 # --- 1.
 
 
@@ -312,6 +336,7 @@ fi
 # We no longer auto-start tunnels. The user should run 'okastr8 tunnel setup <token>'
 
 # --- Done ---
+rm -f "$CONFIG_DIR/.installing"
 info "🎉 Okastr8 installation complete!"
 info "Run 'okastr8 --help' to get started."
 info "Run 'okastr8 setup full' to initialize your system."
