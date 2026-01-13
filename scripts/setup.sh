@@ -205,18 +205,35 @@ fi
 
 # Configure Ngrok authtoken from config.json
 # Configure Ngrok authtoken from system.yaml
+# duplicate removed
+FEDORA_PACKAGES=(
+  curl
+  git
+  firewalld
+  unzip
+  gnupg2
+  xclip
+)
+
+# ... (omitted primarily to keep context clean, tool handles replacement)
+
+# Configure Ngrok authtoken from config.json
 SCRIPT_DIR="$(dirname "$0")"
 READ_CONFIG="$SCRIPT_DIR/read_config.ts"
 
-echo "Configuring Ngrok authtoken..."
-# We now use bun to read the config
-AUTHTOKEN=$(bun "$READ_CONFIG" tunnel.auth_token)
+if [ -f "$READ_CONFIG" ]; then
+  echo "Configuring Ngrok authtoken..."
+  # We now use bun to read the config
+  AUTHTOKEN=$(bun "$READ_CONFIG" tunnel.auth_token)
 
-if [ -n "$AUTHTOKEN" ]; then
-  ngrok config add-authtoken "$AUTHTOKEN"
-  echo "Ngrok authtoken configured successfully."
+  if [ -n "$AUTHTOKEN" ]; then
+    ngrok config add-authtoken "$AUTHTOKEN"
+    echo "Ngrok authtoken configured successfully."
+  else
+    echo "Warning: Ngrok authtoken not found. Ngrok will run unauthenticated." >&2
+  fi
 else
-  echo "Warning: Ngrok authtoken not found in system.yaml. Ngrok will run unauthenticated." >&2
+  echo "Skipping Ngrok auth configuration (read_config.ts not found in $SCRIPT_DIR)."
 fi
 
 # --- Setup bun ---
