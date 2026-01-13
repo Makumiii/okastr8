@@ -120,6 +120,14 @@ fi
 # --- CRITICAL: Validate Config Before Applying ---
 echo ""
 echo "🔍 Validating SSH configuration..."
+
+# Fix for minimal containers: ensure privilege separation directory exists
+if [ ! -d "/run/sshd" ]; then
+    echo "🛠️  Creating missing privilege separation directory: /run/sshd"
+    mkdir -p /run/sshd
+    chmod 0755 /run/sshd
+fi
+
 if ! "$SSHD_BIN" -t -f "$SSHD_CONFIG"; then
   echo "❌ SSH configuration validation FAILED!" >&2
   echo "   Restoring backup..." >&2
