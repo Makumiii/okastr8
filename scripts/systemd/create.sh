@@ -32,6 +32,11 @@ AUTO_START=${7:-true}  # Defaults to true if not provided
 OKASTR8_DIR="/etc/systemd/system"
 mkdir -p "$OKASTR8_DIR"
 UNIT_FILE="$OKASTR8_DIR/$SERVICE_NAME.service"
+# Clean up legacy unit path if present.
+if [ -f "/etc/systemd/system/okastr8/$SERVICE_NAME.service" ]; then
+  rm -f "/etc/systemd/system/okastr8/$SERVICE_NAME.service"
+  rmdir /etc/systemd/system/okastr8 2>/dev/null || true
+fi
 
 # --- Unit File Creation (Always overwrite/create) ---
 echo "Creating/Updating systemd unit file: '$UNIT_FILE'"
@@ -66,8 +71,8 @@ if [[ "$AUTO_START" == "true" ]]; then
   if systemctl is-enabled "$SERVICE_NAME.service" &> /dev/null && systemctl is-active "$SERVICE_NAME.service" &> /dev/null; then
     echo "Info: Service '$SERVICE_NAME' is already enabled and active. Skipping enable/start."
   else
-    systemctl link "$UNIT_FILE" || true # Link might fail if already linked, use || true
-    systemctl enable "$SERVICE_NAME.service"
+    systemctl link "$UNIT_FILE" 2>/dev/null || true # Ignore if already under unit hierarchy.
+    systemctl enable "$SERVICE_NAME.service" || true
     systemctl start "$SERVICE_NAME.service"
     echo "Service '$SERVICE_NAME' linked, enabled, and started."
   fi

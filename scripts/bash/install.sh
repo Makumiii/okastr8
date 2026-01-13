@@ -74,10 +74,13 @@ clean_install() {
   sudo systemctl stop "$WEBHOOK_SERVICE_NAME" || true
   sudo systemctl disable "$WEBHOOK_SERVICE_NAME" || true
   sudo rm -f "/etc/systemd/system/$WEBHOOK_SERVICE_NAME.service"
+  sudo rm -f "/etc/systemd/system/okastr8/$WEBHOOK_SERVICE_NAME.service"
 
   sudo systemctl stop "$MANAGER_SERVICE_NAME" || true
   sudo systemctl disable "$MANAGER_SERVICE_NAME" || true
   sudo rm -f "/etc/systemd/system/$MANAGER_SERVICE_NAME.service"
+  sudo rm -f "/etc/systemd/system/okastr8/$MANAGER_SERVICE_NAME.service"
+  sudo rmdir /etc/systemd/system/okastr8 2>/dev/null || true
 
   info "Reloading systemd daemon..."
   sudo systemctl daemon-reload
