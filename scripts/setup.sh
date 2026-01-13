@@ -68,11 +68,16 @@ fi
 # Move bun binary to /usr/local/bin so sudo can see it
 BUN_SOURCE="$HOME/.bun/bin/bun"
 BUN_TARGET="/usr/local/bin/bun"
-if [ -f "$BUN_SOURCE" ]; then
-  if [ ! -f "$BUN_TARGET" ]; then
-     echo "Moving Bun to /usr/local/bin..."
-     sudo mv "$BUN_SOURCE" "$BUN_TARGET"
-     sudo chmod +x "$BUN_TARGET"
+if [ -f "$BUN_SOURCE" ] && [ ! -f "$BUN_TARGET" ]; then
+  echo "Moving Bun to /usr/local/bin..."
+  if sudo mkdir -p /usr/local/bin; then
+    if sudo mv "$BUN_SOURCE" "$BUN_TARGET"; then
+      sudo chmod +x "$BUN_TARGET"
+    else
+      echo "Warning: Failed to move Bun to /usr/local/bin; continuing with $BUN_SOURCE" >&2
+    fi
+  else
+    echo "Warning: Failed to create /usr/local/bin; continuing with $BUN_SOURCE" >&2
   fi
 fi
 

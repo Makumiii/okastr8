@@ -273,6 +273,14 @@ if ! "$TEMP_SETUP_SCRIPT"; then
   error "setup.sh failed to execute."
 fi
 rm "$TEMP_SETUP_SCRIPT"
+if [ -x "/usr/local/bin/bun" ]; then
+  BUN_PATH="/usr/local/bin/bun"
+elif [ -x "$HOME/.bun/bin/bun" ]; then
+  BUN_PATH="$HOME/.bun/bin/bun"
+  export PATH="$HOME/.bun/bin:$PATH"
+else
+  error "Bun not found after setup.sh. Check setup.sh output for errors."
+fi
 info "Initial system setup complete."
 
 # --- 3. Clone Repository ---
