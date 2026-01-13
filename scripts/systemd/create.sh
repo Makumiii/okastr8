@@ -8,6 +8,12 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
+# Skip service creation if systemd is not running (common in containers).
+if ! systemctl is-system-running --quiet 2>/dev/null; then
+  echo "Warning: systemd not running; skipping service creation." >&2
+  exit 2
+fi
+
 # --- Argument Parsing ---
 if [ "$#" -lt 6 ]; then
     echo "Usage: $0 <service_name> <description> <exec_start> <working_directory> <user> <wanted_by> [auto_start:true|false]" >&2
