@@ -356,13 +356,12 @@ MANAGER_EXEC_START="$BUN_PATH run $INSTALL_DIR/src/managerServer.ts"
 
 # Always create/update the service file
 info "Creating systemd service '$MANAGER_SERVICE_NAME'."
-if ! sudo "$CREATE_SCRIPT_PATH" "$MANAGER_SERVICE_NAME" "$MANAGER_SERVICE_DESCRIPTION" "$MANAGER_EXEC_START" "$SERVICE_WORKING_DIR" "$CURRENT_USER" "multi-user.target" "true"; then
-  status=$?
-  if [ "$status" -eq 2 ]; then
-    info "Systemd not running; skipping service creation."
-  else
-    error "Failed to create systemd service for manager server."
-  fi
+sudo "$CREATE_SCRIPT_PATH" "$MANAGER_SERVICE_NAME" "$MANAGER_SERVICE_DESCRIPTION" "$MANAGER_EXEC_START" "$SERVICE_WORKING_DIR" "$CURRENT_USER" "multi-user.target" "true"
+status=$?
+if [ "$status" -eq 2 ]; then
+  info "Systemd not running; skipping service creation."
+elif [ "$status" -ne 0 ]; then
+  error "Failed to create systemd service for manager server."
 else
   info "Systemd service '$MANAGER_SERVICE_NAME' created and enabled."
 fi
