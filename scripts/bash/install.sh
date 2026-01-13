@@ -141,6 +141,14 @@ if [[ $EUID -eq 0 ]]; then
   echo "We will now create a dedicated administrative user and harden your server."
   echo ""
 
+  # 0. Install essential onboarding tools
+  info "Installing essential tools (openssh, sudo)..."
+  if command -v apt-get &> /dev/null; then
+    apt-get update && apt-get install -y openssh-client sudo
+  elif command -v dnf &> /dev/null; then
+    dnf install -y openssh-clients sudo
+  fi
+
   # 1. Gather User Details
   while true; do
     read -p "👤 Enter username for new admin (default: okastr8): " NEW_USER < /dev/tty
