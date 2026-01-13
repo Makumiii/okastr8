@@ -356,10 +356,15 @@ MANAGER_EXEC_START="$BUN_PATH run $INSTALL_DIR/src/managerServer.ts"
 
 # Always create/update the service file
 info "Creating systemd service '$MANAGER_SERVICE_NAME'."
+
+# Temporarily disable exit-on-error to capture the exit code
+set +e
 sudo "$CREATE_SCRIPT_PATH" "$MANAGER_SERVICE_NAME" "$MANAGER_SERVICE_DESCRIPTION" "$MANAGER_EXEC_START" "$SERVICE_WORKING_DIR" "$CURRENT_USER" "multi-user.target" "true"
 status=$?
+set -e
+
 if [ "$status" -eq 2 ]; then
-  info "Systemd not running; skipping service creation."
+  info "Systemd not running (container?); skipping service creation. You can run okastr8 manually."
 elif [ "$status" -ne 0 ]; then
   error "Failed to create systemd service for manager server."
 else
