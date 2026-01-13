@@ -45,7 +45,10 @@ fi
 
 # Check if at least one SSH key exists for the current user (or calling user)
 # Check if at least one SSH key exists for the current user (or calling user)
-if [[ "${SKIP_KEY_CHECK:-false}" != "true" ]]; then
+# We allow skipping this check if we are in an automated flow where we know a key was just created for another user.
+if [ "${SKIP_KEY_CHECK:-false}" = "true" ]; then
+  echo "⏩ Skipping SSH key check (SKIP_KEY_CHECK=true)"
+else
   CALLING_USER=$(whoami)
   CALLING_USER_HOME=$(eval echo "~$CALLING_USER")
   AUTHORIZED_KEYS="$CALLING_USER_HOME/.ssh/authorized_keys"
