@@ -30,6 +30,7 @@ trap 'cleanup_on_error $LINENO' ERR
 
 # --- Configuration ---
 REPO_URL="https://github.com/Makumiii/okastr8.git"
+REPO_BRANCH="docker-support"
 INSTALL_DIR="$HOME/okastr8"
 SYMLINK_DIR="$HOME/.local/bin"
 SYMLINK_NAME="okastr8"
@@ -289,7 +290,7 @@ info "Initial system setup complete."
 # --- 3. Clone Repository ---
 info "Cloning Okastr8 repository into $INSTALL_DIR..."
 # This step is now simplified as clean_install handles removal
-if ! git clone "$REPO_URL" "$INSTALL_DIR"; then
+if ! git clone --branch "$REPO_BRANCH" "$REPO_URL" "$INSTALL_DIR"; then
   error "Failed to clone repository."
 fi
 cd "$INSTALL_DIR"
