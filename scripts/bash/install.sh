@@ -262,7 +262,7 @@ touch "$CONFIG_DIR/.installing"
 
 # --- 2. Run setup.sh ---
 info "Running initial system setup..."
-SETUP_SCRIPT_URL="https://raw.githubusercontent.com/Makumiii/okastr8/docker-support/scripts/setup.sh"
+SETUP_SCRIPT_URL="https://raw.githubusercontent.com/Makumiii/okastr8/docker-support/scripts/setup.sh?v=$(date +%s)"
 TEMP_SETUP_SCRIPT="$(mktemp)"
 if ! curl -fsSL "$SETUP_SCRIPT_URL" -o "$TEMP_SETUP_SCRIPT"; then
   error "Failed to download setup.sh"
