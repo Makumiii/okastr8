@@ -152,9 +152,9 @@ if [[ $EUID -eq 0 ]]; then
   info "Installing essential onboarding tools (openssh, sudo)..."
   export DEBIAN_FRONTEND=noninteractive
   if command -v apt-get &> /dev/null; then
-    apt-get update -qq && apt-get install -qq -y openssh-client sudo
+    apt-get update -qq && apt-get install -qq -y openssh-client openssh-server sudo
   elif command -v dnf &> /dev/null; then
-    dnf install -y openssh-clients sudo
+    dnf install -y openssh-clients openssh-server sudo
   fi
   
   # Verification
