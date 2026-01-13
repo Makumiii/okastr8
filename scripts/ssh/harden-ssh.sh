@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 set -eou pipefail
 
 # Ensure essential paths are in PATH
@@ -27,11 +28,14 @@ NEW_SSH_PORT="${1:-}"  # Optional: pass port as argument
 # --- Pre-flight Checks ---
 echo "🔍 Running pre-flight checks..."
 
-# Check if sshd is installed
-if ! command -v sshd &> /dev/null; then
+# Check if sshd is installed (with fallback for minimal environments)
+if ! command -v sshd &> /dev/null && [ ! -x /usr/sbin/sshd ]; then
   echo "❌ OpenSSH server (sshd) is not installed." >&2
   exit 1
 fi
+
+# Use explicit path if found in sbin
+SSHD_BIN=$(command -v sshd || echo "/usr/sbin/sshd")
 
 # Check if config file exists
 if [ ! -f "$SSHD_CONFIG" ]; then
@@ -110,7 +114,7 @@ fi
 # --- CRITICAL: Validate Config Before Applying ---
 echo ""
 echo "🔍 Validating SSH configuration..."
-if ! sshd -t -f "$SSHD_CONFIG"; then
+if ! "$SSHD_BIN" -t -f "$SSHD_CONFIG"; then
   echo "❌ SSH configuration validation FAILED!" >&2
   echo "   Restoring backup..." >&2
   cp "$SSHD_CONFIG_BACKUP" "$SSHD_CONFIG"
