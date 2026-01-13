@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -eou pipefail
+set -eo pipefail
 
 # Ensure essential paths are in PATH
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
