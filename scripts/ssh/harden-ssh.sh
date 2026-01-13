@@ -1,5 +1,7 @@
-#!/usr/bin/env bash
 set -eou pipefail
+
+# Ensure essential paths are in PATH
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
 # SSH Hardening Script
 # This script hardens SSH configuration with SAFETY CHECKS to prevent lockouts
