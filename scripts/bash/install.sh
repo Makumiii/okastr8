@@ -254,6 +254,9 @@ if [[ $EUID -eq 0 ]]; then
   exit 0
 fi
 
+# Ensure we're not inside the install directory before cleaning it
+cd "$HOME"
+
 # Call clean_install at the beginning to ensure a fresh state
 clean_install
 
