@@ -136,7 +136,7 @@ if [[ $EUID -eq 0 ]]; then
   done
 
   # 2. Setup Scripts
-  SCRIPTS_URL_BASE="https://raw.githubusercontent.com/Makumiii/okastr8/main/scripts"
+  SCRIPTS_URL_BASE="https://raw.githubusercontent.com/Makumiii/okastr8/docker-support/scripts"
   
   info "Downloading setup tools..."
   curl -sSL "$SCRIPTS_URL_BASE/user/create-user.sh" -o "/tmp/create-user.sh"
@@ -195,7 +195,7 @@ if [[ $EUID -eq 0 ]]; then
   info "✅ User created and server hardened."
   echo "Please switch to your new user to finish the installation:"
   echo ""
-  echo "   su - $NEW_USER -c 'curl -fsSL https://raw.githubusercontent.com/Makumiii/okastr8/main/scripts/bash/install.sh | bash'"
+  echo "   su - $NEW_USER -c 'curl -fsSL https://raw.githubusercontent.com/Makumiii/okastr8/docker-support/scripts/bash/install.sh | bash'"
   echo ""
   exit 0
 fi
@@ -208,7 +208,7 @@ clean_install
 
 # --- 2. Run setup.sh ---
 info "Running initial system setup..."
-SETUP_SCRIPT_URL="https://raw.githubusercontent.com/Makumiii/okastr8/main/scripts/setup.sh"
+SETUP_SCRIPT_URL="https://raw.githubusercontent.com/Makumiii/okastr8/docker-support/scripts/setup.sh"
 TEMP_SETUP_SCRIPT="$(mktemp)"
 if ! curl -fsSL "$SETUP_SCRIPT_URL" -o "$TEMP_SETUP_SCRIPT"; then
   error "Failed to download setup.sh"
