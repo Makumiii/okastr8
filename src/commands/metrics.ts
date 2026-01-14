@@ -105,87 +105,138 @@ async function getSystemMetrics(): Promise<SystemMetrics> {
 
 /**
  * Get metrics for a single application or service
+ * Uses Docker for apps, systemctl for okastr8-manager
  */
 async function getServiceMetrics(serviceName: string): Promise<ServiceMetrics | null> {
     try {
-        // Check if service is active
-        const statusResult = await runCommand('systemctl', ['is-active', serviceName]);
-        const statusOutput = statusResult.stdout.trim();
-
         let status: ServiceMetrics['status'] = 'unknown';
-        if (statusOutput === 'active') status = 'running';
-        else if (statusOutput === 'inactive') status = 'stopped';
-        else if (statusOutput === 'failed') status = 'failed';
-        else status = 'stopped';
-
-        // Default values
         let cpu = 0;
         let memory = 0;
         let uptimeSeconds = 0;
         let pid: number | undefined;
 
-        if (status === 'running') {
-            // Get detailed properties
-            const showResult = await runCommand('systemctl', [
-                'show', serviceName,
-                '--property=MainPID,CPUUsageNSec,MemoryCurrent,ActiveEnterTimestampMonotonic'
-            ]);
+        // okastr8-manager runs as systemd service, apps run as Docker containers
+        const isManager = serviceName === 'okastr8-manager';
 
-            const props: Record<string, string> = {};
-            for (const line of showResult.stdout.split('\n')) {
-                const [key, ...valueParts] = line.split('=');
-                if (key && valueParts.length) {
-                    props[key.trim()] = valueParts.join('=').trim();
+        if (isManager) {
+            // Use systemctl for manager service
+            const statusResult = await runCommand('systemctl', ['is-active', serviceName]);
+            const statusOutput = statusResult.stdout.trim();
+
+            if (statusOutput === 'active') status = 'running';
+            else if (statusOutput === 'inactive') status = 'stopped';
+            else if (statusOutput === 'failed') status = 'failed';
+            else status = 'stopped';
+
+            if (status === 'running') {
+                // Get detailed properties from systemctl
+                const showResult = await runCommand('systemctl', [
+                    'show', serviceName,
+                    '--property=MainPID,CPUUsageNSec,MemoryCurrent,ActiveEnterTimestampMonotonic'
+                ]);
+
+                const props: Record<string, string> = {};
+                for (const line of showResult.stdout.split('\n')) {
+                    const [key, ...valueParts] = line.split('=');
+                    if (key && valueParts.length) {
+                        props[key.trim()] = valueParts.join('=').trim();
+                    }
                 }
-            }
 
-            // Parse PID
-            if (props.MainPID && props.MainPID !== '0') {
-                pid = parseInt(props.MainPID, 10);
-            }
-
-            // Parse memory (MemoryCurrent is in bytes, may be "[not set]")
-            if (props.MemoryCurrent && !props.MemoryCurrent.includes('not set')) {
-                const memBytes = parseInt(props.MemoryCurrent, 10);
-                if (!isNaN(memBytes)) {
-                    memory = Math.round(memBytes / 1024 / 1024); // MB
+                // Parse PID
+                if (props.MainPID && props.MainPID !== '0') {
+                    pid = parseInt(props.MainPID, 10);
                 }
-            }
 
-            // Fallback: try cgroup memory file
-            if (memory === 0) {
-                const cgroupPath = `/sys/fs/cgroup/system.slice/${serviceName}.service/memory.current`;
-                if (existsSync(cgroupPath)) {
+                // Parse memory
+                if (props.MemoryCurrent && !props.MemoryCurrent.includes('not set')) {
+                    const memBytes = parseInt(props.MemoryCurrent, 10);
+                    if (!isNaN(memBytes)) {
+                        memory = Math.round(memBytes / 1024 / 1024);
+                    }
+                }
+
+                // Parse CPU via ps if PID available
+                if (pid) {
+                    const psResult = await runCommand('ps', ['-p', pid.toString(), '-o', '%cpu', '--no-headers']);
+                    const cpuStr = psResult.stdout.trim();
+                    if (cpuStr) {
+                        cpu = parseFloat(cpuStr) || 0;
+                    }
+                }
+
+                // Parse uptime
+                if (props.ActiveEnterTimestampMonotonic && props.ActiveEnterTimestampMonotonic !== '0') {
                     try {
-                        const memContent = await readFile(cgroupPath, 'utf-8');
-                        const memBytes = parseInt(memContent.trim(), 10);
-                        if (!isNaN(memBytes)) {
-                            memory = Math.round(memBytes / 1024 / 1024);
+                        const startMonotonicUSec = parseInt(props.ActiveEnterTimestampMonotonic, 10);
+                        const systemUptimeSec = osUptime();
+                        if (!isNaN(startMonotonicUSec)) {
+                            uptimeSeconds = Math.max(0, Math.floor(systemUptimeSec - (startMonotonicUSec / 1000000)));
                         }
                     } catch { }
                 }
             }
+        } else {
+            // Use Docker for app containers
+            const { containerStatus } = await import('./docker');
+            const dockerStatus = await containerStatus(serviceName);
 
-            // Parse CPU (CPUUsageNSec is nanoseconds since service start)
-            // This is cumulative, so we'd need to track delta for real %
-            // For now, we'll use a simpler approach via ps if PID available
-            if (pid) {
-                const psResult = await runCommand('ps', ['-p', pid.toString(), '-o', '%cpu', '--no-headers']);
-                const cpuStr = psResult.stdout.trim();
-                if (cpuStr) {
-                    cpu = parseFloat(cpuStr) || 0;
-                }
+            if (dockerStatus.running) {
+                status = 'running';
+            } else if (dockerStatus.status === 'exited' || dockerStatus.status === 'stopped') {
+                status = 'stopped';
+            } else if (dockerStatus.status === 'dead' || dockerStatus.status === 'unhealthy') {
+                status = 'failed';
+            } else {
+                status = dockerStatus.status ? 'stopped' : 'unknown';
             }
 
-            // Parse uptime from ActiveEnterTimestampMonotonic (microseconds)
-            if (props.ActiveEnterTimestampMonotonic && props.ActiveEnterTimestampMonotonic !== '0') {
+            if (status === 'running') {
+                // Get Docker stats for CPU and memory
                 try {
-                    const startMonotonicUSec = parseInt(props.ActiveEnterTimestampMonotonic, 10);
-                    const systemUptimeSec = osUptime();
-                    // System uptime is in seconds, convert to microseconds roughly or just compare seconds
-                    // Actually, simple math: uptime = system_uptime - (start_monotonic / 1M)
-                    if (!isNaN(startMonotonicUSec)) {
-                        uptimeSeconds = Math.max(0, Math.floor(systemUptimeSec - (startMonotonicUSec / 1000000)));
+                    const statsResult = await runCommand('sudo', [
+                        'docker', 'stats', serviceName,
+                        '--no-stream', '--format', '{{.CPUPerc}}\t{{.MemUsage}}'
+                    ]);
+
+                    if (statsResult.exitCode === 0 && statsResult.stdout.trim()) {
+                        const [cpuPerc, memUsage] = statsResult.stdout.trim().split('\t');
+
+                        // Parse CPU (e.g., "0.50%")
+                        if (cpuPerc) {
+                            cpu = parseFloat(cpuPerc.replace('%', '')) || 0;
+                        }
+
+                        // Parse memory (e.g., "64.5MiB / 1.94GiB")
+                        if (memUsage) {
+                            const memMatch = memUsage.match(/^([\d.]+)([A-Za-z]+)/);
+                            if (memMatch && memMatch[1] && memMatch[2]) {
+                                const value = parseFloat(memMatch[1]);
+                                const unit = memMatch[2].toLowerCase();
+                                if (unit.includes('gib') || unit.includes('gb')) {
+                                    memory = Math.round(value * 1024);
+                                } else if (unit.includes('mib') || unit.includes('mb')) {
+                                    memory = Math.round(value);
+                                } else if (unit.includes('kib') || unit.includes('kb')) {
+                                    memory = Math.round(value / 1024);
+                                }
+                            }
+                        }
+                    }
+                } catch { }
+
+                // Get container uptime via inspect
+                try {
+                    const inspectResult = await runCommand('sudo', [
+                        'docker', 'inspect', serviceName,
+                        '--format', '{{.State.StartedAt}}'
+                    ]);
+
+                    if (inspectResult.exitCode === 0 && inspectResult.stdout.trim()) {
+                        const startedAt = new Date(inspectResult.stdout.trim());
+                        if (!isNaN(startedAt.getTime())) {
+                            uptimeSeconds = Math.floor((Date.now() - startedAt.getTime()) / 1000);
+                        }
                     }
                 } catch { }
             }

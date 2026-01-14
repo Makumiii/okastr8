@@ -21462,8 +21462,6 @@ Importing ${repo}...
 // src/commands/metrics.ts
 init_command();
 import { cpus, freemem, totalmem, uptime as osUptime, loadavg } from "os";
-import { existsSync as existsSync14 } from "fs";
-import { readFile as readFile13 } from "fs/promises";
 function formatUptime(seconds) {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor(seconds % 86400 / 3600);
@@ -21506,69 +21504,119 @@ async function getSystemMetrics() {
 }
 async function getServiceMetrics(serviceName) {
   try {
-    const statusResult = await runCommand("systemctl", ["is-active", serviceName]);
-    const statusOutput = statusResult.stdout.trim();
     let status = "unknown";
-    if (statusOutput === "active")
-      status = "running";
-    else if (statusOutput === "inactive")
-      status = "stopped";
-    else if (statusOutput === "failed")
-      status = "failed";
-    else
-      status = "stopped";
     let cpu = 0;
     let memory = 0;
     let uptimeSeconds = 0;
     let pid;
-    if (status === "running") {
-      const showResult = await runCommand("systemctl", [
-        "show",
-        serviceName,
-        "--property=MainPID,CPUUsageNSec,MemoryCurrent,ActiveEnterTimestampMonotonic"
-      ]);
-      const props = {};
-      for (const line of showResult.stdout.split(`
+    const isManager = serviceName === "okastr8-manager";
+    if (isManager) {
+      const statusResult = await runCommand("systemctl", ["is-active", serviceName]);
+      const statusOutput = statusResult.stdout.trim();
+      if (statusOutput === "active")
+        status = "running";
+      else if (statusOutput === "inactive")
+        status = "stopped";
+      else if (statusOutput === "failed")
+        status = "failed";
+      else
+        status = "stopped";
+      if (status === "running") {
+        const showResult = await runCommand("systemctl", [
+          "show",
+          serviceName,
+          "--property=MainPID,CPUUsageNSec,MemoryCurrent,ActiveEnterTimestampMonotonic"
+        ]);
+        const props = {};
+        for (const line of showResult.stdout.split(`
 `)) {
-        const [key, ...valueParts] = line.split("=");
-        if (key && valueParts.length) {
-          props[key.trim()] = valueParts.join("=").trim();
+          const [key, ...valueParts] = line.split("=");
+          if (key && valueParts.length) {
+            props[key.trim()] = valueParts.join("=").trim();
+          }
         }
-      }
-      if (props.MainPID && props.MainPID !== "0") {
-        pid = parseInt(props.MainPID, 10);
-      }
-      if (props.MemoryCurrent && !props.MemoryCurrent.includes("not set")) {
-        const memBytes = parseInt(props.MemoryCurrent, 10);
-        if (!isNaN(memBytes)) {
-          memory = Math.round(memBytes / 1024 / 1024);
+        if (props.MainPID && props.MainPID !== "0") {
+          pid = parseInt(props.MainPID, 10);
         }
-      }
-      if (memory === 0) {
-        const cgroupPath = `/sys/fs/cgroup/system.slice/${serviceName}.service/memory.current`;
-        if (existsSync14(cgroupPath)) {
+        if (props.MemoryCurrent && !props.MemoryCurrent.includes("not set")) {
+          const memBytes = parseInt(props.MemoryCurrent, 10);
+          if (!isNaN(memBytes)) {
+            memory = Math.round(memBytes / 1024 / 1024);
+          }
+        }
+        if (pid) {
+          const psResult = await runCommand("ps", ["-p", pid.toString(), "-o", "%cpu", "--no-headers"]);
+          const cpuStr = psResult.stdout.trim();
+          if (cpuStr) {
+            cpu = parseFloat(cpuStr) || 0;
+          }
+        }
+        if (props.ActiveEnterTimestampMonotonic && props.ActiveEnterTimestampMonotonic !== "0") {
           try {
-            const memContent = await readFile13(cgroupPath, "utf-8");
-            const memBytes = parseInt(memContent.trim(), 10);
-            if (!isNaN(memBytes)) {
-              memory = Math.round(memBytes / 1024 / 1024);
+            const startMonotonicUSec = parseInt(props.ActiveEnterTimestampMonotonic, 10);
+            const systemUptimeSec = osUptime();
+            if (!isNaN(startMonotonicUSec)) {
+              uptimeSeconds = Math.max(0, Math.floor(systemUptimeSec - startMonotonicUSec / 1e6));
             }
           } catch {}
         }
       }
-      if (pid) {
-        const psResult = await runCommand("ps", ["-p", pid.toString(), "-o", "%cpu", "--no-headers"]);
-        const cpuStr = psResult.stdout.trim();
-        if (cpuStr) {
-          cpu = parseFloat(cpuStr) || 0;
-        }
+    } else {
+      const { containerStatus: containerStatus2 } = await Promise.resolve().then(() => (init_docker(), exports_docker));
+      const dockerStatus = await containerStatus2(serviceName);
+      if (dockerStatus.running) {
+        status = "running";
+      } else if (dockerStatus.status === "exited" || dockerStatus.status === "stopped") {
+        status = "stopped";
+      } else if (dockerStatus.status === "dead" || dockerStatus.status === "unhealthy") {
+        status = "failed";
+      } else {
+        status = dockerStatus.status ? "stopped" : "unknown";
       }
-      if (props.ActiveEnterTimestampMonotonic && props.ActiveEnterTimestampMonotonic !== "0") {
+      if (status === "running") {
         try {
-          const startMonotonicUSec = parseInt(props.ActiveEnterTimestampMonotonic, 10);
-          const systemUptimeSec = osUptime();
-          if (!isNaN(startMonotonicUSec)) {
-            uptimeSeconds = Math.max(0, Math.floor(systemUptimeSec - startMonotonicUSec / 1e6));
+          const statsResult = await runCommand("sudo", [
+            "docker",
+            "stats",
+            serviceName,
+            "--no-stream",
+            "--format",
+            "{{.CPUPerc}}	{{.MemUsage}}"
+          ]);
+          if (statsResult.exitCode === 0 && statsResult.stdout.trim()) {
+            const [cpuPerc, memUsage] = statsResult.stdout.trim().split("\t");
+            if (cpuPerc) {
+              cpu = parseFloat(cpuPerc.replace("%", "")) || 0;
+            }
+            if (memUsage) {
+              const memMatch = memUsage.match(/^([\d.]+)([A-Za-z]+)/);
+              if (memMatch && memMatch[1] && memMatch[2]) {
+                const value = parseFloat(memMatch[1]);
+                const unit = memMatch[2].toLowerCase();
+                if (unit.includes("gib") || unit.includes("gb")) {
+                  memory = Math.round(value * 1024);
+                } else if (unit.includes("mib") || unit.includes("mb")) {
+                  memory = Math.round(value);
+                } else if (unit.includes("kib") || unit.includes("kb")) {
+                  memory = Math.round(value / 1024);
+                }
+              }
+            }
+          }
+        } catch {}
+        try {
+          const inspectResult = await runCommand("sudo", [
+            "docker",
+            "inspect",
+            serviceName,
+            "--format",
+            "{{.State.StartedAt}}"
+          ]);
+          if (inspectResult.exitCode === 0 && inspectResult.stdout.trim()) {
+            const startedAt = new Date(inspectResult.stdout.trim());
+            if (!isNaN(startedAt.getTime())) {
+              uptimeSeconds = Math.floor((Date.now() - startedAt.getTime()) / 1000);
+            }
           }
         } catch {}
       }
@@ -22594,7 +22642,7 @@ init_app();
 init_systemd();
 init_config();
 import * as fs from "fs/promises";
-import { existsSync as existsSync15 } from "fs";
+import { existsSync as existsSync14 } from "fs";
 import * as readline from "readline";
 async function controlAllServices(action) {
   console.log(`${action.toUpperCase()}ING all services...`);
@@ -22682,7 +22730,7 @@ Step 2: Stopping Manager Service...`);
   }
   console.log(`
 Step 3: Incinerating Configuration...`);
-  if (existsSync15(OKASTR8_HOME)) {
+  if (existsSync14(OKASTR8_HOME)) {
     await fs.rm(OKASTR8_HOME, { recursive: true, force: true });
     console.log(`   Deleted ${OKASTR8_HOME}`);
   }

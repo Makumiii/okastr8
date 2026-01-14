@@ -147,22 +147,6 @@
                             <p style="font-size: 12px; color: var(--text-secondary);">Active processes</p>
                         </div>
                         
-                        <div class="bento-card" style="grid-column: span 3; background: #EBF8FF;">
-                             <div class="card-label">
-                                Global Controls
-                                <div class="card-icon-small" style="background: #BEE3F8; color: #2B6CB0;">🎛️</div>
-                            </div>
-                            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 15px;">
-                                Manage all services at once. Use with caution.
-                            </p>
-                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                <button onclick="controlServices(this, 'start-all')" class="btn" style="background: #48BB78; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">🚀 Start All</button>
-                                <button onclick="controlServices(this, 'restart-all')" class="btn" style="background: #ECC94B; color: #744210; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">🔄 Restart All</button>
-                                <button onclick="controlServices(this, 'stop-all')" class="btn" style="background: #F56565; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">🛑 Stop All</button>
-                                <div style="width: 1px; background: rgba(0,0,0,0.1); margin: 0 5px;"></div>
-                                <button onclick="revokeAllTokens(this)" class="btn" style="background: #2D3748; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">🔐 Revoke Access</button>
-                            </div>
-                        </div>
 
                         <div class="bento-card" style="grid-column: span 2; display: flex; flex-direction: row; align-items: center; justify-content: space-between;">
                              <div>
@@ -185,57 +169,6 @@
             }
         }
 
-        async function controlServices(btn, action) {
-            if (!confirm(`Are you sure you want to ${action.replace('-', ' ')}? This affects ALL applications.`)) return;
-
-            const originalText = btn.innerText;
-            btn.innerText = 'Processing...';
-            btn.disabled = true;
-
-            try {
-                const response = await fetch(`/api/services/${action}`, { method: 'POST' });
-                const result = await response.json();
-
-                if (result.success) {
-                    alert('✅ ' + result.message);
-                } else {
-                    alert('❌ Error: ' + result.message);
-                }
-
-                // Refresh dashboard after a short delay to allow services to react
-                setTimeout(loadDashboard, 2000);
-            } catch (error) {
-                alert('❌ Request failed: ' + error.message);
-            } finally {
-                btn.innerText = originalText;
-                btn.disabled = false;
-            }
-        }
-
-        async function revokeAllTokens(btn) {
-            if (!confirm('⚠️ SECURITY WARNING ⚠️\n\nAre you sure you want to REVOKE ALL ACCESS TOKENS?\n\nThis will log out EVERY user immediately, including YOU.')) return;
-
-            const originalText = btn.innerText;
-            btn.innerText = 'Revoking...';
-            btn.disabled = true;
-
-            try {
-                const response = await fetch('/api/auth/revoke-all', { method: 'POST' });
-                const result = await response.json();
-
-                if (result.success) {
-                    alert('✅ ' + result.message);
-                    window.location.href = '/login.html';
-                } else {
-                    alert('❌ Error: ' + result.message);
-                }
-            } catch (error) {
-                alert('❌ Request failed: ' + error.message);
-            } finally {
-                btn.innerText = originalText;
-                btn.disabled = false;
-            }
-        }
 
         // Load dashboard on page load
         document.addEventListener('DOMContentLoaded', loadDashboard);
