@@ -9,90 +9,92 @@ export type ServiceConfig = {
     autoStart?: boolean;         // Whether to enable on boot
   };
   git: {
-    remoteName:string
+    remoteName: string
     watchRemoteBranch: string;         // Remote to watch (e.g., main/develop)
   };
   buildSteps: string[]         // Shell commands to run before starting service
-  networking:{
-    port:number,
-    domain:string,
-    ngrokExpose?:boolean
+  networking: {
+    port: number,
+    domain: string,
+    ngrokExpose?: boolean
   }
 };
 
 export type Okastr8Config = {
-    services: ServiceConfig[],
-    networking:{
-      ngrok:{
-        authToken?:string, // Ngrok auth token
-      }
+  services: ServiceConfig[],
+  networking: {
+    ngrok: {
+      authToken?: string, // Ngrok auth token
     }
+  }
 }
 export type GitWebhookPayload = {
-    ref:string,
-    before:string,
-    
-    repository:{
-        name:string,
-        ssh_url:string,
-        clone_url:string,
-        html_url:string,
-    }
+  ref: string,
+  before: string,
+
+  repository: {
+    name: string,
+    ssh_url: string,
+    clone_url: string,
+    html_url: string,
+  }
 }
 
 
 export type DeploysMetadata = {
-    gitHash: string;  // Commit hash of the deployment
-    timeStamp: Date;
-    ssh_url:string  // Timestamp of the deployment
+  gitHash: string;  // Commit hash of the deployment
+  timeStamp: Date;
+  ssh_url: string  // Timestamp of the deployment
 }
 
 export type Deployment = {
-    serviceName:string,
-    gitRemoteName:string,
-    deploys:DeploysMetadata[]
-    lastSuccessfulDeploy:DeploysMetadata | null 
+  serviceName: string,
+  gitRemoteName: string,
+  deploys: DeploysMetadata[]
+  lastSuccessfulDeploy: DeploysMetadata | null
 
 }
 
 export type DeploymentRecord = {
-    deployments: Deployment[]
+  deployments: Deployment[]
 }
 
 export type OrchestrateEnvironment = {
-  createUser:{
-    userName:string,
-    passWord:string,
-    distro?:string
+  createUser: {
+    userName: string,
+    passWord: string,
+    distro?: string
   },
-  changeSSHPort:{
-    port:number
+  changeSSHPort: {
+    port: number
   },
 
-    
+
 }
 
 export interface DeployConfig {
-    runtime?: string;        // Optional - will be auto-detected if not provided
-    buildSteps: string[];
-    startCommand: string;
-    port: number;            // Required for health checks
-    domain?: string;
-    database?: string;       // e.g., "postgres:15" | "mysql:8" | "mongodb:7"
-    cache?: string;          // e.g., "redis:7"
+  runtime?: string;        // Optional - will be auto-detected if not provided
+  buildSteps: string[];
+  startCommand: string;
+  port: number;            // Required for health checks
+  domain?: string;
+  database?: string;       // e.g., "postgres:15" | "mysql:8" | "mongodb:7"
+  cache?: string;          // e.g., "redis:7"
+  env?: Record<string, string>;
 }
 
 export interface DeployFromPathOptions {
-    appName: string;
-    releasePath: string;         // Path to version folder containing okastr8.yaml
-    versionId: number;
-    gitRepo?: string;            // Optional: for app.json metadata
-    gitBranch?: string;
-    onProgress?: (msg: string) => void;
+  appName: string;
+  releasePath: string;         // Path to version folder containing okastr8.yaml
+  versionId: number;
+  gitRepo?: string;            // Optional: for app.json metadata
+  gitBranch?: string;
+  env?: Record<string, string>;
+  onProgress?: (msg: string) => void;
 }
 
 export interface DeployResult {
-    success: boolean;
-    message: string;
-    config?: DeployConfig;
+  success: boolean;
+  message: string;
+  config?: DeployConfig;
 }

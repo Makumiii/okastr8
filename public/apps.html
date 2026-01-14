@@ -4,76 +4,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Apps - okastr8</title>
-    <link rel="stylesheet" href="css/styles.css">
+    <title>Okastr8 - Applications</title>
+    <link rel="stylesheet" href="css/style.css">
     <style>
-        /* Apps Page Specific Styles */
-        .apps-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-        }
-
-        .apps-header h2 {
-            margin: 0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .create-app-btn {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .create-app-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
-        }
-
-        /* App Cards Grid */
         .apps-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 24px;
+            margin-top: 24px;
         }
 
         .app-card {
             background: white;
             border-radius: 16px;
             padding: 24px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            border: 1px solid #f0f0f5;
-            transition: all 0.2s;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
             position: relative;
+            overflow: hidden;
         }
 
         .app-card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
         }
 
         .app-card-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 16px;
         }
 
         .app-name {
-            font-size: 18px;
+            font-size: 1.25rem;
             font-weight: 700;
-            color: #1f2937;
+            color: #1a1a1a;
             margin: 0;
             display: flex;
             align-items: center;
@@ -81,28 +49,23 @@
         }
 
         .app-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
             padding: 4px 12px;
             border-radius: 20px;
-            font-size: 12px;
+            font-size: 0.75rem;
             font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .app-status.running {
-            background: #dcfce7;
-            color: #166534;
+            background: #e6fffa;
+            color: #2c7a7b;
         }
 
         .app-status.stopped {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .app-status.unknown {
-            background: #f3f4f6;
-            color: #6b7280;
+            background: #fff5f5;
+            color: #c53030;
         }
 
         .status-dot {
@@ -112,122 +75,116 @@
         }
 
         .status-dot.running {
-            background: #22c55e;
+            background: #38b2ac;
+            box-shadow: 0 0 0 2px rgba(56, 178, 172, 0.2);
             animation: pulse 2s infinite;
         }
 
         .status-dot.stopped {
-            background: #ef4444;
+            background: #e53e3e;
         }
 
         @keyframes pulse {
-
-            0%,
-            100% {
-                opacity: 1;
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(56, 178, 172, 0.7);
             }
 
-            50% {
-                opacity: 0.5;
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 10px rgba(56, 178, 172, 0);
+            }
+
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(56, 178, 172, 0);
             }
         }
 
         .app-meta {
-            color: #6b7280;
-            font-size: 13px;
-            margin-bottom: 16px;
+            color: #4a5568;
+            font-size: 0.875rem;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
         }
 
         .app-meta-item {
             display: flex;
             align-items: center;
             gap: 6px;
-            margin-bottom: 4px;
         }
 
-        /* Action buttons */
         .app-actions {
             display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
+            gap: 12px;
+            margin-top: auto;
+            border-top: 1px solid #edf2f7;
             padding-top: 16px;
-            border-top: 1px solid #f0f0f5;
-            align-items: center;
         }
 
         .action-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 12px;
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #e2e8f0;
             border-radius: 8px;
-            font-size: 12px;
-            font-weight: 500;
-            border: 1px solid #e5e7eb;
             background: white;
-            color: #374151;
+            color: #4a5568;
+            font-size: 0.8125rem;
+            font-weight: 600;
             cursor: pointer;
-            transition: all 0.15s;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
         }
 
         .action-btn:hover {
-            background: #f9fafb;
-            border-color: #d1d5db;
+            background: #f7fafc;
+            border-color: #cbd5e0;
         }
 
         .action-btn.primary {
-            background: #22c55e;
+            background: #667eea;
             color: white;
-            border-color: #22c55e;
+            border-color: #667eea;
         }
 
         .action-btn.primary:hover {
-            background: #16a34a;
+            background: #5a67d8;
         }
 
         .action-btn.warning {
-            background: #f59e0b;
-            color: white;
-            border-color: #f59e0b;
+            color: #c05621;
         }
 
-        .action-btn.warning:hover {
-            background: #d97706;
-        }
-
-        /* Dropdown Menu */
+        /* Dropdown */
         .dropdown {
             position: relative;
-            margin-left: auto;
         }
 
         .dropdown-btn {
-            background: none;
-            border: none;
             padding: 8px;
-            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background: white;
             cursor: pointer;
-            color: #6b7280;
-        }
-
-        .dropdown-btn:hover {
-            background: #f3f4f6;
-            color: #374151;
         }
 
         .dropdown-menu {
             position: absolute;
             bottom: 100%;
             right: 0;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-            border: 1px solid #e5e7eb;
-            width: 160px;
-            display: none;
-            z-index: 10;
             margin-bottom: 8px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            min-width: 200px;
+            z-index: 100;
+            display: none;
             overflow: hidden;
+            border: 1px solid #edf2f7;
         }
 
         .dropdown-menu.active {
@@ -235,164 +192,37 @@
         }
 
         .dropdown-item {
+            width: 100%;
+            padding: 12px 16px;
+            text-align: left;
+            background: none;
+            border: none;
+            font-size: 0.875rem;
+            color: #4a5568;
+            cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 10px 16px;
-            width: 100%;
-            border: none;
-            background: none;
-            text-align: left;
-            font-size: 13px;
-            color: #374151;
-            cursor: pointer;
+            gap: 10px;
         }
 
         .dropdown-item:hover {
-            background: #f9fafb;
+            background: #f7fafc;
+            color: #2d3748;
         }
 
         .dropdown-item.danger {
-            color: #dc2626;
-            border-top: 1px solid #e5e7eb;
+            color: #e53e3e;
         }
 
         .dropdown-item.danger:hover {
-            background: #fef2f2;
+            background: #fff5f5;
         }
 
-        /* Empty state */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #6b7280;
-        }
-
-        .empty-state svg {
-            width: 64px;
-            height: 64px;
-            margin-bottom: 16px;
-            opacity: 0.5;
-        }
-
-        /* Modal styles */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-            backdrop-filter: blur(4px);
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: white;
-            padding: 32px;
-            border-radius: 16px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 85vh;
-            overflow-y: auto;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-        }
-
-        .modal-header h3 {
-            margin: 0;
-            font-size: 20px;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: #9ca3af;
-            padding: 4px;
-        }
-
-        .modal-close:hover {
-            color: #374151;
-        }
-
-        .form-group {
-            margin-bottom: 16px;
-        }
-
-        .form-group label {
-            display: block;
-            font-weight: 500;
-            margin-bottom: 6px;
-            color: #374151;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 10px 14px;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            font-size: 14px;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-
-        .form-group small {
-            color: #9ca3af;
-            font-size: 12px;
-        }
-
-        .modal-actions {
-            display: flex;
-            gap: 12px;
-            margin-top: 24px;
-        }
-
-        .modal-actions button {
-            flex: 1;
-            padding: 12px;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        /* Logs Modal */
-        .logs-content {
-            background: #1f2937;
-            color: #f9fafb;
-            padding: 16px;
-            border-radius: 8px;
-            font-family: monospace;
-            font-size: 12px;
-            max-height: 400px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        /* Versions Table */
+        /* Modal specific versions table */
         .versions-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .versions-table th,
@@ -447,15 +277,22 @@
             }
         }
 
-        /* Environment Variables UI */
+        /* Environment Variables UI - Premium Styling */
+        .env-section {
+            border-top: 1px solid #edf2f7;
+            margin-top: 24px;
+            padding-top: 24px;
+        }
+
         .env-drop-zone {
-            border: 2px dashed #d1d5db;
+            border: 2px dashed #cbd5e0;
             border-radius: 12px;
-            padding: 32px;
+            padding: 24px;
             text-align: center;
-            background: #f9fafb;
-            transition: all 0.2s;
+            background: #f7fafc;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
+            margin-bottom: 16px;
         }
 
         .env-drop-zone:hover {
@@ -465,8 +302,9 @@
 
         .env-drop-zone.dragover {
             border-color: #667eea;
-            background: #e0e7ff;
-            box-shadow: 0 0 20px rgba(102, 126, 234, 0.2);
+            background: #ebf4ff;
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
         }
 
         .env-var-item {
@@ -474,48 +312,61 @@
             gap: 8px;
             margin-bottom: 8px;
             align-items: center;
+            background: #f8fafc;
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid #edf2f7;
         }
 
         .env-var-item input {
             flex: 1;
             padding: 8px 12px;
-            border: 1px solid #e5e7eb;
-            border-radius: 6px;
+            border: 1px solid transparent;
+            background: transparent;
             font-size: 13px;
             font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            border-radius: 6px;
+        }
+
+        .env-var-item input:focus {
+            background: white;
+            border-color: #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            outline: none;
         }
 
         .env-var-item input:first-child {
             flex: 0.4;
-            /* Key is smaller */
+            font-weight: 600;
+            color: #4a5568;
         }
 
-        .env-var-item button {
-            padding: 6px 10px;
-            background: #fee2e2;
-            color: #dc2626;
+        .env-var-remove {
+            padding: 6px;
+            color: #a0aec0;
+            background: none;
             border: none;
-            border-radius: 6px;
             cursor: pointer;
-            font-size: 12px;
-            transition: all 0.15s;
+            border-radius: 4px;
+            transition: all 0.1s;
         }
 
-        .env-var-item button:hover {
-            background: #fecaca;
+        .env-var-remove:hover {
+            color: #e53e3e;
+            background: #fff5f5;
         }
 
         .env-file-status {
-            margin-top: 12px;
-            padding: 10px 14px;
-            background: #dcfce7;
-            border: 1px solid #86efac;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: #f0fff4;
+            border: 1px solid #c6f6d5;
             border-radius: 8px;
-            font-size: 13px;
-            color: #166534;
+            font-size: 12px;
+            color: #2f855a;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
     </style>
 </head>
@@ -543,8 +394,6 @@
             </div>
             <span id="auth-status" class="auth-status">Checking...</span>
         </header>
-
-
 
         <!-- Apps Header -->
         <div class="apps-header">
@@ -594,26 +443,21 @@
                     <label>Description</label>
                     <input type="text" name="description" placeholder="My awesome application">
                 </div>
-                <div class="form-group">
-                    <label>Working Directory</label>
-                    <input type="text" name="workingDirectory" placeholder="/home/user/myapp">
-                </div>
-                <div class="form-group">
-                    <label>Port</label>
-                    <input type="number" name="port" placeholder="3000">
-                </div>
-                <div class="form-group">
-                    <label>Domain</label>
-                    <input type="text" name="domain" placeholder="myapp.example.com">
-                </div>
-                <div class="form-group">
-                    <label>Run as User</label>
-                    <input type="text" name="user" placeholder="Current user by default">
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label>Port</label>
+                        <input type="number" name="port" placeholder="3000">
+                    </div>
+                    <div class="form-group">
+                        <label>Domain</label>
+                        <input type="text" name="domain" placeholder="myapp.example.com">
+                    </div>
                 </div>
 
                 <!-- Environment Variables Section -->
-                <div class="form-group" style="border-top: 2px solid #f0f0f5; padding-top: 20px; margin-top: 20px;">
-                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                <div class="env-section">
+                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-weight: 600;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                             style="width: 18px; height: 18px;">
                             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -622,45 +466,34 @@
                         Environment Variables
                     </label>
 
-                    <!-- File Upload / Drag and Drop Area -->
                     <div id="env-drop-zone" class="env-drop-zone">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            style="width: 32px; height: 32px; margin-bottom: 8px;">
+                            style="width: 32px; height: 32px; margin-bottom: 8px; color: #a0aec0;">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <polyline points="17 8 12 3 7 8"></polyline>
                             <line x1="12" y1="3" x2="12" y2="15"></line>
                         </svg>
-                        <div>
+                        <div style="font-size: 13px;">
                             <strong>Drop .env file here</strong> or
                             <label for="env-file-input"
                                 style="color: #667eea; cursor: pointer; text-decoration: underline;">browse</label>
                         </div>
-                        <small style="color: #9ca3af; margin-top: 4px;">Supports .env format files</small>
                         <input type="file" id="env-file-input" accept=".env,.txt" style="display: none;">
                     </div>
 
-                    <!-- Manual Input Section -->
-                    <div style="margin-top: 16px;">
-                        <div
-                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                            <span style="font-size: 13px; font-weight: 500; color: #6b7280;">Or add manually:</span>
-                            <button type="button" class="btn-link" onclick="addEnvVar()"
-                                style="font-size: 13px; color: #667eea; background: none; border: none; cursor: pointer; text-decoration: underline;">
-                                + Add Variable
-                            </button>
-                        </div>
+                    <div id="env-vars-container" style="max-height: 200px; overflow-y: auto;">
                         <div id="env-vars-list">
-                            <!-- Env var inputs will be added here -->
+                            <!-- Injected manually -->
                         </div>
                     </div>
 
-                    <small style="color: #9ca3af; display: block; margin-top: 8px;">
-                        💡 Environment variables are stored securely on the server and never committed to your
-                        repository
-                    </small>
+                    <button type="button" class="action-btn" onclick="addEnvVar()"
+                        style="width: auto; margin-top: 8px; border-style: dashed;">
+                        + Add Manual Variable
+                    </button>
                 </div>
-                <!-- Other fields omitted for brevity -->
-                <div class="modal-actions">
+
+                <div class="modal-actions" style="margin-top: 24px;">
                     <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Create App</button>
                 </div>
@@ -684,12 +517,14 @@
 
     <!-- Logs Modal -->
     <div id="logs-modal" class="modal">
-        <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-content" style="max-width: 800px;">
             <div class="modal-header">
                 <h3 id="logs-modal-title">Logs</h3>
                 <button class="modal-close" onclick="closeLogsModal()">×</button>
             </div>
-            <div id="logs-content" class="logs-content">Loading...</div>
+            <div id="logs-content"
+                style="background: #1a202c; color: #e2e8f0; padding: 20px; border-radius: 8px; font-family: 'DM Mono', monospace; font-size: 13px; max-height: 500px; overflow-y: auto; white-space: pre-wrap;">
+                Loading...</div>
             <div class="modal-actions">
                 <button type="button" class="btn btn-secondary" onclick="closeLogsModal()">Close</button>
                 <button type="button" class="btn btn-primary" id="export-logs-btn">Export to File</button>
@@ -701,61 +536,13 @@
     <script>
         let currentApps = [];
         let currentLogsApp = '';
+        let envVariablesAvailable = {}; // Map of key -> value
 
         document.addEventListener('DOMContentLoaded', () => {
             loadApps();
 
-            // Close dropdowns when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!e.target.closest('.dropdown')) {
-                    document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.remove('active'));
-                }
-            });
-
-            // Environment Variables - Drag and Drop Functionality
-            const dropZone = document.getElementById('env-drop-zone');
-            const fileInput = document.getElementById('env-file-input');
-
-            // File input change
-            fileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    handleEnvFile(e.target.files[0]);
-                }
-            });
-
-            // Click to browse
-            dropZone.addEventListener('click', () => {
-                fileInput.click();
-            });
-
-            // Drag and drop handlers
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, preventDefaults, false);
-            });
-
-            function preventDefaults(e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropZone.addEventListener(eventName, () => {
-                    dropZone.classList.add('dragover');
-                }, false);
-            });
-
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, () => {
-                    dropZone.classList.remove('dragover');
-                }, false);
-            });
-
-            dropZone.addEventListener('drop', (e) => {
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    handleEnvFile(files[0]);
-                }
-            }, false);
+            // Refresh periodically
+            setInterval(loadApps, 10000);
 
             // Create app form listeners
             document.getElementById('create-app-form').addEventListener('submit', async (e) => {
@@ -769,31 +556,13 @@
                 });
                 if (data.port) data.port = parseInt(data.port);
 
+                // Add environment variables
+                data.env = envVariablesAvailable;
+
                 try {
-                    // Create the app first
                     const res = await apiPost('/app/create', data);
                     if (res.success) {
-                        // If we have environment variables, send them separately for security
-                        if (Object.keys(envVariables).length > 0) {
-                            try {
-                                // Send env vars using the CLI-style API
-                                const envPromises = Object.entries(envVariables).map(([key, value]) =>
-                                    apiPost('/app/env-set', {
-                                        appName: data.name,
-                                        key,
-                                        value
-                                    })
-                                );
-
-                                await Promise.all(envPromises);
-                                showToast(`App created with ${Object.keys(envVariables).length} environment variables!`, 'success');
-                            } catch (envError) {
-                                showToast('App created but failed to set some env vars: ' + envError.message, 'warning');
-                            }
-                        } else {
-                            showToast('App created successfully!', 'success');
-                        }
-
+                        showToast(`App '${data.name}' created successfully!`, 'success');
                         closeCreateModal();
                         loadApps();
                     } else {
@@ -818,6 +587,35 @@
                     showToast(e.message, 'error');
                 }
             });
+
+            // Setup Env Drag and Drop
+            const dropZone = document.getElementById('env-drop-zone');
+            const fileInput = document.getElementById('env-file-input');
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (file) handleEnvFile(file);
+            });
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) handleEnvFile(file);
+            });
+
+            dropZone.addEventListener('click', () => {
+                fileInput.click();
+            });
         });
 
         async function loadApps() {
@@ -829,27 +627,17 @@
                     document.getElementById('apps-count').textContent = currentApps.length;
 
                     if (currentApps.length === 0) {
-                        // Empty state...
-                        grid.innerHTML = `<div class="empty-state">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        grid.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 60px; color: #a0aec0;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="width: 48px; height: 48px; margin-bottom: 16px;">
                                     <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
                                 </svg>
                                 <h3>No Apps Yet</h3>
-                                <p>Create your first app or deploy from GitHub</p>
+                                <p>Register your first app to get started</p>
                             </div>`;
                         return;
                     }
 
-                    const appsWithStatus = await Promise.all(currentApps.map(async (app) => {
-                        try {
-                            const statusRes = await apiPost('/app/status', { name: app.name });
-                            return { ...app, running: statusRes.success };
-                        } catch {
-                            return { ...app, running: false };
-                        }
-                    }));
-
-                    grid.innerHTML = appsWithStatus.map(app => renderAppCard(app)).join('');
+                    grid.innerHTML = currentApps.map(app => renderAppCard(app)).join('');
                 }
             } catch (e) {
                 grid.innerHTML = `<p>Error loading apps: ${e.message}</p>`;
@@ -876,8 +664,19 @@
                     </div>
                     
                     <div class="app-meta">
-                        ${app.description ? `<div class="app-meta-item">${app.description}</div>` : ''}
-                        ${app.port ? `<div class="app-meta-item">Port ${app.port}</div>` : ''}
+                        <div class="app-meta-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; color: #a0aec0;">
+                                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                            </svg>
+                            ${app.description || 'No description'}
+                        </div>
+                        ${app.port ? `
+                        <div class="app-meta-item">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; color: #a0aec0;">
+                                <path d="M12 2v10m0 0l-3-3m3 3l3-3m-9 9h12"></path>
+                            </svg>
+                            Port ${app.port}
+                        </div>` : ''}
                     </div>
 
                     <div class="app-actions">
@@ -885,22 +684,23 @@
                     ? `<button class="action-btn warning" onclick="controlApp('${app.name}', 'stop')">Stop</button>`
                     : `<button class="action-btn primary" onclick="controlApp('${app.name}', 'start')">Start</button>`
                 }
-                        <button class="action-btn" onclick="controlApp('${app.name}', 'restart')">Restart</button>
                         <button class="action-btn" onclick="viewLogs('${app.name}')">Logs</button>
                         
                         <div class="dropdown">
                             <button class="dropdown-btn" onclick="toggleDropdown(this, event)">
-                                <svg viewBox="0 0 24 24" fill="currentColor" style="width: 20px; height: 20px;"><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle><circle cx="5" cy="12" r="2"></circle></svg>
+                                <svg viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px; color: #a0aec0;"><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle><circle cx="5" cy="12" r="2"></circle></svg>
                             </button>
                             <div class="dropdown-menu">
                                 <button class="dropdown-item" onclick="viewVersions('${app.name}')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><path d="M12 20v-6M6 20V10M18 20V4"></path></svg>
                                     Version History
                                 </button>
+                                <button class="dropdown-item" onclick="controlApp('${app.name}', 'restart')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><path d="M23 4v6h-6M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                                    Restart App
+                                </button>
                                 <button class="dropdown-item" onclick="toggleWebhook('${app.name}', ${app.webhookAutoDeploy === false})">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
-                                        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
-                                    </svg>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>
                                     ${app.webhookAutoDeploy !== false ? 'Disable Auto-Deploy' : 'Enable Auto-Deploy'}
                                 </button>
                                 <button class="dropdown-item danger" onclick="deleteApp('${app.name}')">
@@ -921,6 +721,38 @@
                 if (m !== menu) m.classList.remove('active');
             });
             menu.classList.toggle('active');
+        }
+
+        async function controlApp(name, action) {
+            try {
+                const res = await apiPost(`/app/${action}`, { name });
+                if (res.success) {
+                    showToast(`${name} ${action}ed`, 'success');
+                    loadApps();
+                } else {
+                    showToast(res.message, 'error');
+                }
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
+        }
+
+        async function viewLogs(name) {
+            currentLogsApp = name;
+            document.getElementById('logs-modal-title').textContent = `Logs: ${name}`;
+            document.getElementById('logs-content').textContent = 'Loading...';
+            document.getElementById('logs-modal').classList.add('active');
+
+            try {
+                const res = await apiPost('/app/logs', { name, lines: 100 });
+                if (res.success) {
+                    document.getElementById('logs-content').textContent = res.data;
+                } else {
+                    document.getElementById('logs-content').textContent = `Failed to load logs: ${res.message}`;
+                }
+            } catch (e) {
+                document.getElementById('logs-content').textContent = `Error: ${e.message}`;
+            }
         }
 
         async function viewVersions(name) {
@@ -946,9 +778,7 @@
                 return;
             }
 
-            // Sort by ID descending
             const versions = data.versions.sort((a, b) => b.id - a.id);
-
             let html = `
                 <table class="versions-table">
                     <thead>
@@ -970,17 +800,12 @@
 
                 html += `
                     <tr style="${isCurrent ? 'background: #f0f9ff;' : ''}">
-                        <td>
-                            v${v.id}
-                            ${isCurrent ? '<span class="version-badge current">Current</span>' : ''}
-                        </td>
+                        <td>v${v.id} ${isCurrent ? '<span class="version-badge current">Current</span>' : ''}</td>
                         <td><code>${v.commit.substring(0, 7)}</code> (${v.branch})</td>
                         <td><span class="version-badge ${statusClass}">${v.status}</span></td>
                         <td>${date}</td>
                         <td>
-                            ${!isCurrent && v.status === 'success'
-                        ? `<button class="action-btn" onclick="rollbackApp('${appName}', ${v.id})">Rollback</button>`
-                        : ''}
+                            ${!isCurrent && v.status === 'success' ? `<button class="action-btn" onclick="rollbackApp('${appName}', ${v.id})">Rollback</button>` : ''}
                         </td>
                     </tr>
                 `;
@@ -990,62 +815,8 @@
             document.getElementById('versions-content').innerHTML = html;
         }
 
-        async function rollbackApp(name, versionId) {
-            if (!confirm(`Rollback ${name} to version v${versionId}?`)) return;
-
-            const content = document.getElementById('versions-content');
-            content.innerHTML = '<div class="loading-spinner"></div> Rolling back...';
-
-            try {
-                const res = await apiPost('/app/rollback', { name, versionId });
-                if (res.success) {
-                    showToast(`Rolled back to v${versionId}`, 'success');
-                    closeVersionsModal();
-                    loadApps(); // Refresh app status
-                } else {
-                    showToast(res.message, 'error');
-                    viewVersions(name); // Reload list
-                }
-            } catch (e) {
-                showToast(e.message, 'error');
-            }
-        }
-
-        async function controlApp(name, action) {
-            try {
-                showToast(`${action.charAt(0).toUpperCase() + action.slice(1)}ing ${name}...`, 'info');
-                const res = await apiPost(`/app/${action}`, { name });
-                if (res.success) {
-                    showToast(`${name} ${action}ed successfully`, 'success');
-                    loadApps();
-                } else {
-                    showToast(res.message, 'error');
-                }
-            } catch (e) {
-                showToast(e.message, 'error');
-            }
-        }
-
-        async function viewLogs(name) {
-            currentLogsApp = name;
-            document.getElementById('logs-modal-title').textContent = `Logs: ${name}`;
-            document.getElementById('logs-content').textContent = 'Loading...';
-            document.getElementById('logs-modal').classList.add('active');
-
-            try {
-                const res = await apiPost('/app/logs', { name, lines: 100 });
-                if (res.success) {
-                    document.getElementById('logs-content').textContent = res.data?.logs || 'No logs available';
-                } else {
-                    document.getElementById('logs-content').textContent = `Error: ${res.message}`;
-                }
-            } catch (e) {
-                document.getElementById('logs-content').textContent = `Error: ${e.message}`;
-            }
-        }
-
         async function deleteApp(name) {
-            if (!confirm(`Delete app "${name}"? This cannot be undone.`)) return;
+            if (!confirm(`Are you sure you want to delete ${name}? This action cannot be undone.`)) return;
             try {
                 const res = await apiPost('/app/delete', { name });
                 if (res.success) {
@@ -1059,115 +830,97 @@
             }
         }
 
-        // Environment Variable Helper Functions
-        let envVariables = {}; // Store env vars
-
+        // Environment Variable Helpers
         function handleEnvFile(file) {
             const reader = new FileReader();
             reader.onload = (e) => {
                 const content = e.target.result;
-                parseEnvFile(content);
-
-                // Show success message
-                const dropZone = document.getElementById('env-drop-zone');
-                const status = document.createElement('div');
-                status.className = 'env-file-status';
-                status.innerHTML = `
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                    </svg>
-                    Loaded ${Object.keys(envVariables).length} variables from ${file.name}
-                `;
-
-                // Remove existing status if any
-                const existing = dropZone.querySelector('.env-file-status');
-                if (existing) existing.remove();
-
-                dropZone.insertAdjacentElement('afterend', status);
-
-                // Update manual input list
+                const lines = content.split('\n');
+                let count = 0;
+                lines.forEach(line => {
+                    line = line.trim();
+                    if (!line || line.startsWith('#')) return;
+                    const equalsIndex = line.indexOf('=');
+                    if (equalsIndex > 0) {
+                        const key = line.substring(0, equalsIndex).trim();
+                        const value = line.substring(equalsIndex + 1).trim().replace(/^["']|["']$/g, '');
+                        envVariablesAvailable[key] = value;
+                        count++;
+                    }
+                });
                 renderEnvVars();
+                showFileStatus(`Loaded ${count} variables from ${file.name}`);
             };
             reader.readAsText(file);
         }
 
-        function parseEnvFile(content) {
-            const lines = content.split('\n');
-            lines.forEach(line => {
-                line = line.trim();
-                // Skip empty lines and comments
-                if (!line || line.startsWith('#')) return;
-
-                const equalsIndex = line.indexOf('=');
-                if (equalsIndex > 0) {
-                    const key = line.substring(0, equalsIndex).trim();
-                    const value = line.substring(equalsIndex + 1).trim();
-                    // Remove quotes if present
-                    const cleanValue = value.replace(/^["']|["']$/g, '');
-                    envVariables[key] = cleanValue;
-                }
-            });
-        }
-
         function addEnvVar() {
-            const key = prompt('Enter variable name (e.g., API_KEY):');
-            if (!key) return;
-
-            const value = prompt(`Enter value for ${key}:`);
-            if (value === null) return; // User canceled
-
-            envVariables[key] = value;
+            const key = `VAR_${Object.keys(envVariablesAvailable).length + 1}`;
+            envVariablesAvailable[key] = '';
             renderEnvVars();
         }
 
+        function updateEnvVar(oldKey, newKey, newValue) {
+            if (oldKey !== newKey) {
+                delete envVariablesAvailable[oldKey];
+            }
+            envVariablesAvailable[newKey] = newValue;
+        }
+
         function removeEnvVar(key) {
-            delete envVariables[key];
+            delete envVariablesAvailable[key];
             renderEnvVars();
         }
 
         function renderEnvVars() {
             const list = document.getElementById('env-vars-list');
-            const keys = Object.keys(envVariables);
+            const keys = Object.keys(envVariablesAvailable);
 
             if (keys.length === 0) {
-                list.innerHTML = '<p style="text-align: center; color: #9ca3af; font-size: 13px; padding: 16px;">No variables set</p>';
+                list.innerHTML = '<div style="text-align: center; color: #a0aec0; padding: 20px; font-size: 13px; border: 1px dashed #e2e8f0; border-radius: 8px;">No variables configured</div>';
                 return;
             }
 
             list.innerHTML = keys.map(key => `
                 <div class="env-var-item">
-                    <input type="text" value="${key}" readonly style="background: #f9fafb;">
-                    <input type="text" value="${envVariables[key]}" readonly style="background: #f9fafb;">
-                    <button type="button" onclick="removeEnvVar('${key}')">×</button>
+                    <input type="text" value="${key}" placeholder="KEY" onchange="updateEnvVar('${key}', this.value, '${envVariablesAvailable[key]}')">
+                    <input type="text" value="${envVariablesAvailable[key]}" placeholder="VALUE" onchange="updateEnvVar('${key}', '${key}', this.value)">
+                    <button type="button" class="env-var-remove" onclick="removeEnvVar('${key}')">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                    </button>
                 </div>
             `).join('');
         }
 
+        function showFileStatus(msg) {
+            const dropZone = document.getElementById('env-drop-zone');
+            const existing = document.querySelector('.env-file-status');
+            if (existing) existing.remove();
+
+            const status = document.createElement('div');
+            status.className = 'env-file-status';
+            status.innerHTML = `
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                ${msg}
+            `;
+            dropZone.insertAdjacentElement('afterend', status);
+        }
+
         function openCreateModal() {
             document.getElementById('create-modal').classList.add('active');
-            document.getElementById('create-app-form').reset();
         }
 
         function closeCreateModal() {
             document.getElementById('create-modal').classList.remove('active');
             document.getElementById('create-app-form').reset();
-            // Reset env variables
-            envVariables = {};
+            envVariablesAvailable = {};
             renderEnvVars();
-            // Remove file status if exists
             const status = document.querySelector('.env-file-status');
             if (status) status.remove();
         }
 
-        function closeVersionsModal() {
-            document.getElementById('versions-modal').classList.remove('active');
-        }
-
-        function closeLogsModal() {
-            document.getElementById('logs-modal').classList.remove('active');
-            currentLogsApp = '';
-        }
+        function closeVersionsModal() { document.getElementById('versions-modal').classList.remove('active'); }
+        function closeLogsModal() { document.getElementById('logs-modal').classList.remove('active'); currentLogsApp = ''; }
 
         function showToast(message, type = 'info') {
             const result = createResultDisplay('apps-results');
@@ -1177,39 +930,23 @@
             setTimeout(() => result.clear(), 5000);
         }
 
-        // Close modals on escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeCreateModal();
-                closeLogsModal();
-                closeVersionsModal();
-            }
-        });
-
-        // Close modals on backdrop click
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    closeCreateModal();
-                    closeLogsModal();
-                    closeVersionsModal();
-                }
-            });
-        });
-
         async function toggleWebhook(name, enable) {
             try {
                 const res = await apiPost('/app/webhook-toggle', { name, enabled: enable });
-                if (res.success) {
-                    showToast(res.message, 'success');
-                    loadApps(); // Reload to update UI
-                } else {
-                    showToast(res.message, 'error');
-                }
-            } catch (e) {
-                showToast(e.message, 'error');
-            }
+                if (res.success) { showToast(res.message, 'success'); loadApps(); }
+                else { showToast(res.message, 'error'); }
+            } catch (e) { showToast(e.message, 'error'); }
         }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { closeCreateModal(); closeLogsModal(); closeVersionsModal(); }
+        });
+
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) { closeCreateModal(); closeLogsModal(); closeVersionsModal(); }
+            });
+        });
     </script>
 </body>
 

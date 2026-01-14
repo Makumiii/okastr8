@@ -279,6 +279,59 @@ export function addGitHubCommands(program: Command) {
                         appName = (nameResponse as any).appName;
                     }
 
+                    // 4. Environment Variables Prompt (Opinionated Flow)
+                    let env: Record<string, string> = {};
+                    const envOption = await Enquirer.prompt({
+                        type: 'select',
+                        name: 'choice',
+                        message: 'Configure environment variables?',
+                        choices: [
+                            'No, skip for now',
+                            'Import from .env file',
+                            'Manual entry (key=value)',
+                        ],
+                    } as any);
+
+                    if ((envOption as any).choice === 'Import from .env file') {
+                        const fileRes = await Enquirer.prompt({
+                            type: 'input',
+                            name: 'path',
+                            message: 'Path to .env file:',
+                            initial: '.env',
+                        } as any);
+                        const filePath = (fileRes as any).path;
+                        if (existsSync(filePath)) {
+                            const { readFile } = await import('fs/promises');
+                            const content = await readFile(filePath, 'utf-8');
+                            content.split('\n').forEach(line => {
+                                line = line.trim();
+                                if (!line || line.startsWith('#')) return;
+                                const [k, ...v] = line.split('=');
+                                if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+                            });
+                            console.log(`   ✅ Loaded ${Object.keys(env).length} variables from ${filePath}`);
+                        } else {
+                            console.error(`   ❌ File not found: ${filePath}`);
+                        }
+                    } else if ((envOption as any).choice === 'Manual entry (key=value)') {
+                        console.log('   Enter variables (empty key to finish):');
+                        while (true) {
+                            const pair = await Enquirer.prompt({
+                                type: 'input',
+                                name: 'val',
+                                message: 'Variable (KEY=VALUE):',
+                            } as any);
+                            const val = (pair as any).val;
+                            if (!val) break;
+                            const [k, ...v] = val.split('=');
+                            if (k && v.length > 0) {
+                                env[k.trim()] = v.join('=').trim();
+                            } else {
+                                console.log('   Invalid format. Use KEY=VALUE');
+                            }
+                        }
+                    }
+
                     console.log(`\n${deployed ? 'Redeploying' : 'Importing'} ${repo.full_name}...`);
                     console.log(`   App: ${appName}`);
                     console.log(`   Branch: ${branch}\n`);
@@ -289,6 +342,7 @@ export function addGitHubCommands(program: Command) {
                         appName: appName,
                         branch: branch,
                         setupWebhook: true,
+                        env: Object.keys(env).length > 0 ? env : undefined
                     });
 
                     if (result.success) {
@@ -314,6 +368,8 @@ export function addGitHubCommands(program: Command) {
         .description("Import and deploy a GitHub repository")
         .argument("<repo>", "Repository full name (e.g., owner/repo)")
         .option("-b, --branch <branch>", "Branch to deploy")
+        .option("--env <vars...>", "Environment variables (KEY=VALUE)")
+        .option("--env-file <path>", "Path to .env file")
         .option("--no-webhook", "Don't setup webhook for auto-deploys")
         .action(async (repo, options) => {
             try {
@@ -323,12 +379,40 @@ export function addGitHubCommands(program: Command) {
                     process.exit(1);
                 }
 
+                let env: Record<string, string> = {};
+
+                // Parse --env-file
+                if (options.envFile) {
+                    if (existsSync(options.envFile)) {
+                        const { readFile } = await import('fs/promises');
+                        const content = await readFile(options.envFile, 'utf-8');
+                        content.split('\n').forEach(line => {
+                            line = line.trim();
+                            if (!line || line.startsWith('#')) return;
+                            const [k, ...v] = line.split('=');
+                            if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+                        });
+                    } else {
+                        console.error(`❌ Env file not found: ${options.envFile}`);
+                        process.exit(1);
+                    }
+                }
+
+                // Parse --env flags
+                if (options.env) {
+                    options.env.forEach((pair: string) => {
+                        const [k, ...v] = pair.split('=');
+                        if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+                    });
+                }
+
                 console.log(`\nImporting ${repo}...\n`);
 
                 const result = await importRepo({
                     repoFullName: repo,
                     branch: options.branch,
                     setupWebhook: options.webhook !== false,
+                    env: Object.keys(env).length > 0 ? env : undefined
                 });
 
                 if (result.success) {

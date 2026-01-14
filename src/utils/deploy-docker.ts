@@ -101,12 +101,27 @@ export async function deployWithDocker(
 ): Promise<DeployResult> {
     const { appName, releasePath, versionId, onProgress } = options;
     const log = onProgress || ((msg: string) => console.log(msg));
-    const envFilePath = join(releasePath, ".env");
 
-    // 1. Load env vars if present
-    if (existsSync(envFilePath)) {
-        await importEnvFile(appName, envFilePath);
+    // 1. Handle Environment Variables
+    const { saveEnvVars } = await import("./env-manager");
+
+    // A. Env file from repository (cloned code) - Loaded FIRST
+    const repoEnvPath = join(releasePath, ".env");
+    if (existsSync(repoEnvPath)) {
+        log("Importing .env from repository...");
+        await importEnvFile(appName, repoEnvPath);
     }
+
+    // B. Manual env vars from options (UI/Manual trigger) - Loaded SECOND (overwrites)
+    if (options.env && Object.keys(options.env).length > 0) {
+        log(`Applying ${Object.keys(options.env).length} manual environment variables...`);
+        await saveEnvVars(appName, options.env);
+    }
+
+    // C. Determine final env file to use for Docker
+    // We always prefer the persistent okastr8 one if it exists
+    const persistentEnvPath = join(APPS_DIR, appName, ".env.production");
+    const envFilePath = existsSync(persistentEnvPath) ? persistentEnvPath : undefined;
 
     // 2. Universal Cleanup: Stop both possible strategies to ensure a clean slate
     // This handles cases where a user switches from Dockerfile to Compose or vice-versa,
@@ -147,7 +162,7 @@ export async function deployWithDocker(
             releasePath,
             config,
             strategy,
-            existsSync(envFilePath) ? envFilePath : undefined,
+            envFilePath,
             log
         );
     } else {
@@ -157,7 +172,7 @@ export async function deployWithDocker(
             config,
             versionId,
             strategy,
-            existsSync(envFilePath) ? envFilePath : undefined,
+            envFilePath,
             log
         );
     }

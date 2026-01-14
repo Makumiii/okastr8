@@ -49,6 +49,7 @@ export interface ImportOptions {
     startCommand?: string;
     autoDetect?: boolean;
     setupWebhook?: boolean;
+    env?: Record<string, string>;
 }
 
 // Config helpers
@@ -400,6 +401,13 @@ export async function importRepo(
 
         log("✅ okastr8.yaml found - proceeding with deployment");
 
+        // Save environment variables if provided
+        if (options.env && Object.keys(options.env).length > 0) {
+            const { saveEnvVars } = await import("../utils/env-manager");
+            log(`Saving ${Object.keys(options.env).length} environment variables...`);
+            await saveEnvVars(appName, options.env);
+        }
+
         // Initialize directories
         const appDir = join(APPS_DIR, appName);
         await mkdir(appDir, { recursive: true });
@@ -594,6 +602,7 @@ export async function importRepo(
             versionId,
             gitRepo: repo.ssh_url || repo.clone_url || repo.html_url,
             gitBranch: branch,
+            env: options.env,
             onProgress: log,
         });
 

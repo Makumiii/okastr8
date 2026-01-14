@@ -17859,10 +17859,18 @@ async function waitForHealth(containerName, maxWaitSeconds, log) {
 async function deployWithDocker(options, config) {
   const { appName, releasePath, versionId, onProgress } = options;
   const log = onProgress || ((msg) => console.log(msg));
-  const envFilePath = join11(releasePath, ".env");
-  if (existsSync6(envFilePath)) {
-    await importEnvFile(appName, envFilePath);
+  const { saveEnvVars: saveEnvVars2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
+  const repoEnvPath = join11(releasePath, ".env");
+  if (existsSync6(repoEnvPath)) {
+    log("Importing .env from repository...");
+    await importEnvFile(appName, repoEnvPath);
   }
+  if (options.env && Object.keys(options.env).length > 0) {
+    log(`Applying ${Object.keys(options.env).length} manual environment variables...`);
+    await saveEnvVars2(appName, options.env);
+  }
+  const persistentEnvPath = join11(APPS_DIR2, appName, ".env.production");
+  const envFilePath = existsSync6(persistentEnvPath) ? persistentEnvPath : undefined;
   log("Ensuring clean slate for deployment...");
   await stopContainer(appName).catch(() => {});
   await removeContainer(appName).catch(() => {});
@@ -17883,9 +17891,9 @@ async function deployWithDocker(options, config) {
   const strategy = await detectDockerStrategy(releasePath, config);
   log(`Docker strategy: ${strategy}`);
   if (strategy === "user-compose" || strategy === "auto-compose") {
-    return await deployWithCompose(appName, releasePath, config, strategy, existsSync6(envFilePath) ? envFilePath : undefined, log);
+    return await deployWithCompose(appName, releasePath, config, strategy, envFilePath, log);
   } else {
-    return await deployWithDockerfile(appName, releasePath, config, versionId, strategy, existsSync6(envFilePath) ? envFilePath : undefined, log);
+    return await deployWithDockerfile(appName, releasePath, config, versionId, strategy, envFilePath, log);
   }
 }
 async function deployWithCompose(appName, releasePath, config, strategy, envFilePath, log) {
@@ -19042,6 +19050,11 @@ Visit https://github.com/${repo.full_name}/new/${branch} to create the file.`,
       };
     }
     log("✅ okastr8.yaml found - proceeding with deployment");
+    if (options.env && Object.keys(options.env).length > 0) {
+      const { saveEnvVars: saveEnvVars2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
+      log(`Saving ${Object.keys(options.env).length} environment variables...`);
+      await saveEnvVars2(appName, options.env);
+    }
     const appDir = join16(APPS_DIR6, appName);
     await mkdir6(appDir, { recursive: true });
     await initializeVersioning2(appName);
@@ -19185,6 +19198,7 @@ ${buildResult.stderr}` };
       versionId,
       gitRepo: repo.ssh_url || repo.clone_url || repo.html_url,
       gitBranch: branch,
+      env: options.env,
       onProgress: log
     });
     if (!deployResult.success) {
@@ -19369,6 +19383,10 @@ async function createApp2(config) {
       webhookAutoDeploy: config.webhookAutoDeploy ?? true
     };
     await writeFile9(metadataPath, JSON.stringify(metadata, null, 2));
+    if (config.env && Object.keys(config.env).length > 0) {
+      const { saveEnvVars: saveEnvVars2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
+      await saveEnvVars2(config.name, config.env);
+    }
     return {
       success: true,
       appDir,
@@ -19508,7 +19526,7 @@ async function getAppMetadata2(appName) {
     throw new Error(`App ${appName} not found or corrupted`);
   }
 }
-async function updateApp(appName) {
+async function updateApp(appName, env) {
   let versionId = 0;
   let releasePath = "";
   try {
@@ -19550,6 +19568,7 @@ async function updateApp(appName) {
       versionId,
       gitRepo: metadata.gitRepo,
       gitBranch: branch,
+      env,
       onProgress: (msg) => console.log(msg)
     });
     if (!deployResult.success) {
@@ -19585,9 +19604,38 @@ async function setAppWebhookAutoDeploy2(appName, enabled) {
 }
 function addAppCommands2(program2) {
   const app = program2.command("app").description("Manage okastr8 applications");
-  app.command("create").description("Create a new application").argument("<name>", "Application name").argument("<exec_start>", "Command to run (e.g., 'bun run start')").option("-d, --description <desc>", "Service description", "Okastr8 managed app").option("-u, --user <user>", "User to run as", process.env.USER || "root").option("-w, --working-dir <dir>", "Working directory").option("-p, --port <port>", "Application port").option("--domain <domain>", "Domain for Caddy reverse proxy").option("--git-repo <url>", "Git repository URL").option("--git-branch <branch>", "Git branch to track", "main").option("--database <type:version>", "Database service (e.g., 'postgres:15')").option("--cache <type:version>", "Cache service (e.g., 'redis:7')").action(async (name, execStart, options) => {
+  app.command("create").description("Create a new application").argument("<name>", "Application name").argument("<exec_start>", "Command to run (e.g., 'bun run start')").option("-d, --description <desc>", "Service description", "Okastr8 managed app").option("-u, --user <user>", "User to run as", process.env.USER || "root").option("-w, --working-dir <dir>", "Working directory").option("-p, --port <port>", "Application port").option("--domain <domain>", "Domain for Caddy reverse proxy").option("--git-repo <url>", "Git repository URL").option("--git-branch <branch>", "Git branch to track", "main").option("--database <type:version>", "Database service (e.g., 'postgres:15')").option("--cache <type:version>", "Cache service (e.g., 'redis:7')").option("--env <vars...>", "Environment variables (KEY=VALUE)").option("--env-file <path>", "Path to .env file").action(async (name, execStart, options) => {
     console.log(`Creating app '${name}'...`);
     try {
+      let env2 = {};
+      if (options.envFile) {
+        if (existsSync11(options.envFile)) {
+          const content = await readFile9(options.envFile, "utf-8");
+          content.split(`
+`).forEach((line) => {
+            line = line.trim();
+            if (!line || line.startsWith("#"))
+              return;
+            const [k, ...v] = line.split("=");
+            if (k && v.length > 0)
+              env2[k.trim()] = v.join("=").trim();
+          });
+        } else {
+          console.error(`❌ Env file not found: ${options.envFile}`);
+          process.exit(1);
+        }
+      }
+      if (options.env) {
+        options.env.forEach((pair) => {
+          const [k, ...v] = pair.split("=");
+          if (k && v.length > 0)
+            env2[k.trim()] = v.join("=").trim();
+        });
+      }
+      if (Object.keys(env2).length > 0) {
+        const { saveEnvVars: saveEnvVars2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
+        await saveEnvVars2(name, env2);
+      }
       const result = await createApp2({
         name,
         description: options.description,
@@ -20601,6 +20649,10 @@ async function createApp(config) {
       webhookAutoDeploy: config.webhookAutoDeploy ?? true
     };
     await writeFile7(metadataPath, JSON.stringify(metadata, null, 2));
+    if (config.env && Object.keys(config.env).length > 0) {
+      const { saveEnvVars: saveEnvVars2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
+      await saveEnvVars2(config.name, config.env);
+    }
     return {
       success: true,
       appDir,
@@ -20755,9 +20807,38 @@ async function setAppWebhookAutoDeploy(appName, enabled) {
 }
 function addAppCommands(program2) {
   const app = program2.command("app").description("Manage okastr8 applications");
-  app.command("create").description("Create a new application").argument("<name>", "Application name").argument("<exec_start>", "Command to run (e.g., 'bun run start')").option("-d, --description <desc>", "Service description", "Okastr8 managed app").option("-u, --user <user>", "User to run as", process.env.USER || "root").option("-w, --working-dir <dir>", "Working directory").option("-p, --port <port>", "Application port").option("--domain <domain>", "Domain for Caddy reverse proxy").option("--git-repo <url>", "Git repository URL").option("--git-branch <branch>", "Git branch to track", "main").option("--database <type:version>", "Database service (e.g., 'postgres:15')").option("--cache <type:version>", "Cache service (e.g., 'redis:7')").action(async (name, execStart, options) => {
+  app.command("create").description("Create a new application").argument("<name>", "Application name").argument("<exec_start>", "Command to run (e.g., 'bun run start')").option("-d, --description <desc>", "Service description", "Okastr8 managed app").option("-u, --user <user>", "User to run as", process.env.USER || "root").option("-w, --working-dir <dir>", "Working directory").option("-p, --port <port>", "Application port").option("--domain <domain>", "Domain for Caddy reverse proxy").option("--git-repo <url>", "Git repository URL").option("--git-branch <branch>", "Git branch to track", "main").option("--database <type:version>", "Database service (e.g., 'postgres:15')").option("--cache <type:version>", "Cache service (e.g., 'redis:7')").option("--env <vars...>", "Environment variables (KEY=VALUE)").option("--env-file <path>", "Path to .env file").action(async (name, execStart, options) => {
     console.log(`Creating app '${name}'...`);
     try {
+      let env2 = {};
+      if (options.envFile) {
+        if (existsSync9(options.envFile)) {
+          const content = await readFile7(options.envFile, "utf-8");
+          content.split(`
+`).forEach((line) => {
+            line = line.trim();
+            if (!line || line.startsWith("#"))
+              return;
+            const [k, ...v] = line.split("=");
+            if (k && v.length > 0)
+              env2[k.trim()] = v.join("=").trim();
+          });
+        } else {
+          console.error(`❌ Env file not found: ${options.envFile}`);
+          process.exit(1);
+        }
+      }
+      if (options.env) {
+        options.env.forEach((pair) => {
+          const [k, ...v] = pair.split("=");
+          if (k && v.length > 0)
+            env2[k.trim()] = v.join("=").trim();
+        });
+      }
+      if (Object.keys(env2).length > 0) {
+        const { saveEnvVars: saveEnvVars2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
+        await saveEnvVars2(name, env2);
+      }
       const result = await createApp({
         name,
         description: options.description,
@@ -20936,6 +21017,7 @@ init_config();
 import { join as join19, dirname as dirname7 } from "path";
 import { fileURLToPath as fileURLToPath6 } from "url";
 import { readFile as readFile11, writeFile as writeFile10, mkdir as mkdir8 } from "fs/promises";
+import { existsSync as existsSync13 } from "fs";
 var __filename7 = fileURLToPath6(import.meta.url);
 var __dirname7 = dirname7(__filename7);
 var PROJECT_ROOT6 = join19(__dirname7, "..", "..");
@@ -20958,7 +21040,7 @@ async function runHealthCheck(method, target, timeout = 30) {
   ]);
 }
 async function deployApp(options) {
-  const { appName, branch, skipHealthCheck } = options;
+  const { appName, branch, skipHealthCheck, env } = options;
   console.log(`Starting deployment for ${appName}...`);
   try {
     const { getAppMetadata: getAppMetadata3, updateApp: updateApp2 } = await Promise.resolve().then(() => (init_app(), exports_app));
@@ -20991,7 +21073,7 @@ async function deployApp(options) {
     }
     console.log(`
 Using immutable deployment strategy (V2)...`);
-    const result = await updateApp2(appName);
+    const result = await updateApp2(appName, env);
     const { sendDeploymentAlertEmail: sendDeploymentAlertEmail2 } = await Promise.resolve().then(() => (init_email(), exports_email));
     if (result.success) {
       console.log(`
@@ -21063,19 +21145,45 @@ async function getDeploymentHistory(appName) {
 }
 function addDeployCommands(program2) {
   const deploy = program2.command("deploy").description("Deployment management commands");
-  deploy.command("trigger").description("Trigger a deployment for an app").argument("<app>", "Application name").option("-b, --branch <branch>", "Git branch to deploy").option("--build <steps>", "Build steps (comma-separated)").option("--health-method <method>", "Health check method (http, process, port, command)").option("--health-target <target>", "Health check target").option("--health-timeout <seconds>", "Health check timeout", "30").option("--skip-health", "Skip health check").action(async (app, options) => {
+  deploy.command("trigger").description("Trigger a deployment for an app").argument("<app>", "Application name").option("-b, --branch <branch>", "Git branch to deploy").option("--build <steps>", "Build steps (comma-separated)").option("--health-method <method>", "Health check method (http, process, port, command)").option("--health-target <target>", "Health check target").option("--health-timeout <seconds>", "Health check timeout", "30").option("--skip-health", "Skip health check").option("--env <vars...>", "Environment variables (KEY=VALUE)").option("--env-file <path>", "Path to .env file").action(async (app, options) => {
     const buildSteps = options.build ? options.build.split(",").map((s) => s.trim()) : [];
     const healthCheck = options.healthMethod && options.healthTarget ? {
       method: options.healthMethod,
       target: options.healthTarget,
       timeout: parseInt(options.healthTimeout, 10)
     } : undefined;
+    let env = {};
+    if (options.envFile) {
+      if (existsSync13(options.envFile)) {
+        const content = await readFile11(options.envFile, "utf-8");
+        content.split(`
+`).forEach((line) => {
+          line = line.trim();
+          if (!line || line.startsWith("#"))
+            return;
+          const [k, ...v] = line.split("=");
+          if (k && v.length > 0)
+            env[k.trim()] = v.join("=").trim();
+        });
+      } else {
+        console.error(`❌ Env file not found: ${options.envFile}`);
+        process.exit(1);
+      }
+    }
+    if (options.env) {
+      options.env.forEach((pair) => {
+        const [k, ...v] = pair.split("=");
+        if (k && v.length > 0)
+          env[k.trim()] = v.join("=").trim();
+      });
+    }
     const result = await deployApp({
       appName: app,
       branch: options.branch,
       buildSteps,
       healthCheck,
-      skipHealthCheck: options.skipHealth
+      skipHealthCheck: options.skipHealth,
+      env: Object.keys(env).length > 0 ? env : undefined
     });
     if (!result.success) {
       process.exit(1);
@@ -21113,7 +21221,7 @@ init_command();
 init_github();
 import { join as join20 } from "path";
 import { homedir as homedir5 } from "os";
-import { existsSync as existsSync13 } from "fs";
+import { existsSync as existsSync14 } from "fs";
 import { readFile as readFile12 } from "fs/promises";
 var SSH_KEY_PATH = join20(homedir5(), ".ssh", "okastr8_deploy_key");
 function addGitHubCommands(program2) {
@@ -21321,6 +21429,60 @@ Full Details for ${repo.full_name}`);
           });
           appName = nameResponse.appName;
         }
+        let env = {};
+        const envOption = await Enquirer2.prompt({
+          type: "select",
+          name: "choice",
+          message: "Configure environment variables?",
+          choices: [
+            "No, skip for now",
+            "Import from .env file",
+            "Manual entry (key=value)"
+          ]
+        });
+        if (envOption.choice === "Import from .env file") {
+          const fileRes = await Enquirer2.prompt({
+            type: "input",
+            name: "path",
+            message: "Path to .env file:",
+            initial: ".env"
+          });
+          const filePath = fileRes.path;
+          if (existsSync14(filePath)) {
+            const { readFile: readFile13 } = await import("fs/promises");
+            const content = await readFile13(filePath, "utf-8");
+            content.split(`
+`).forEach((line) => {
+              line = line.trim();
+              if (!line || line.startsWith("#"))
+                return;
+              const [k, ...v] = line.split("=");
+              if (k && v.length > 0)
+                env[k.trim()] = v.join("=").trim();
+            });
+            console.log(`   ✅ Loaded ${Object.keys(env).length} variables from ${filePath}`);
+          } else {
+            console.error(`   ❌ File not found: ${filePath}`);
+          }
+        } else if (envOption.choice === "Manual entry (key=value)") {
+          console.log("   Enter variables (empty key to finish):");
+          while (true) {
+            const pair = await Enquirer2.prompt({
+              type: "input",
+              name: "val",
+              message: "Variable (KEY=VALUE):"
+            });
+            const val = pair.val;
+            if (!val)
+              break;
+            const [k, ...v] = val.split("=");
+            if (k && v.length > 0) {
+              env[k.trim()] = v.join("=").trim();
+            } else {
+              console.log("   Invalid format. Use KEY=VALUE");
+            }
+          }
+        }
         console.log(`
 ${deployed ? "Redeploying" : "Importing"} ${repo.full_name}...`);
         console.log(`   App: ${appName}`);
@@ -21330,7 +21492,8 @@ ${deployed ? "Redeploying" : "Importing"} ${repo.full_name}...`);
           repoFullName: repo.full_name,
           appName,
           branch,
-          setupWebhook: true
+          setupWebhook: true,
+          env: Object.keys(env).length > 0 ? env : undefined
         });
         if (result.success) {
           console.log(`
@@ -21350,12 +21513,38 @@ Cancelled.`);
       process.exit(1);
     }
   });
-  github.command("import").description("Import and deploy a GitHub repository").argument("<repo>", "Repository full name (e.g., owner/repo)").option("-b, --branch <branch>", "Branch to deploy").option("--no-webhook", "Don't setup webhook for auto-deploys").action(async (repo, options) => {
+  github.command("import").description("Import and deploy a GitHub repository").argument("<repo>", "Repository full name (e.g., owner/repo)").option("-b, --branch <branch>", "Branch to deploy").option("--env <vars...>", "Environment variables (KEY=VALUE)").option("--env-file <path>", "Path to .env file").option("--no-webhook", "Don't setup webhook for auto-deploys").action(async (repo, options) => {
     try {
       const config = await getGitHubConfig();
       if (!config.accessToken) {
         console.error("❌ Not connected to GitHub. Use web UI to connect first.");
         process.exit(1);
+      }
+      let env = {};
+      if (options.envFile) {
+        if (existsSync14(options.envFile)) {
+          const { readFile: readFile13 } = await import("fs/promises");
+          const content = await readFile13(options.envFile, "utf-8");
+          content.split(`
+`).forEach((line) => {
+            line = line.trim();
+            if (!line || line.startsWith("#"))
+              return;
+            const [k, ...v] = line.split("=");
+            if (k && v.length > 0)
+              env[k.trim()] = v.join("=").trim();
+          });
+        } else {
+          console.error(`❌ Env file not found: ${options.envFile}`);
+          process.exit(1);
+        }
+      }
+      if (options.env) {
+        options.env.forEach((pair) => {
+          const [k, ...v] = pair.split("=");
+          if (k && v.length > 0)
+            env[k.trim()] = v.join("=").trim();
+        });
       }
       console.log(`
 Importing ${repo}...
@@ -21363,7 +21552,8 @@ Importing ${repo}...
       const result = await importRepo({
         repoFullName: repo,
         branch: options.branch,
-        setupWebhook: options.webhook !== false
+        setupWebhook: options.webhook !== false,
+        env: Object.keys(env).length > 0 ? env : undefined
       });
       if (result.success) {
         console.log(`
@@ -21417,7 +21607,7 @@ Importing ${repo}...
         return;
       }
       const pubKeyPath = `${SSH_KEY_PATH}.pub`;
-      if (!existsSync13(pubKeyPath)) {
+      if (!existsSync14(pubKeyPath)) {
         console.log("Generating new SSH deploy key...");
         const sshDir = join20(homedir5(), ".ssh");
         await runCommand("mkdir", ["-p", sshDir]);
@@ -22642,7 +22832,7 @@ init_app();
 init_systemd();
 init_config();
 import * as fs from "fs/promises";
-import { existsSync as existsSync14 } from "fs";
+import { existsSync as existsSync15 } from "fs";
 import * as readline from "readline";
 async function controlAllServices(action) {
   console.log(`${action.toUpperCase()}ING all services...`);
@@ -22730,7 +22920,7 @@ Step 2: Stopping Manager Service...`);
   }
   console.log(`
 Step 3: Incinerating Configuration...`);
-  if (existsSync14(OKASTR8_HOME)) {
+  if (existsSync15(OKASTR8_HOME)) {
     await fs.rm(OKASTR8_HOME, { recursive: true, force: true });
     console.log(`   Deleted ${OKASTR8_HOME}`);
   }

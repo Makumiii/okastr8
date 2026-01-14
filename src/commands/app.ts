@@ -84,6 +84,12 @@ export async function createApp(config: AppConfig) {
 
         await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
 
+        // Save env vars to .env.production if provided
+        if (config.env && Object.keys(config.env).length > 0) {
+            const { saveEnvVars } = await import("../utils/env-manager");
+            await saveEnvVars(config.name, config.env);
+        }
+
         return {
             success: true,
             appDir,
@@ -256,7 +262,7 @@ export async function getAppMetadata(appName: string): Promise<AppConfig & { rep
     }
 }
 
-export async function updateApp(appName: string) {
+export async function updateApp(appName: string, env?: Record<string, string>) {
     let versionId: number = 0;
     let releasePath: string = "";
     try {
@@ -310,6 +316,7 @@ export async function updateApp(appName: string) {
             versionId,
             gitRepo: metadata.gitRepo,
             gitBranch: branch,
+            env: env,
             onProgress: (msg) => console.log(msg)
         });
 
@@ -370,9 +377,43 @@ export function addAppCommands(program: Command) {
         .option("--git-branch <branch>", "Git branch to track", "main")
         .option("--database <type:version>", "Database service (e.g., 'postgres:15')")
         .option("--cache <type:version>", "Cache service (e.g., 'redis:7')")
+        .option("--env <vars...>", "Environment variables (KEY=VALUE)")
+        .option("--env-file <path>", "Path to .env file")
         .action(async (name: string, execStart: string, options: any) => {
             console.log(`Creating app '${name}'...`);
             try {
+                let env: Record<string, string> = {};
+
+                // Parse --env-file
+                if (options.envFile) {
+                    if (existsSync(options.envFile)) {
+                        const content = await readFile(options.envFile, 'utf-8');
+                        content.split('\n').forEach(line => {
+                            line = line.trim();
+                            if (!line || line.startsWith('#')) return;
+                            const [k, ...v] = line.split('=');
+                            if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+                        });
+                    } else {
+                        console.error(`❌ Env file not found: ${options.envFile}`);
+                        process.exit(1);
+                    }
+                }
+
+                // Parse --env flags
+                if (options.env) {
+                    options.env.forEach((pair: string) => {
+                        const [k, ...v] = pair.split('=');
+                        if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+                    });
+                }
+
+                // Save env vars if present
+                if (Object.keys(env).length > 0) {
+                    const { saveEnvVars } = await import('../utils/env-manager');
+                    await saveEnvVars(name, env);
+                }
+
                 const result = await createApp({
                     name,
                     description: options.description,

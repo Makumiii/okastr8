@@ -201,6 +201,91 @@
             gap: 8px;
         }
 
+        /* Environment Variables UI */
+        .env-drop-zone {
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            background: #f9fafb;
+            transition: all 0.2s;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .env-drop-zone:hover {
+            border-color: #0366d6;
+            background: #f0f4ff;
+        }
+
+        .env-drop-zone.dragover {
+            border-color: #0366d6;
+            background: #e0e7ff;
+            box-shadow: 0 0 20px rgba(3, 102, 214, 0.2);
+        }
+
+        .env-var-item {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+
+        .env-var-item input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+        }
+
+        .env-var-item input:first-child {
+            flex: 0.4;
+        }
+
+        .env-var-item button {
+            padding: 6px 10px;
+            background: #fee2e2;
+            color: #dc2626;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.15s;
+        }
+
+        .env-var-item button:hover {
+            background: #fecaca;
+        }
+
+        .env-file-status {
+            margin-top: 12px;
+            padding: 10px 14px;
+            background: #dcfce7;
+            border: 1px solid #86efac;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #166534;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-link {
+            background: none;
+            border: none;
+            color: #0366d6;
+            cursor: pointer;
+            padding: 0;
+            font-size: 13px;
+            text-decoration: underline;
+        }
+
+        .btn-link:hover {
+            text-decoration: none;
+        }
+
         .search-box {
             padding: 10px 15px;
             font-size: 16px;
@@ -411,6 +496,44 @@ manager:
                     Enable Auto-Deploy (Webhook)
                 </label>
 
+                <!-- Environment Variables Section -->
+                <div style="border-top: 1px solid #e1e4e8; padding-top: 15px; margin-top: 20px;">
+                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-weight: 600;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            style="width: 18px; height: 18px;">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        Environment Variables
+                    </label>
+
+                    <div id="env-drop-zone" class="env-drop-zone">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            style="width: 24px; height: 24px; margin-bottom: 8px; color: #586069;">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <div style="font-size: 13px;">
+                            <strong>Drop .env file here</strong> or
+                            <label for="env-file-input"
+                                style="color: #0366d6; cursor: pointer; text-decoration: underline;">browse</label>
+                        </div>
+                        <input type="file" id="env-file-input" accept=".env,.txt" style="display: none;">
+                    </div>
+
+                    <div style="margin-top: 12px;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-size: 12px; color: #586069;">Manual Entry:</span>
+                            <button type="button" class="btn-link" onclick="addEnvVar()">+ Add Variable</button>
+                        </div>
+                        <div id="env-vars-list">
+                            <!-- Env var items will be added here -->
+                        </div>
+                    </div>
+                </div>
+
                 <div style="margin-top: 15px; display: flex; gap: 10px;">
                     <button type="submit" class="btn btn-primary">🚀 Deploy</button>
                     <button type="button" id="cancel-deploy" class="btn btn-cancel">Cancel</button>
@@ -423,6 +546,95 @@ manager:
     <script src="js/common.js"></script>
     <script>
         let allRepos = [];
+        let envVariables = {};
+
+        // Environment Variable Helpers
+        function addEnvVar(key = '', value = '') {
+            const list = document.getElementById('env-vars-list');
+            const id = 'env-' + Math.random().toString(36).substr(2, 9);
+
+            const div = document.createElement('div');
+            div.className = 'env-var-item';
+            div.id = id;
+            div.innerHTML = `
+                <input type="text" placeholder="KEY" value="${key}" class="env-key" oninput="updateEnvVar('${id}')">
+                <input type="text" placeholder="VALUE" value="${value}" class="env-value" oninput="updateEnvVar('${id}')">
+                <button type="button" onclick="removeEnvVar('${id}')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            `;
+            list.appendChild(div);
+            updateEnvVar(id);
+        }
+
+        function removeEnvVar(id) {
+            const el = document.getElementById(id);
+            const key = el.querySelector('.env-key').value;
+            if (key) delete envVariables[key];
+            el.remove();
+        }
+
+        function updateEnvVar(id) {
+            const el = document.getElementById(id);
+            const key = el.querySelector('.env-key').value.trim();
+            const value = el.querySelector('.env-value').value.trim();
+
+            if (key) {
+                envVariables[key] = value;
+            }
+        }
+
+        function renderEnvVars() {
+            const list = document.getElementById('env-vars-list');
+            list.innerHTML = '';
+            Object.entries(envVariables).forEach(([key, value]) => {
+                addEnvVar(key, value);
+            });
+        }
+
+        function parseEnvFile(content) {
+            const vars = {};
+            const lines = content.split('\n');
+            lines.forEach(line => {
+                line = line.trim();
+                if (!line || line.startsWith('#')) return;
+
+                const parts = line.split('=');
+                if (parts.length >= 2) {
+                    const key = parts[0].trim();
+                    const value = parts.slice(1).join('=').trim();
+                    // Remove quotes if present
+                    const cleanValue = value.replace(/^["'](.*)["']$/, '$1');
+                    vars[key] = cleanValue;
+                }
+            });
+            return vars;
+        }
+
+        async function handleEnvFile(file) {
+            const text = await file.text();
+            const vars = parseEnvFile(text);
+            envVariables = { ...envVariables, ...vars };
+            renderEnvVars();
+
+            const dropZone = document.getElementById('env-drop-zone');
+            const originalContent = dropZone.innerHTML;
+            dropZone.innerHTML = `
+                <div class="env-file-status">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    Loaded ${Object.keys(vars).length} variables from ${file.name}
+                </div>
+            `;
+            setTimeout(() => {
+                dropZone.innerHTML = originalContent;
+                // Re-attach listener if needed, but since we use onclick/onchange in HTML it's fine
+            }, 3000);
+        }
 
         document.addEventListener('DOMContentLoaded', async () => {
             const result = createResultDisplay('github-results');
@@ -443,6 +655,35 @@ manager:
             document.getElementById('callback-url').textContent = `http://${host}/api/github/callback`;
 
             await checkConnectionStatus();
+
+            // Set up environment variable drag and drop
+            const dropZone = document.getElementById('env-drop-zone');
+            const fileInput = document.getElementById('env-file-input');
+
+            if (dropZone && fileInput) {
+                dropZone.onclick = () => fileInput.click();
+
+                fileInput.onchange = (e) => {
+                    if (e.target.files.length) handleEnvFile(e.target.files[0]);
+                };
+
+                dropZone.ondragover = (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('dragover');
+                };
+
+                dropZone.ondragleave = () => {
+                    dropZone.classList.remove('dragover');
+                };
+
+                dropZone.ondrop = (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('dragover');
+                    if (e.dataTransfer.files.length) {
+                        handleEnvFile(e.dataTransfer.files[0]);
+                    }
+                };
+            }
         });
 
         async function checkConnectionStatus() {
@@ -656,6 +897,12 @@ manager:
         async function openDeployModal(repoFullName, repoName, defaultBranch) {
             document.getElementById('deploy-repo-name').value = repoFullName;
 
+            // Reset environment variables
+            envVariables = {};
+            document.getElementById('env-vars-list').innerHTML = '';
+            const status = document.querySelector('.env-file-status');
+            if (status) status.remove();
+
             // Set app name display
             const appName = repoName.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
             document.getElementById('deploy-app-name-text').textContent = appName;
@@ -768,6 +1015,7 @@ manager:
                     repoFullName,
                     branch,
                     setupWebhook: document.getElementById('deploy-webhook').checked,
+                    env: envVariables
                 });
 
                 if (!res.success || !res.data?.deploymentId) {

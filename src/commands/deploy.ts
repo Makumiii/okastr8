@@ -4,6 +4,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { homedir } from "os";
 import { readFile, writeFile, mkdir } from "fs/promises";
+import { existsSync } from "fs";
 import type { DeploymentRecord, DeploysMetadata } from "../types";
 
 // Get the directory of this file (works in Bun and Node ESM)
@@ -38,6 +39,7 @@ export interface DeployOptions {
         timeout?: number;
     };
     skipHealthCheck?: boolean;
+    env?: Record<string, string>;
 }
 
 // Core Functions
@@ -61,7 +63,7 @@ export async function runHealthCheck(
 }
 
 export async function deployApp(options: DeployOptions) {
-    const { appName, branch, skipHealthCheck } = options;
+    const { appName, branch, skipHealthCheck, env } = options;
 
     console.log(`Starting deployment for ${appName}...`);
 
@@ -106,7 +108,7 @@ export async function deployApp(options: DeployOptions) {
         // This creates a new release, clones fresh, builds, and switches symlink
         console.log(`\nUsing immutable deployment strategy (V2)...`);
 
-        const result = await updateApp(appName);
+        const result = await updateApp(appName, env);
 
         // Dynamically import to avoid circular dep if any
         const { sendDeploymentAlertEmail } = await import('../services/email');
@@ -268,6 +270,8 @@ export function addDeployCommands(program: Command) {
         .option("--health-target <target>", "Health check target")
         .option("--health-timeout <seconds>", "Health check timeout", "30")
         .option("--skip-health", "Skip health check")
+        .option("--env <vars...>", "Environment variables (KEY=VALUE)")
+        .option("--env-file <path>", "Path to .env file")
         .action(async (app, options) => {
             const buildSteps = options.build ? options.build.split(",").map((s: string) => s.trim()) : [];
             const healthCheck = options.healthMethod && options.healthTarget
@@ -278,12 +282,39 @@ export function addDeployCommands(program: Command) {
                 }
                 : undefined;
 
+            let env: Record<string, string> = {};
+
+            // Parse --env-file
+            if (options.envFile) {
+                if (existsSync(options.envFile)) {
+                    const content = await readFile(options.envFile, 'utf-8');
+                    content.split('\n').forEach(line => {
+                        line = line.trim();
+                        if (!line || line.startsWith('#')) return;
+                        const [k, ...v] = line.split('=');
+                        if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+                    });
+                } else {
+                    console.error(`❌ Env file not found: ${options.envFile}`);
+                    process.exit(1);
+                }
+            }
+
+            // Parse --env flags
+            if (options.env) {
+                options.env.forEach((pair: string) => {
+                    const [k, ...v] = pair.split('=');
+                    if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+                });
+            }
+
             const result = await deployApp({
                 appName: app,
                 branch: options.branch,
                 buildSteps,
                 healthCheck,
                 skipHealthCheck: options.skipHealth,
+                env: Object.keys(env).length > 0 ? env : undefined
             });
 
             if (!result.success) {
