@@ -614,11 +614,26 @@
         </div>
     </div>
 
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content" style="max-width: 400px; text-align: center;">
+            <div id="confirm-icon" style="font-size: 48px; margin-bottom: 20px;">⚠️</div>
+            <h3 id="confirm-title" style="margin-bottom: 12px; border: none; padding: 0;">Are you sure?</h3>
+            <p id="confirm-message" style="color: #64748b; font-size: 14px; margin-bottom: 32px; line-height: 1.6;"></p>
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <button type="button" class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+                <button type="button" id="confirm-yes-btn" class="btn btn-primary">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/common.js"></script>
+
     <script>
         let currentApps = [];
         let currentLogsApp = '';
         let envVariablesAvailable = {}; // Map of key -> value
+        let confirmPromise = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             loadApps();
@@ -763,8 +778,8 @@
 
                     <div class="app-actions">
                         ${app.running
-                    ? `<button class="btn btn-danger btn-small" onclick="controlApp('${app.name}', 'stop')">Stop</button>`
-                    : `<button class="btn btn-primary btn-small" onclick="controlApp('${app.name}', 'start')">Start</button>`
+                    ? `<button class="btn btn-danger btn-small" onclick="controlApp('${app.name}', 'stop', event)">Stop</button>`
+                    : `<button class="btn btn-primary btn-small" onclick="controlApp('${app.name}', 'start', event)">Start</button>`
                 }
                         <button class="btn btn-secondary btn-small" onclick="viewLogs('${app.name}')">Logs</button>
                         <button class="btn btn-secondary btn-small" onclick="viewVersions('${app.name}')">History</button>
@@ -774,7 +789,7 @@
                                 <svg viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px; color: #a0aec0;"><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle><circle cx="5" cy="12" r="2"></circle></svg>
                             </button>
                             <div class="dropdown-menu">
-                                <button class="dropdown-item" onclick="controlApp('${app.name}', 'restart')">
+                                <button class="dropdown-item" onclick="controlApp('${app.name}', 'restart', event)">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><path d="M23 4v6h-6M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                                     Restart App
                                 </button>
@@ -802,7 +817,14 @@
             menu.classList.toggle('active');
         }
 
-        async function controlApp(name, action) {
+        async function controlApp(name, action, e) {
+            const btn = e?.currentTarget;
+            const originalHtml = btn?.innerHTML;
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading-spinner" style="width: 12px; height: 12px; border-width: 2px;"></span>';
+            }
+
             try {
                 const res = await apiPost(`/app/${action}`, { name });
                 if (res.success) {
@@ -810,9 +832,11 @@
                     loadApps();
                 } else {
                     showToast(res.message, 'error');
+                    if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
                 }
             } catch (e) {
                 showToast(e.message, 'error');
+                if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
             }
         }
 
@@ -895,7 +919,24 @@
         }
 
         async function rollbackApp(name, versionId) {
-            if (!confirm(`Are you sure you want to rollback ${name} to version ${versionId}?`)) return;
+            const confirmed = await showConfirm(
+                `Rollback ${name}?`,
+                `This will restore version v${versionId} and restart the application.`,
+                '🚀'
+            );
+            if (!confirmed) return;
+
+            // Show loading in history modal if open
+            const historyContent = document.getElementById('versions-content');
+            const originalContent = historyContent.innerHTML;
+            historyContent.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px; gap: 20px;">
+                    <div class="loading-spinner" style="width: 40px; height: 40px; border-width: 3px;"></div>
+                    <div style="font-weight: 600; color: #4a5568;">Rolling back to v${versionId}...</div>
+                    <div style="font-size: 12px; color: #a0aec0;">The application will restart automatically.</div>
+                </div>
+            `;
+
             try {
                 const res = await apiPost('/app/rollback', { name, versionId });
                 if (res.success) {
@@ -904,14 +945,22 @@
                     loadApps();
                 } else {
                     showToast(res.message, 'error');
+                    historyContent.innerHTML = originalContent; // Restore on fail
                 }
             } catch (e) {
                 showToast(e.message, 'error');
+                historyContent.innerHTML = originalContent;
             }
         }
 
         async function deleteApp(name) {
-            if (!confirm(`Are you sure you want to delete ${name}? This action cannot be undone.`)) return;
+            const confirmed = await showConfirm(
+                `Delete ${name}?`,
+                `This action is permanent and cannot be undone. All data for ${name} will be lost.`,
+                '🗑️'
+            );
+            if (!confirmed) return;
+
             try {
                 const res = await apiPost('/app/delete', { name });
                 if (res.success) {
@@ -923,6 +972,35 @@
             } catch (e) {
                 showToast(e.message, 'error');
             }
+        }
+
+        // Custom Confirmation UI
+        function showConfirm(title, message, icon = '⚠️') {
+            return new Promise((resolve) => {
+                document.getElementById('confirm-title').textContent = title;
+                document.getElementById('confirm-message').textContent = message;
+                document.getElementById('confirm-icon').textContent = icon;
+
+                const modal = document.getElementById('confirm-modal');
+                const yesBtn = document.getElementById('confirm-yes-btn');
+
+                modal.classList.add('active');
+
+                const handleYes = () => {
+                    modal.classList.remove('active');
+                    yesBtn.removeEventListener('click', handleYes);
+                    resolve(true);
+                };
+
+                const handleCancel = () => {
+                    modal.classList.remove('active');
+                    yesBtn.removeEventListener('click', handleYes);
+                    resolve(false);
+                };
+
+                yesBtn.addEventListener('click', handleYes);
+                window.closeConfirmModal = handleCancel;
+            });
         }
 
         // Environment Variable Helpers
