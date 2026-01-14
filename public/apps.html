@@ -155,6 +155,13 @@
             background: #5a67d8;
         }
 
+        .app-actions {
+            margin-top: 24px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
         .action-btn.warning {
             color: #c05621;
         }
@@ -760,16 +767,13 @@
                     : `<button class="btn btn-primary btn-small" onclick="controlApp('${app.name}', 'start')">Start</button>`
                 }
                         <button class="btn btn-secondary btn-small" onclick="viewLogs('${app.name}')">Logs</button>
+                        <button class="btn btn-secondary btn-small" onclick="viewVersions('${app.name}')">History</button>
                         
                         <div class="dropdown">
                             <button class="dropdown-btn" onclick="toggleDropdown(this, event)">
                                 <svg viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px; color: #a0aec0;"><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle><circle cx="5" cy="12" r="2"></circle></svg>
                             </button>
                             <div class="dropdown-menu">
-                                <button class="dropdown-item" onclick="viewVersions('${app.name}')">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><path d="M12 20v-6M6 20V10M18 20V4"></path></svg>
-                                    Version History
-                                </button>
                                 <button class="dropdown-item" onclick="controlApp('${app.name}', 'restart')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px;"><path d="M23 4v6h-6M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                                     Restart App
@@ -880,7 +884,7 @@
                         <td><span class="version-badge ${statusClass}">${v.status}</span></td>
                         <td>${date}</td>
                         <td>
-                            ${!isCurrent && v.status === 'success' ? `<button class="action-btn" onclick="rollbackApp('${appName}', ${v.id})">Rollback</button>` : ''}
+                            ${!isCurrent && v.status === 'success' ? `<button class="btn btn-secondary btn-small" onclick="rollbackApp('${appName}', ${v.id})">Rollback</button>` : ''}
                         </td>
                     </tr>
                 `;
@@ -888,6 +892,22 @@
 
             html += '</tbody></table>';
             document.getElementById('versions-content').innerHTML = html;
+        }
+
+        async function rollbackApp(name, versionId) {
+            if (!confirm(`Are you sure you want to rollback ${name} to version ${versionId}?`)) return;
+            try {
+                const res = await apiPost('/app/rollback', { name, versionId });
+                if (res.success) {
+                    showToast(`${name} rolled back to v${versionId}`, 'success');
+                    closeVersionsModal();
+                    loadApps();
+                } else {
+                    showToast(res.message, 'error');
+                }
+            } catch (e) {
+                showToast(e.message, 'error');
+            }
         }
 
         async function deleteApp(name) {
