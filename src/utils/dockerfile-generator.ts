@@ -6,6 +6,50 @@
 import type { DeployConfig } from "../types";
 
 /**
+ * Normalize start command for Docker deployment.
+ * Adds --host flags for dev servers that default to localhost binding.
+ */
+function normalizeStartCommandForDocker(startCommand: string): string {
+    const cmd = startCommand.trim();
+
+    // Vite: needs --host flag
+    // Matches: vite, vite dev, vite serve, npx vite, npm run dev (when it's vite)
+    if (/\bvite\b/.test(cmd) && !cmd.includes('--host')) {
+        return cmd + ' --host';
+    }
+
+    // Next.js dev: needs -H 0.0.0.0
+    // Matches: next dev, npx next dev
+    if (/\bnext\s+dev\b/.test(cmd) && !cmd.includes('-H ') && !cmd.includes('--hostname')) {
+        return cmd + ' -H 0.0.0.0';
+    }
+
+    // Webpack Dev Server: needs --host 0.0.0.0
+    if (/\bwebpack\s+serve\b/.test(cmd) && !cmd.includes('--host')) {
+        return cmd + ' --host 0.0.0.0';
+    }
+
+    // Angular CLI (ng serve): needs --host 0.0.0.0
+    if (/\bng\s+serve\b/.test(cmd) && !cmd.includes('--host')) {
+        return cmd + ' --host 0.0.0.0';
+    }
+
+    // Nuxt dev: needs --host
+    if (/\bnuxt\s+dev\b/.test(cmd) && !cmd.includes('--host') && !cmd.includes('-H')) {
+        return cmd + ' --host';
+    }
+
+    // Astro dev: needs --host
+    if (/\bastro\s+dev\b/.test(cmd) && !cmd.includes('--host')) {
+        return cmd + ' --host';
+    }
+
+    // SvelteKit dev (vite-based, already covered by vite check above)
+
+    return cmd;
+}
+
+/**
  * Generate a Dockerfile based on the deployment config
  */
 export function generateDockerfile(config: DeployConfig): string {
@@ -54,7 +98,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
   CMD wget --spider -q http://localhost:${config.port}/health || exit 1
 
 # Start application
-CMD ${JSON.stringify(config.startCommand.split(' '))}
+CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(' '))}
 `;
 }
 
@@ -85,7 +129,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
   CMD curl -f http://localhost:${config.port}/health || exit 1
 
 # Start application
-CMD ${JSON.stringify(config.startCommand.split(' '))}
+CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(' '))}
 `;
 }
 
@@ -159,7 +203,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
   CMD wget --spider -q http://localhost:${config.port}/health || exit 1
 
 # Start application
-CMD ${JSON.stringify(config.startCommand.split(' '))}
+CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(' '))}
 `;
 }
 
@@ -187,6 +231,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
   CMD wget --spider -q http://localhost:${config.port}/health || exit 1
 
 # Start application
-CMD ${JSON.stringify(config.startCommand.split(' '))}
+CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(' '))}
 `;
 }

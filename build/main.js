@@ -16838,6 +16838,28 @@ async function detectRuntime(releasePath) {
 var init_runtime_detector = () => {};
 
 // src/utils/dockerfile-generator.ts
+function normalizeStartCommandForDocker(startCommand) {
+  const cmd = startCommand.trim();
+  if (/\bvite\b/.test(cmd) && !cmd.includes("--host")) {
+    return cmd + " --host";
+  }
+  if (/\bnext\s+dev\b/.test(cmd) && !cmd.includes("-H ") && !cmd.includes("--hostname")) {
+    return cmd + " -H 0.0.0.0";
+  }
+  if (/\bwebpack\s+serve\b/.test(cmd) && !cmd.includes("--host")) {
+    return cmd + " --host 0.0.0.0";
+  }
+  if (/\bng\s+serve\b/.test(cmd) && !cmd.includes("--host")) {
+    return cmd + " --host 0.0.0.0";
+  }
+  if (/\bnuxt\s+dev\b/.test(cmd) && !cmd.includes("--host") && !cmd.includes("-H")) {
+    return cmd + " --host";
+  }
+  if (/\bastro\s+dev\b/.test(cmd) && !cmd.includes("--host")) {
+    return cmd + " --host";
+  }
+  return cmd;
+}
 function generateDockerfile(config) {
   const runtime = config.runtime || "node";
   switch (runtime.toLowerCase()) {
@@ -16879,7 +16901,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
   CMD wget --spider -q http://localhost:${config.port}/health || exit 1
 
 # Start application
-CMD ${JSON.stringify(config.startCommand.split(" "))}
+CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(" "))}
 `;
 }
 function generatePythonDockerfile(config) {
@@ -16906,7 +16928,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
   CMD curl -f http://localhost:${config.port}/health || exit 1
 
 # Start application
-CMD ${JSON.stringify(config.startCommand.split(" "))}
+CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(" "))}
 `;
 }
 function generateGoDockerfile(config) {
@@ -16972,7 +16994,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
   CMD wget --spider -q http://localhost:${config.port}/health || exit 1
 
 # Start application
-CMD ${JSON.stringify(config.startCommand.split(" "))}
+CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(" "))}
 `;
 }
 function generateDenoDockerfile(config) {
@@ -16996,7 +17018,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
   CMD wget --spider -q http://localhost:${config.port}/health || exit 1
 
 # Start application
-CMD ${JSON.stringify(config.startCommand.split(" "))}
+CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(" "))}
 `;
 }
 
@@ -18389,6 +18411,7 @@ async function deployFromPath(options) {
     log(`Runtime: ${config.runtime}`);
   }
   task.step("deploy", "Deploying with Docker...");
+  log(`\uD83D\uDCA1 Tip: Apps must bind to 0.0.0.0 (not localhost) to be accessible. We inject HOST=0.0.0.0 automatically.`);
   const { deployWithDocker: deployWithDocker2 } = await Promise.resolve().then(() => (init_deploy_docker(), exports_deploy_docker));
   const deployResult = await deployWithDocker2(options, config);
   if (!deployResult.success) {

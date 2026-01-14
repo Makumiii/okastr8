@@ -135,6 +135,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
 
     // 3. Deploy with Docker
     task.step("deploy", "Deploying with Docker...");
+    log(`💡 Tip: Apps must bind to 0.0.0.0 (not localhost) to be accessible. We inject HOST=0.0.0.0 automatically.`);
     const { deployWithDocker } = await import("../utils/deploy-docker.ts");
     const deployResult = await deployWithDocker(options, config);
 
