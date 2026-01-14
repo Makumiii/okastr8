@@ -16,6 +16,11 @@ app.route('/api', api);
 // Serve static files
 app.use('/*', serveStatic({ root: './public' }));
 
+// SPA Fallback
+app.get('*', (c) => {
+  return new Response(Bun.file('./public/index.html'));
+});
+
 console.log('Hono server listening on port 41788');
 
 export default {

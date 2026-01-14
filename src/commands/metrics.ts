@@ -297,7 +297,15 @@ async function getCaddyMetrics(): Promise<TrafficMetrics> {
 
     try {
         // Caddy admin API serves Prometheus metrics at localhost:2019/metrics
-        const response = await fetch('http://localhost:2019/metrics');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000); // 2s timeout
+
+        // Use outer try/catch for error handling
+        const response = await fetch('http://localhost:2019/metrics', {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
         if (!response.ok) {
             return result;
         }
