@@ -316,8 +316,7 @@ export async function updateApp(appName: string, env?: Record<string, string>) {
             versionId,
             gitRepo: metadata.gitRepo,
             gitBranch: branch,
-            env: env,
-            onProgress: (msg) => console.log(msg)
+            env: env
         });
 
         if (!deployResult.success) {

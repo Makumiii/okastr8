@@ -39,19 +39,46 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
         "proxy"
     ]);
 
+    const useTaskProgress = !onProgress;
+
+    const step = (key: string, message: string) => {
+        if (useTaskProgress) {
+            task.step(key, message);
+        }
+        if (onProgress) onProgress(message);
+    };
+
     const log = (msg: string) => {
-        task.log(msg);
+        if (useTaskProgress) {
+            task.log(msg);
+        }
         if (onProgress) onProgress(msg);
+    };
+
+    const fail = (message: string) => {
+        if (useTaskProgress) {
+            task.fail(message);
+        } else if (onProgress) {
+            onProgress(message);
+        }
+    };
+
+    const success = (message: string) => {
+        if (useTaskProgress) {
+            task.success(message);
+        } else if (onProgress) {
+            onProgress(message);
+        }
     };
 
     const appDir = join(APPS_DIR, appName);
     const currentPath = join(appDir, "current");
 
-    task.step("config", "Loading application configuration...");
+    step("config", "Loading application configuration...");
     const configPath = join(releasePath, "okastr8.yaml");
 
     if (!existsSync(configPath)) {
-        task.fail(`okastr8.yaml not found at ${configPath}`);
+        fail(`okastr8.yaml not found at ${configPath}`);
         return {
             success: false,
             message: `okastr8.yaml not found at ${configPath}`,
@@ -76,7 +103,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
 
         log(`Configuration loaded`);
     } catch (error: any) {
-        task.fail(`Failed to parse okastr8.yaml: ${error.message}`);
+        fail(`Failed to parse okastr8.yaml: ${error.message}`);
         return {
             success: false,
             message: `Failed to parse okastr8.yaml: ${error.message}`,
@@ -84,7 +111,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     }
 
     if (!config.startCommand) {
-        task.fail("No start command specified in okastr8.yaml");
+        fail("No start command specified in okastr8.yaml");
         return {
             success: false,
             message: "No start command specified in okastr8.yaml",
@@ -93,7 +120,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     }
 
     if (!config.port) {
-        task.fail("No port specified in okastr8.yaml");
+        fail("No port specified in okastr8.yaml");
         return {
             success: false,
             message: "No port specified in okastr8.yaml. Port is required for health checks.",
@@ -103,10 +130,10 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
 
     // Early-stage port conflict check
     try {
-        task.step("port", `Checking port ${config.port} availability...`);
+        step("port", `Checking port ${config.port} availability...`);
         await checkPortAvailability(config.port, appName, log);
     } catch (error: any) {
-        task.fail(`Port conflict: ${error.message}`);
+        fail(`Port conflict: ${error.message}`);
         return {
             success: false,
             message: `Port conflict detected: ${error.message}`,
@@ -116,13 +143,13 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
 
     // 2. Auto-detect runtime if not specified
     if (!config.runtime) {
-        task.step("runtime", "Auto-detecting runtime...");
+        step("runtime", "Auto-detecting runtime...");
         const { detectRuntime } = await import("../utils/runtime-detector.ts");
         try {
             config.runtime = await detectRuntime(releasePath);
             log(`Detected: ${config.runtime}`);
         } catch (error: any) {
-            task.fail(error.message);
+            fail(error.message);
             return {
                 success: false,
                 message: error.message,
@@ -134,23 +161,23 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     }
 
     // 3. Deploy with Docker
-    task.step("deploy", "Deploying with Docker...");
+    step("deploy", "Deploying with Docker...");
     log(`💡 Tip: Apps must bind to 0.0.0.0 (not localhost) to be accessible. We inject HOST=0.0.0.0 automatically.`);
     const { deployWithDocker } = await import("../utils/deploy-docker.ts");
     const deployResult = await deployWithDocker(options, config);
 
     if (!deployResult.success) {
-        task.fail(deployResult.message);
+        fail(deployResult.message);
         return deployResult;
     }
 
     // 4. Update symlink to this version
-    task.step("symlink", "Switching to new version...");
+    step("symlink", "Switching to new version...");
     const { setCurrentVersion } = await import("./version.ts");
     await setCurrentVersion(appName, versionId);
 
     // 5. Update app.json with metadata
-    task.step("metadata", "Updating application metadata...");
+    step("metadata", "Updating application metadata...");
     const metadataPath = join(appDir, "app.json");
     let existingMetadata: any = {};
     try {
@@ -189,14 +216,14 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
 
     // 6. Update Caddy configuration (Reverse Proxy)
     try {
-        task.step("proxy", "Updating reverse proxy configuration...");
+        step("proxy", "Updating reverse proxy configuration...");
         const { genCaddyFile } = await import("../utils/genCaddyFile.ts");
         await genCaddyFile(log);
     } catch (e) {
         log(`Failed to update Caddy: ${e instanceof Error ? e.message : String(e)}`);
     }
 
-    task.success(`Successfully deployed ${appName} (v${versionId})`);
+    success(`Successfully deployed ${appName} (v${versionId})`);
 
     return {
         success: true,

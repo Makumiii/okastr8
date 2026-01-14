@@ -1,7 +1,9 @@
 /**
  * CLI Logger Utility
- * Handles spinners, task progress, and professional formatted output
+ * Uses ora for spinners and provides task progress tracking
  */
+
+import ora, { type Ora } from 'ora';
 
 const colors = {
     red: "\x1b[31m",
@@ -14,18 +16,17 @@ const colors = {
     dim: "\x1b[2m",
 };
 
-const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
 export class TaskProgress {
     private steps: string[];
     private currentStepKey: string | null = null;
-    private spinnerIndex = 0;
-    private spinnerInterval: any = null;
-    private lastMessage = "";
-    private isTTY = process.stdout.isTTY ?? false;
+    private spinner: Ora;
 
     constructor(steps: string[]) {
         this.steps = steps;
+        this.spinner = ora({
+            spinner: 'dots',
+            color: 'cyan',
+        });
     }
 
     private get currentStepIndex() {
@@ -34,32 +35,11 @@ export class TaskProgress {
         return index !== -1 ? index + 1 : 0;
     }
 
-    private render(message: string, isFinal = false, status: "success" | "fail" | "progress" = "progress") {
+    private formatMessage(message: string): string {
         const stepIndex = this.currentStepIndex;
         const stepTotal = this.steps.length;
         const progressPrefix = stepTotal > 0 ? `[${stepIndex}/${stepTotal}] ` : "";
-
-        let symbol = "";
-        if (isFinal) {
-            symbol = status === "success"
-                ? `${colors.green}DONE${colors.reset}`
-                : `${colors.red}FAIL${colors.reset}`;
-        } else {
-            symbol = `${colors.cyan}${frames[this.spinnerIndex]}${colors.reset}`;
-        }
-
-        const content = `${symbol} ${colors.bold}${progressPrefix}${colors.reset}${message}`;
-
-        if (this.isTTY) {
-            // TTY: Use carriage return to overwrite same line
-            process.stdout.write(`\r\x1b[2K${content}${isFinal ? "\n" : ""}`);
-        } else {
-            // Non-TTY: Only print on final or when message changes to avoid spam
-            if (isFinal || message !== this.lastMessage) {
-                console.log(content);
-            }
-        }
-        this.lastMessage = message;
+        return `${colors.bold}${progressPrefix}${colors.reset}${message}`;
     }
 
     /**
@@ -67,51 +47,34 @@ export class TaskProgress {
      */
     step(key: string, message: string) {
         this.currentStepKey = key;
-        this.lastMessage = message;
+        const formattedMessage = this.formatMessage(message);
 
-        // Only animate spinner in TTY mode
-        if (this.isTTY && !this.spinnerInterval) {
-            this.spinnerInterval = setInterval(() => {
-                this.spinnerIndex = (this.spinnerIndex + 1) % frames.length;
-                this.render(this.lastMessage);
-            }, 80);
+        if (this.spinner.isSpinning) {
+            this.spinner.text = formattedMessage;
+        } else {
+            this.spinner.start(formattedMessage);
         }
-
-        this.render(message);
     }
 
     /**
      * Update message for current step without changing step index
      */
     log(message: string) {
-        // Only render if message changed (prevents spam from repeated log calls)
-        if (message !== this.lastMessage) {
-            this.lastMessage = message;
-            this.render(message);
-        }
+        this.spinner.text = this.formatMessage(message);
     }
 
     /**
      * Finish the entire task successfully
      */
     success(message: string) {
-        this.stopSpinner();
-        this.render(message, true, "success");
+        this.spinner.succeed(this.formatMessage(message));
     }
 
     /**
      * Fail the task
      */
     fail(message: string) {
-        this.stopSpinner();
-        this.render(message, true, "fail");
-    }
-
-    private stopSpinner() {
-        if (this.spinnerInterval) {
-            clearInterval(this.spinnerInterval);
-            this.spinnerInterval = null;
-        }
+        this.spinner.fail(this.formatMessage(message));
     }
 }
 

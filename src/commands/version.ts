@@ -224,6 +224,7 @@ export async function rollback(
     onProgress?: (msg: string) => void
 ): Promise<{ success: boolean; message: string }> {
     const log = onProgress || ((msg: string) => console.log(msg));
+    const progressHandler = onProgress ? log : undefined;
 
     const data = await getVersions(appName);
     const version = data.versions.find(v => v.id === versionId);
@@ -251,7 +252,7 @@ export async function rollback(
         releasePath,
         versionId,
         gitBranch: version.branch,
-        onProgress: log,
+        onProgress: progressHandler,
     });
 
     if (result.success) {
