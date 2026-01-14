@@ -201,77 +201,6 @@
             gap: 8px;
         }
 
-        /* Environment Variables UI */
-        .env-drop-zone {
-            border: 2px dashed #d1d5db;
-            border-radius: 12px;
-            padding: 24px;
-            text-align: center;
-            background: #f9fafb;
-            transition: all 0.2s;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-
-        .env-drop-zone:hover {
-            border-color: #0366d6;
-            background: #f0f4ff;
-        }
-
-        .env-drop-zone.dragover {
-            border-color: #0366d6;
-            background: #e0e7ff;
-            box-shadow: 0 0 20px rgba(3, 102, 214, 0.2);
-        }
-
-        .env-var-item {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 8px;
-            align-items: center;
-        }
-
-        .env-var-item input {
-            flex: 1;
-            padding: 8px 12px;
-            border: 1px solid #e5e7eb;
-            border-radius: 6px;
-            font-size: 13px;
-            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
-        }
-
-        .env-var-item input:first-child {
-            flex: 0.4;
-        }
-
-        .env-var-item button {
-            padding: 6px 10px;
-            background: #fee2e2;
-            color: #dc2626;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: all 0.15s;
-        }
-
-        .env-var-item button:hover {
-            background: #fecaca;
-        }
-
-        .env-file-status {
-            margin-top: 12px;
-            padding: 10px 14px;
-            background: #dcfce7;
-            border: 1px solid #86efac;
-            border-radius: 8px;
-            font-size: 13px;
-            color: #166534;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
         .btn-link {
             background: none;
             border: none;
@@ -321,37 +250,6 @@
             border-radius: 3px;
             font-size: 13px;
         }
-
-        .deploy-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .deploy-modal.active {
-            display: flex;
-        }
-
-        .deploy-modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .deploy-modal-content h3 {
-            margin-top: 0;
-        }
     </style>
 </head>
 
@@ -375,8 +273,6 @@
             </div>
             <span id="auth-status" class="auth-status">Checking...</span>
         </header>
-
-
 
         <!-- GitHub Connection Status -->
         <div class="github-header">
@@ -466,175 +362,9 @@ manager:
         <div id="github-results" class="results-display"></div>
     </div>
 
-    <!-- Deploy Modal -->
-    <div id="deploy-modal" class="deploy-modal">
-        <div class="deploy-modal-content">
-            <h3>🚀 Deploy Repository</h3>
-            <div id="deploy-app-name-display"
-                style="background: #f6f8fa; padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 14px; color: #24292e;">
-                <strong>App Name:</strong> <code id="deploy-app-name-text"
-                    style="background: #e1e4e8; padding: 2px 6px; border-radius: 3px;"></code>
-            </div>
-            <form id="deploy-form">
-                <input type="hidden" id="deploy-repo-name" name="repoFullName">
-
-                <label>Branch</label>
-                <select id="deploy-branch" name="branch"
-                    style="width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 6px; border: 1px solid #ccc;">
-                    <option>Loading...</option>
-                </select>
-
-                <div
-                    style="background: #f6f8fa; padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; color: #586069;">
-                    <strong>ℹ️ Configuration Required</strong><br>
-                    Your repository must have an <code>okastr8.yaml</code> file in the root defining:
-                    runtime, build steps, start command, port, etc.
-                </div>
-
-                <label style="display:flex; align-items:center; gap:8px; margin-top:10px;">
-                    <input type="checkbox" id="deploy-webhook" name="setupWebhook" checked>
-                    Enable Auto-Deploy (Webhook)
-                </label>
-
-                <!-- Environment Variables Section -->
-                <div style="border-top: 1px solid #e1e4e8; padding-top: 15px; margin-top: 20px;">
-                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-weight: 600;">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            style="width: 18px; height: 18px;">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                        </svg>
-                        Environment Variables
-                    </label>
-
-                    <div id="env-drop-zone" class="env-drop-zone">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            style="width: 24px; height: 24px; margin-bottom: 8px; color: #586069;">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="17 8 12 3 7 8"></polyline>
-                            <line x1="12" y1="3" x2="12" y2="15"></line>
-                        </svg>
-                        <div style="font-size: 13px;">
-                            <strong>Drop .env file here</strong> or
-                            <label for="env-file-input"
-                                style="color: #0366d6; cursor: pointer; text-decoration: underline;">browse</label>
-                        </div>
-                        <input type="file" id="env-file-input" accept=".env,.txt" style="display: none;">
-                    </div>
-
-                    <div style="margin-top: 12px;">
-                        <div
-                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                            <span style="font-size: 12px; color: #586069;">Manual Entry:</span>
-                            <button type="button" class="btn-link" onclick="addEnvVar()">+ Add Variable</button>
-                        </div>
-                        <div id="env-vars-list">
-                            <!-- Env var items will be added here -->
-                        </div>
-                    </div>
-                </div>
-
-                <div style="margin-top: 15px; display: flex; gap: 10px;">
-                    <button type="submit" class="btn btn-primary">🚀 Deploy</button>
-                    <button type="button" id="cancel-deploy" class="btn btn-cancel">Cancel</button>
-                </div>
-            </form>
-            <div id="deploy-result" style="margin-top: 15px;"></div>
-        </div>
-    </div>
-
     <script src="js/common.js"></script>
     <script>
         let allRepos = [];
-        let envVariables = {};
-
-        // Environment Variable Helpers
-        function addEnvVar(key = '', value = '') {
-            const list = document.getElementById('env-vars-list');
-            const id = 'env-' + Math.random().toString(36).substr(2, 9);
-
-            const div = document.createElement('div');
-            div.className = 'env-var-item';
-            div.id = id;
-            div.innerHTML = `
-                <input type="text" placeholder="KEY" value="${key}" class="env-key" oninput="updateEnvVar('${id}')">
-                <input type="text" placeholder="VALUE" value="${value}" class="env-value" oninput="updateEnvVar('${id}')">
-                <button type="button" onclick="removeEnvVar('${id}')">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                </button>
-            `;
-            list.appendChild(div);
-            updateEnvVar(id);
-        }
-
-        function removeEnvVar(id) {
-            const el = document.getElementById(id);
-            const key = el.querySelector('.env-key').value;
-            if (key) delete envVariables[key];
-            el.remove();
-        }
-
-        function updateEnvVar(id) {
-            const el = document.getElementById(id);
-            const key = el.querySelector('.env-key').value.trim();
-            const value = el.querySelector('.env-value').value.trim();
-
-            if (key) {
-                envVariables[key] = value;
-            }
-        }
-
-        function renderEnvVars() {
-            const list = document.getElementById('env-vars-list');
-            list.innerHTML = '';
-            Object.entries(envVariables).forEach(([key, value]) => {
-                addEnvVar(key, value);
-            });
-        }
-
-        function parseEnvFile(content) {
-            const vars = {};
-            const lines = content.split('\n');
-            lines.forEach(line => {
-                line = line.trim();
-                if (!line || line.startsWith('#')) return;
-
-                const parts = line.split('=');
-                if (parts.length >= 2) {
-                    const key = parts[0].trim();
-                    const value = parts.slice(1).join('=').trim();
-                    // Remove quotes if present
-                    const cleanValue = value.replace(/^["'](.*)["']$/, '$1');
-                    vars[key] = cleanValue;
-                }
-            });
-            return vars;
-        }
-
-        async function handleEnvFile(file) {
-            const text = await file.text();
-            const vars = parseEnvFile(text);
-            envVariables = { ...envVariables, ...vars };
-            renderEnvVars();
-
-            const dropZone = document.getElementById('env-drop-zone');
-            const originalContent = dropZone.innerHTML;
-            dropZone.innerHTML = `
-                <div class="env-file-status">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
-                        <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                    Loaded ${Object.keys(vars).length} variables from ${file.name}
-                </div>
-            `;
-            setTimeout(() => {
-                dropZone.innerHTML = originalContent;
-                // Re-attach listener if needed, but since we use onclick/onchange in HTML it's fine
-            }, 3000);
-        }
 
         document.addEventListener('DOMContentLoaded', async () => {
             const result = createResultDisplay('github-results');
@@ -655,35 +385,6 @@ manager:
             document.getElementById('callback-url').textContent = `http://${host}/api/github/callback`;
 
             await checkConnectionStatus();
-
-            // Set up environment variable drag and drop
-            const dropZone = document.getElementById('env-drop-zone');
-            const fileInput = document.getElementById('env-file-input');
-
-            if (dropZone && fileInput) {
-                dropZone.onclick = () => fileInput.click();
-
-                fileInput.onchange = (e) => {
-                    if (e.target.files.length) handleEnvFile(e.target.files[0]);
-                };
-
-                dropZone.ondragover = (e) => {
-                    e.preventDefault();
-                    dropZone.classList.add('dragover');
-                };
-
-                dropZone.ondragleave = () => {
-                    dropZone.classList.remove('dragover');
-                };
-
-                dropZone.ondrop = (e) => {
-                    e.preventDefault();
-                    dropZone.classList.remove('dragover');
-                    if (e.dataTransfer.files.length) {
-                        handleEnvFile(e.dataTransfer.files[0]);
-                    }
-                };
-            }
         });
 
         async function checkConnectionStatus() {
@@ -699,12 +400,10 @@ manager:
                 const status = statusRes.data;
 
                 if (status.connected) {
-                    // Update status indicator to connected (green glow)
                     statusIndicator.className = 'status-indicator connected';
                     statusDot.className = 'status-dot connected';
                     statusText.textContent = 'Connected';
 
-                    // Update button to disconnect mode
                     connectionBtn.className = 'connect-btn disconnect';
                     connectionBtnText.textContent = 'Disconnect';
 
@@ -714,19 +413,16 @@ manager:
 
                     await loadRepos();
                 } else {
-                    // Update status indicator to disconnected (red glow)
                     statusIndicator.className = 'status-indicator disconnected';
                     statusDot.className = 'status-dot disconnected';
                     statusText.textContent = 'Disconnected';
 
-                    // Update button to connect mode
                     connectionBtn.className = 'connect-btn connect';
                     connectionBtnText.textContent = 'Connect';
 
                     document.getElementById('github-user').textContent = '';
                     document.getElementById('repos-section').style.display = 'none';
 
-                    // Check if OAuth is configured
                     const authUrlRes = await apiGet('/github/auth-url');
                     if (!authUrlRes.success) {
                         document.getElementById('setup-section').style.display = 'block';
@@ -744,13 +440,11 @@ manager:
             }
         }
 
-        // Unified connection action handler
         async function handleConnectionAction() {
             const connectionBtn = document.getElementById('connection-btn');
             const isConnected = connectionBtn.classList.contains('disconnect');
 
             if (isConnected) {
-                // Disconnect
                 if (confirm('Disconnect from GitHub?')) {
                     try {
                         await apiPost('/github/disconnect', {});
@@ -760,7 +454,6 @@ manager:
                     }
                 }
             } else {
-                // Connect - redirect to OAuth
                 try {
                     const res = await apiGet('/github/auth-url');
                     if (res.success && res.data.authUrl) {
@@ -818,7 +511,7 @@ manager:
                         <span>Updated ${formatDate(repo.pushed_at)}</span>
                     </div>
                     <div class="repo-actions">
-                        <button type="button" class="btn btn-primary btn-small" onclick="openDeployModal('${repo.full_name}', '${repo.name}', '${repo.default_branch || 'main'}')">
+                        <button type="button" class="btn btn-primary btn-small" onclick="window.location.href='github-deploy.html?repo=${repo.full_name}&branch=${repo.default_branch || 'main'}'">
                             🚀 Deploy
                         </button>
                         <a href="${repo.html_url}" target="_blank" class="btn btn-secondary btn-small">View on GitHub</a>
@@ -836,22 +529,9 @@ manager:
 
         function getLanguageColor(language) {
             const colors = {
-                JavaScript: '#f1e05a',
-                TypeScript: '#3178c6',
-                Python: '#3572A5',
-                Go: '#00ADD8',
-                Rust: '#dea584',
-                Java: '#b07219',
-                Ruby: '#701516',
-                PHP: '#4F5D95',
-                C: '#555555',
-                'C++': '#f34b7d',
-                'C#': '#178600',
-                Swift: '#ffac45',
-                Kotlin: '#A97BFF',
-                Shell: '#89e051',
-                HTML: '#e34c26',
-                CSS: '#563d7c',
+                JavaScript: '#f1e05a', TypeScript: '#3178c6', Python: '#3572A5', Go: '#00ADD8', Rust: '#dea584', Java: '#b07219',
+                Ruby: '#701516', PHP: '#4F5D95', C: '#555555', 'C++': '#f34b7d', 'C#': '#178600', Swift: '#ffac45', Kotlin: '#A97BFF',
+                Shell: '#89e051', HTML: '#e34c26', CSS: '#563d7c',
             };
             return colors[language] || '#8b8b8b';
         }
@@ -861,7 +541,6 @@ manager:
             const now = new Date();
             const diffMs = now - date;
             const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
             if (diffDays === 0) return 'today';
             if (diffDays === 1) return 'yesterday';
             if (diffDays < 7) return `${diffDays} days ago`;
@@ -870,18 +549,14 @@ manager:
             return `${Math.floor(diffDays / 365)} years ago`;
         }
 
-        // Search and filter
         document.getElementById('search-repos').addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase();
             const langFilter = document.getElementById('filter-lang').value;
-
             const filtered = allRepos.filter(repo => {
-                const matchesQuery = repo.name.toLowerCase().includes(query) ||
-                    (repo.description && repo.description.toLowerCase().includes(query));
+                const matchesQuery = repo.name.toLowerCase().includes(query) || (repo.description && repo.description.toLowerCase().includes(query));
                 const matchesLang = !langFilter || repo.language === langFilter;
                 return matchesQuery && matchesLang;
             });
-
             renderRepos(filtered);
         });
 
@@ -890,193 +565,6 @@ manager:
         });
 
         document.getElementById('refresh-repos').addEventListener('click', loadRepos);
-
-
-
-        // Deploy modal
-        async function openDeployModal(repoFullName, repoName, defaultBranch) {
-            document.getElementById('deploy-repo-name').value = repoFullName;
-
-            // Reset environment variables
-            envVariables = {};
-            document.getElementById('env-vars-list').innerHTML = '';
-            const status = document.querySelector('.env-file-status');
-            if (status) status.remove();
-
-            // Set app name display
-            const appName = repoName.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
-            document.getElementById('deploy-app-name-text').textContent = appName;
-
-            const branchSelect = document.getElementById('deploy-branch');
-            branchSelect.innerHTML = '<option>Loading...</option>';
-            document.getElementById('deploy-result').innerHTML = '';
-            document.getElementById('deploy-modal').classList.add('active');
-
-            // Load Branches
-            try {
-                const res = await apiPost('/github/branches', { repoFullName });
-                if (res.success && res.data.branches?.length) {
-                    branchSelect.innerHTML = res.data.branches.map(b =>
-                        `<option value="${b}" ${b === defaultBranch ? 'selected' : ''}>${b}</option>`
-                    ).join('');
-                } else {
-                    branchSelect.innerHTML = `<option value="${defaultBranch}">${defaultBranch}</option>`;
-                }
-            } catch (e) {
-                console.error("Failed to load branches", e);
-                branchSelect.innerHTML = `<option value="${defaultBranch}">${defaultBranch}</option>`;
-            }
-
-            // Trigger Config Check
-            checkConfiguration(repoFullName, branchSelect.value);
-
-            // Add listener for branch change
-            branchSelect.onchange = () => checkConfiguration(repoFullName, branchSelect.value);
-        }
-
-        async function checkConfiguration(repoFullName, branch) {
-            const statusDiv = document.getElementById('config-check-status');
-            const manualSection = document.getElementById('manual-config-section');
-
-            statusDiv.style.display = 'block';
-            statusDiv.innerHTML = '⏳ Checking for configuration...';
-            statusDiv.style.background = '#f6f8fa';
-            statusDiv.style.color = '#586069';
-
-            try {
-                const res = await apiPost('/github/check-config', { repoFullName, ref: branch });
-                if (res.success && res.data.hasConfig) {
-                    statusDiv.innerHTML = '✅ <strong>okastr8.yaml found!</strong> Using configuration from repository.';
-                    statusDiv.style.background = '#dcffe4';
-                    statusDiv.style.color = '#155225';
-                    manualSection.style.display = 'none';
-                } else {
-                    statusDiv.innerHTML = '⚠️ <strong>No config found.</strong> Please configure manually below:';
-                    statusDiv.style.background = '#fff5b1';
-                    statusDiv.style.color = '#735c0f';
-                    manualSection.style.display = 'block';
-                }
-            } catch (e) {
-                statusDiv.innerHTML = '⚠️ Could not check config status.';
-                manualSection.style.display = 'block';
-            }
-        }
-
-
-        document.getElementById('cancel-deploy').addEventListener('click', () => {
-            document.getElementById('deploy-modal').classList.remove('active');
-        });
-
-        document.getElementById('deploy-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const resultEl = document.getElementById('deploy-result');
-            const formData = new FormData(e.target);
-            const repoFullName = formData.get('repoFullName');
-            const branch = formData.get('branch') || undefined;
-
-            // Check for branch change before deploying
-            try {
-                const branchCheck = await apiPost('/github/check-branch-change', {
-                    repoFullName,
-                    branch
-                });
-
-                if (branchCheck.success && branchCheck.data?.branchChanged) {
-                    // Show warning and get confirmation
-                    const confirmed = confirm(
-                        `⚠️ Branch Change Warning!\n\n` +
-                        `Current branch: ${branchCheck.data.currentBranch}\n` +
-                        `New branch: ${branchCheck.data.requestedBranch}\n\n` +
-                        `${branchCheck.data.warning}\n\n` +
-                        `Do you want to continue?`
-                    );
-
-                    if (!confirmed) {
-                        resultEl.innerHTML = `<div class="result-status result-warning"><span class="result-icon">⚠️</span><span class="result-message">Deployment cancelled - branch change not confirmed</span></div>`;
-                        return;
-                    }
-                }
-            } catch (err) {
-                console.warn('Branch check failed, proceeding anyway:', err);
-            }
-
-            // Create logs container
-            resultEl.innerHTML = `
-                <div class="deployment-logs-container" style="max-height: 400px; overflow-y: auto; background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 6px; font-family: 'Consolas', monospace; font-size: 13px; line-height: 1.6;">
-                    <div class="deployment-logs"></div>
-                </div>
-            `;
-            const logsContainer = resultEl.querySelector('.deployment-logs');
-
-            try {
-                // Start deployment - config comes from okastr8.yaml
-                const res = await apiPost('/github/import', {
-                    repoFullName,
-                    branch,
-                    setupWebhook: document.getElementById('deploy-webhook').checked,
-                    env: envVariables
-                });
-
-                if (!res.success || !res.data?.deploymentId) {
-                    resultEl.innerHTML = `<div class="result-status result-error"><span class="result-icon">❌</span><span class="result-message">${res.message || 'Deployment failed to start'}</span></div>`;
-                    return;
-                }
-
-                const deploymentId = res.data.deploymentId;
-                logsContainer.innerHTML += `<div style="color: #4ec9b0;">🚀 Connecting to deployment stream...</div>`;
-
-                // Connect to SSE stream
-                const eventSource = new EventSource(`/api/github/deploy-stream/${deploymentId}`);
-                let deploymentSucceeded = null;
-
-                eventSource.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-
-                        if (data.type === 'connected') {
-                            logsContainer.innerHTML += `<div style="color: #4ec9b0;">✓ Connected to deployment stream</div>`;
-                        } else if (data.type === 'log') {
-                            const logLine = escapeHtml(data.message);
-                            // Color code based on content
-                            let color = '#d4d4d4';
-                            if (logLine.includes('✅') || logLine.includes('successfully')) color = '#4ec9b0';
-                            if (logLine.includes('❌') || logLine.includes('failed')) color = '#f48771';
-                            if (logLine.includes('⚠️') || logLine.includes('warning')) color = '#dcdcaa';
-
-                            logsContainer.innerHTML += `<div style="color: ${color};">${logLine}</div>`;
-                            logsContainer.parentElement.scrollTop = logsContainer.parentElement.scrollHeight;
-
-                            // Capture success/failure
-                            if (logLine.includes('Deployment succeeded')) deploymentSucceeded = true;
-                            if (logLine.includes('Deployment failed')) deploymentSucceeded = false;
-                        } else if (data.type === 'end') {
-                            eventSource.close();
-                            logsContainer.innerHTML += `<div style="color: #4ec9b0; margin-top: 10px;">━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>`;
-                            logsContainer.innerHTML += `<div style="color: ${deploymentSucceeded ? '#4ec9b0' : '#f48771'}; font-weight: bold; margin-top: 5px;">${deploymentSucceeded ? '✅ Deployment Complete!' : '❌ Deployment Failed'}</div>`;
-
-                            if (deploymentSucceeded) {
-                                setTimeout(() => {
-                                    document.getElementById('deploy-modal').classList.remove('active');
-                                    window.location.href = 'apps.html';
-                                }, 2000);
-                            }
-                        }
-                    } catch (err) {
-                        console.error('Error parsing SSE message:', err);
-                    }
-                };
-
-                eventSource.onerror = (error) => {
-                    console.error('SSE Error:', error);
-                    eventSource.close();
-                    logsContainer.innerHTML += `<div style="color: #f48771; margin-top: 10px;">⚠️ Connection lost. Deployment may still be running in background.</div>`;
-                };
-
-            } catch (e) {
-                resultEl.innerHTML = `<div class="result-status result-error"><span class="result-icon">❌</span><span class="result-message">${e.message}</span></div>`;
-            }
-        });
     </script>
 </body>
 

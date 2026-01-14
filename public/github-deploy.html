@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deploy Repository - okastr8</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .deploy-container {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 32px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+        }
+
+        .deploy-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid #edf2f7;
+        }
+
+        .repo-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .repo-icon {
+            width: 40px;
+            height: 40px;
+            background: #f7fafc;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #667eea;
+        }
+
+        .repo-name-large {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1a202c;
+        }
+
+        .deploy-form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+        }
+
+        /* Form Styling */
+        .form-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .config-status {
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .config-status.checking {
+            background: #f7fafc;
+            color: #4a5568;
+        }
+
+        .config-status.success {
+            background: #f0fff4;
+            color: #2f855a;
+            border: 1px solid #c6f6d5;
+        }
+
+        .config-status.warning {
+            background: #fffaf0;
+            color: #9c4221;
+            border: 1px solid #feebc8;
+        }
+
+        /* Env Var Styling Sync */
+        .env-section {
+            background: #f8fafc;
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid #edf2f7;
+        }
+
+        .env-drop-zone {
+            border: 2px dashed #cbd5e0;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            background: white;
+            transition: all 0.2s;
+            cursor: pointer;
+            margin-bottom: 16px;
+        }
+
+        .env-drop-zone:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .env-drop-zone.dragover {
+            border-color: #667eea;
+            background: #ebf4ff;
+            transform: scale(1.02);
+        }
+
+        .env-var-item {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+            background: white;
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid #edf2f7;
+        }
+
+        .env-var-item input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid transparent;
+            font-size: 13px;
+            font-family: 'DM Mono', monospace;
+            background: transparent;
+        }
+
+        .env-var-item input:first-child {
+            flex: 0.4;
+            font-weight: 600;
+        }
+
+        .env-var-item input:focus {
+            background: #f7fafc;
+            outline: none;
+        }
+
+        .env-var-remove {
+            padding: 6px;
+            color: #a0aec0;
+            background: none;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .env-var-remove:hover {
+            color: #e53e3e;
+            background: #fff5f5;
+        }
+
+        /* Log Streaming */
+        .logs-panel {
+            background: #1a202c;
+            border-radius: 12px;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-height: 500px;
+            box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.2);
+            position: relative;
+        }
+
+        .logs-header {
+            padding: 12px 20px;
+            background: #2d3748;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logs-title {
+            color: #a0aec0;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .logs-content {
+            flex: 1;
+            padding: 20px;
+            font-family: 'DM Mono', monospace;
+            font-size: 13px;
+            color: #e2e8f0;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+
+        .deployment-complete-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(26, 32, 44, 0.8);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 10;
+            border-radius: 12px;
+        }
+
+        .deployment-complete-overlay.active {
+            display: flex;
+        }
+
+        .success-checkmark {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: #38b2ac;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes bounceIn {
+            from {
+                transform: scale(0);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="header-group">
+                <a href="github.html" class="back-arrow">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7"></path>
+                    </svg>
+                </a>
+                <h1>Launch Application</h1>
+            </div>
+        </header>
+
+        <div class="deploy-container">
+            <div class="deploy-header">
+                <div class="repo-info">
+                    <div class="repo-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            style="width: 24px; height: 24px;">
+                            <path
+                                d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22">
+                            </path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="repo-name-large" id="repo-title">Loading...</div>
+                        <div style="font-size: 14px; color: #718096; margin-top: 4px;">Deploying to <span
+                                id="app-name-badge"
+                                style="background: #edf2f7; padding: 2px 8px; border-radius: 4px; font-family: monospace; color: #4a5568;">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="deploy-form-grid">
+                <!-- Left: Configuration -->
+                <div class="form-section">
+                    <div id="config-status" class="config-status checking">
+                        <span class="loading-spinner"></span> Checking repository for okastr8.yaml...
+                    </div>
+
+                    <form id="deploy-form">
+                        <div class="form-group">
+                            <label>Deployment Branch</label>
+                            <select id="branch-select" name="branch" class="form-control"
+                                style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                                <option>Loading branches...</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" style="margin-top: 10px;">
+                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                <input type="checkbox" id="webhook-toggle" checked style="width: 18px; height: 18px;">
+                                <div>
+                                    <div style="font-weight: 600;">Enable Auto-Deploy</div>
+                                    <div style="font-size: 12px; color: #718096;">Deploy automatically on every git push
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div class="env-section">
+                            <label
+                                style="display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-weight: 600;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    style="width: 18px; height: 18px;">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                                Configuration Variables
+                            </label>
+
+                            <div id="env-drop-zone" class="env-drop-zone">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    style="width: 32px; height: 32px; margin-bottom: 8px; color: #cbd5e0;">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                                <div style="font-size: 13px;">Drop <strong>.env</strong> file or <span
+                                        style="color: #667eea; text-decoration: underline;">browse</span></div>
+                                <input type="file" id="env-file-input" accept=".env,.txt" style="display: none;">
+                            </div>
+
+                            <div id="env-list"></div>
+
+                            <button type="button" class="btn btn-secondary" onclick="addManualEnv()"
+                                style="width: 100%; margin-top: 12px; border-style: dashed; font-size: 13px;">
+                                + Add Manual Variable
+                            </button>
+                        </div>
+
+                        <button type="submit" id="deploy-btn" class="btn btn-primary"
+                            style="width: 100%; padding: 16px; font-size: 16px; margin-top: 12px;">
+                            🚀 Trigger Deployment
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Right: Live Logs -->
+                <div class="logs-panel">
+                    <div class="logs-header">
+                        <div class="logs-title">Deployment Output</div>
+                        <div id="deployment-status-tag" style="font-size: 11px; font-weight: 700; color: #718096;">IDLE
+                        </div>
+                    </div>
+                    <div id="logs-view" class="logs-content">Waiting for deployment to start...</div>
+
+                    <!-- Completion Overlay -->
+                    <div id="success-overlay" class="deployment-complete-overlay">
+                        <div class="success-checkmark">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+                                style="width: 32px; height: 32px;">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </div>
+                        <h2 style="color: white; margin-bottom: 8px;">Success!</h2>
+                        <p style="color: #a0aec0; margin-bottom: 24px;">Your app is now live.</p>
+                        <button class="btn btn-primary" onclick="window.location.href='apps.html'">View
+                            Dashboard</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="deploy-results-toast" class="results-display"></div>
+    </div>
+
+    <script src="js/common.js"></script>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const repoFullName = params.get('repo');
+        const defaultBranch = params.get('branch') || 'main';
+        let envVars = {};
+
+        if (!repoFullName) {
+            window.location.href = 'github.html';
+        }
+
+        document.getElementById('repo-title').textContent = repoFullName;
+        const appName = repoFullName.split('/')[1].toLowerCase().replace(/[^a-z0-9-]/g, '-');
+        document.getElementById('app-name-badge').textContent = appName;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 1. Load Branches
+            const branchSelect = document.getElementById('branch-select');
+            try {
+                const res = await apiPost('/github/branches', { repoFullName });
+                if (res.success && res.data.branches?.length) {
+                    branchSelect.innerHTML = res.data.branches.map(b =>
+                        `<option value="${b}" ${b === defaultBranch ? 'selected' : ''}>${b}</option>`
+                    ).join('');
+                } else {
+                    branchSelect.innerHTML = `<option value="${defaultBranch}">${defaultBranch}</option>`;
+                }
+            } catch (e) {
+                branchSelect.innerHTML = `<option value="${defaultBranch}">${defaultBranch}</option>`;
+            }
+
+            // 2. Initial Config Check
+            checkConfig(repoFullName, branchSelect.value);
+
+            // 3. Listen for branch changes
+            branchSelect.onchange = () => checkConfig(repoFullName, branchSelect.value);
+
+            // 4. Setup Env Handlers
+            const dropZone = document.getElementById('env-drop-zone');
+            const fileInput = document.getElementById('env-file-input');
+
+            dropZone.onclick = () => fileInput.click();
+            fileInput.onchange = (e) => {
+                if (e.target.files.length) handleEnvFile(e.target.files[0]);
+            };
+            dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('dragover'); };
+            dropZone.ondragleave = () => dropZone.classList.remove('dragover');
+            dropZone.ondrop = (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                if (e.dataTransfer.files.length) handleEnvFile(e.dataTransfer.files[0]);
+            };
+
+            // 5. Deployment Form
+            document.getElementById('deploy-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                startDeployment();
+            });
+        });
+
+        async function checkConfig(repo, branch) {
+            const statusDiv = document.getElementById('config-status');
+            statusDiv.className = 'config-status checking';
+            statusDiv.innerHTML = '<span class="loading-spinner"></span> Validating configuration in ' + branch + '...';
+
+            try {
+                const res = await apiPost('/github/check-config', { repoFullName: repo, ref: branch });
+                if (res.success && res.data.hasConfig) {
+                    statusDiv.className = 'config-status success';
+                    statusDiv.innerHTML = '✅ <strong>okastr8.yaml confirmed</strong>. Deployment system ready.';
+                } else {
+                    statusDiv.className = 'config-status warning';
+                    statusDiv.innerHTML = '⚠️ <strong>No okastr8.yaml found</strong> in this branch. Deployment will likely fail unless added.';
+                }
+            } catch (e) {
+                statusDiv.className = 'config-status warning';
+                statusDiv.innerHTML = '⚠️ Could not verify repository configuration.';
+            }
+        }
+
+        function addManualEnv(key = '', value = '') {
+            const list = document.getElementById('env-list');
+            const id = 'env-' + Math.random().toString(36).substr(2, 9);
+            const div = document.createElement('div');
+            div.className = 'env-var-item';
+            div.id = id;
+            div.innerHTML = `
+                <input type="text" placeholder="KEY" value="${key}" onchange="updateEnvData()">
+                <input type="text" placeholder="VALUE" value="${value}" onchange="updateEnvData()">
+                <button type="button" class="env-var-remove" onclick="document.getElementById('${id}').remove(); updateEnvData()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                </button>
+            `;
+            list.appendChild(div);
+        }
+
+        async function handleEnvFile(file) {
+            const text = await file.text();
+            const lines = text.split('\n');
+            let count = 0;
+            lines.forEach(line => {
+                line = line.trim();
+                if (!line || line.startsWith('#')) return;
+                const eq = line.indexOf('=');
+                if (eq > 0) {
+                    const k = line.substring(0, eq).trim();
+                    const v = line.substring(eq + 1).trim().replace(/^["'](.*)["']$/, '$1');
+                    addManualEnv(k, v);
+                    count++;
+                }
+            });
+            showToast(`Imported ${count} variables from ${file.name}`, 'success');
+        }
+
+        function updateEnvData() {
+            const data = {};
+            document.querySelectorAll('.env-var-item').forEach(item => {
+                const inputs = item.querySelectorAll('input');
+                const k = inputs[0].value.trim();
+                const v = inputs[1].value.trim();
+                if (k) data[k] = v;
+            });
+            envVars = data;
+        }
+
+        async function startDeployment() {
+            updateEnvData();
+            const btn = document.getElementById('deploy-btn');
+            const logs = document.getElementById('logs-view');
+            const statusTag = document.getElementById('deployment-status-tag');
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading-spinner"></span> Initializing...';
+            logs.innerHTML = '<div style="color: #4ec9b0;">🚀 Starting deployment sequence...</div>';
+            statusTag.textContent = 'RUNNING';
+            statusTag.style.color = '#4ec9b0';
+
+            try {
+                const res = await apiPost('/github/import', {
+                    repoFullName,
+                    branch: document.getElementById('branch-select').value,
+                    setupWebhook: document.getElementById('webhook-toggle').checked,
+                    env: envVars
+                });
+
+                if (!res.success || !res.data?.deploymentId) {
+                    logs.innerHTML += `<div style="color: #f48771; margin-top: 10px;">❌ Error: ${res.message || 'Failed to start'}</div>`;
+                    btn.disabled = false;
+                    btn.innerHTML = '🚀 Retry Deployment';
+                    statusTag.textContent = 'FAILED';
+                    statusTag.style.color = '#f48771';
+                    return;
+                }
+
+                const deploymentId = res.data.deploymentId;
+                const es = new EventSource(`/api/github/deploy-stream/${deploymentId}`);
+                let succeeded = null;
+
+                es.onmessage = (e) => {
+                    const data = JSON.parse(e.data);
+                    if (data.type === 'log') {
+                        const msg = data.message;
+                        let color = '#e2e8f0';
+                        if (msg.includes('✅') || msg.includes('successfully')) color = '#4ec9b0';
+                        if (msg.includes('❌') || msg.includes('failed')) color = '#f48771';
+                        if (msg.includes('⚠️') || msg.includes('warning')) color = '#dcdcaa';
+
+                        logs.innerHTML += `<div style="color: ${color}">${escapeHtml(msg)}</div>`;
+                        logs.scrollTop = logs.scrollHeight;
+
+                        if (msg.includes('Deployment succeeded')) succeeded = true;
+                        if (msg.includes('Deployment failed')) succeeded = false;
+                    } else if (data.type === 'end') {
+                        es.close();
+                        if (succeeded) {
+                            statusTag.textContent = 'SUCCESS';
+                            document.getElementById('success-overlay').classList.add('active');
+                        } else {
+                            statusTag.textContent = 'FAILED';
+                            btn.disabled = false;
+                            btn.innerHTML = '🚀 Retry Deployment';
+                        }
+                    }
+                };
+
+                es.onerror = () => {
+                    es.close();
+                    logs.innerHTML += `<div style="color: #f48771; margin-top: 10px;">⚠️ Connection lost. Deployment may still be running in background.</div>`;
+                    btn.disabled = false;
+                    btn.innerHTML = '🚀 Reconnect/Retry';
+                };
+
+            } catch (err) {
+                logs.innerHTML += `<div style="color: #f48771; margin-top: 10px;">❌ Fatal Error: ${err.message}</div>`;
+                btn.disabled = false;
+            }
+        }
+
+        function showToast(msg, type) {
+            const res = createResultDisplay('deploy-results-toast');
+            if (type === 'success') res.showSuccess(msg);
+            else res.showError(msg);
+            setTimeout(() => res.clear(), 3000);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+
+</html>
