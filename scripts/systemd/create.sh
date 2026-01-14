@@ -8,8 +8,10 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-# Skip service creation if systemd is not running (common in containers).
-if ! systemctl is-system-running --quiet 2>/dev/null; then
+# Skip service creation if systemd is not the init system (common in containers).
+# We check for /run/systemd/system which exists when systemd is PID 1.
+# This is more reliable than `systemctl is-system-running` which can fail on "degraded" systems.
+if [ ! -d /run/systemd/system ]; then
   echo "Warning: systemd not running; skipping service creation." >&2
   exit 2
 fi

@@ -373,18 +373,13 @@ if [ "$SYSTEMD_AVAILABLE" = "false" ]; then
   info "Systemd not available (container environment?); skipping service creation."
   info "You can run okastr8 manually with: $BUN_PATH run $INSTALL_DIR/src/managerServer.ts"
 else
-  # Temporarily disable exit-on-error to capture the exit code
-  set +e
-  sudo "$CREATE_SCRIPT_PATH" "$MANAGER_SERVICE_NAME" "$MANAGER_SERVICE_DESCRIPTION" "$MANAGER_EXEC_START" "$SERVICE_WORKING_DIR" "$CURRENT_USER" "multi-user.target" "true"
-  status=$?
-  set -e
-
-  if [ "$status" -eq 0 ]; then
+  # Run create script - capture output and status, never let it crash the installer
+  if sudo "$CREATE_SCRIPT_PATH" "$MANAGER_SERVICE_NAME" "$MANAGER_SERVICE_DESCRIPTION" "$MANAGER_EXEC_START" "$SERVICE_WORKING_DIR" "$CURRENT_USER" "multi-user.target" "true" 2>&1; then
     info "Systemd service '$MANAGER_SERVICE_NAME' created and enabled."
-  elif [ "$status" -eq 2 ]; then
-    info "Systemd not running; skipping service creation. You can run okastr8 manually."
   else
-    info "Warning: Could not create systemd service (exit code: $status). You can run okastr8 manually."
+    # Service creation failed, but don't crash the installer
+    info "Note: Systemd service could not be created. You can run okastr8 manually with:"
+    info "  $BUN_PATH run $INSTALL_DIR/src/managerServer.ts"
   fi
 fi
 
