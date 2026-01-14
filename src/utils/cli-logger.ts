@@ -22,6 +22,7 @@ export class TaskProgress {
     private spinnerIndex = 0;
     private spinnerInterval: any = null;
     private lastMessage = "";
+    private isTTY = process.stdout.isTTY ?? false;
 
     constructor(steps: string[]) {
         this.steps = steps;
@@ -47,11 +48,17 @@ export class TaskProgress {
             symbol = `${colors.cyan}${frames[this.spinnerIndex]}${colors.reset}`;
         }
 
-        const line = `\r${symbol} ${colors.bold}${progressPrefix}${colors.reset}${message}`;
+        const content = `${symbol} ${colors.bold}${progressPrefix}${colors.reset}${message}`;
 
-        // Clear line and write
-        process.stdout.write("\x1b[2K"); // ANSI clear line
-        process.stdout.write(line + (isFinal ? "\n" : ""));
+        if (this.isTTY) {
+            // TTY: Use carriage return to overwrite same line
+            process.stdout.write(`\r\x1b[2K${content}${isFinal ? "\n" : ""}`);
+        } else {
+            // Non-TTY: Only print on final or when message changes to avoid spam
+            if (isFinal || message !== this.lastMessage) {
+                console.log(content);
+            }
+        }
         this.lastMessage = message;
     }
 
@@ -62,7 +69,8 @@ export class TaskProgress {
         this.currentStepKey = key;
         this.lastMessage = message;
 
-        if (!this.spinnerInterval) {
+        // Only animate spinner in TTY mode
+        if (this.isTTY && !this.spinnerInterval) {
             this.spinnerInterval = setInterval(() => {
                 this.spinnerIndex = (this.spinnerIndex + 1) % frames.length;
                 this.render(this.lastMessage);
@@ -76,8 +84,11 @@ export class TaskProgress {
      * Update message for current step without changing step index
      */
     log(message: string) {
-        this.lastMessage = message;
-        this.render(message);
+        // Only render if message changed (prevents spam from repeated log calls)
+        if (message !== this.lastMessage) {
+            this.lastMessage = message;
+            this.render(message);
+        }
     }
 
     /**

@@ -15,7 +15,7 @@ const PROJECT_ROOT = join(__dirname, "..", "..");
 const userConfigPath = `${homedir()}/.okastr8/config.json`;
 const caddyFilePath = "/etc/caddy/Caddyfile"; // Correct casing
 
-export async function genCaddyFile() {
+export async function genCaddyFile(onLog?: (msg: string) => void) {
   try {
     const { readdir, readFile, stat } = await import('fs/promises');
     const { join } = await import('path');
@@ -48,7 +48,8 @@ export async function genCaddyFile() {
           // Use http:// prefix for localhost domains to avoid auto-HTTPS
           const scheme = domain.endsWith('.localhost') ? 'http://' : '';
           caddyEntries.push(`${scheme}${domain} {\n  reverse_proxy localhost:${port}\n}`);
-          console.log(`  Added route: ${domain} -> :${port} (${appName})`);
+          // Only log if not silent (onLog provided)
+          if (onLog) onLog(`  Added route: ${domain} -> :${port} (${appName})`);
         }
       } catch (e) {
         // Skip invalid apps or those without app.json
@@ -78,7 +79,7 @@ export async function genCaddyFile() {
     const pathToReloadCaddy = join(PROJECT_ROOT, "scripts", "caddy", "reloadCaddy.sh");
     await runCommand("sudo", [pathToReloadCaddy]);
 
-    console.log(`Caddyfile regenerated with ${caddyEntries.length} routes at ${caddyFilePath}`);
+    if (onLog) onLog(`Caddyfile regenerated with ${caddyEntries.length} routes at ${caddyFilePath}`);
   } catch (e) {
     console.error("❌ Error generating Caddyfile:", e);
     // Don't throw, just log. Deployment shouldn't fail if Caddy fails? 

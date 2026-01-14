@@ -139,18 +139,10 @@ export async function deployWithDocker(
         await composeDown(currentComposePath, appName).catch(() => { });
     }
 
-    // B. Clean up Legacy Systemd Services
-    // We check for both hyphenated and underscored names to be safe
-    const { stopService, disableService } = await import("../commands/systemd.ts");
-    const serviceNames = [appName, appName.replace(/-/g, "_")];
-    for (const serviceName of serviceNames) {
-        try {
-            // Check if service exists/running (best effort)
-            log(`Checking legacy systemd service: ${serviceName}...`);
-            await stopService(serviceName).catch(() => { });
-            await disableService(serviceName).catch(() => { });
-        } catch { }
-    }
+    // B. Legacy Systemd Cleanup (Removed)
+    // We no longer check for legacy systemd services to avoid sudo hangs and complexity.
+    // If a user has a legacy app running on the same port, the container start will fail with "Port already in use",
+    // which is a clear enough error message.
 
     // 3. Detect strategy
     const strategy = await detectDockerStrategy(releasePath, config);

@@ -191,7 +191,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     try {
         task.step("proxy", "Updating reverse proxy configuration...");
         const { genCaddyFile } = await import("../utils/genCaddyFile.ts");
-        await genCaddyFile();
+        await genCaddyFile(log);
     } catch (e) {
         log(`Failed to update Caddy: ${e instanceof Error ? e.message : String(e)}`);
     }
