@@ -53,6 +53,8 @@ User=$USER
 WorkingDirectory=$WORKING_DIRECTORY
 Environment="PATH=/home/$USER/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Environment="BUN_INSTALL=/home/$USER/.bun"
+# Kill any process using port 41788 before starting (prevents EADDRINUSE)
+ExecStartPre=/bin/bash -c 'fuser -k 41788/tcp 2>/dev/null || true'
 ExecStart=/bin/bash -c "$EXEC_START" # Wrapped in bash -c
 Restart=on-failure
 RestartSec=5
