@@ -775,7 +775,7 @@ api.get('/github/auth-url', async (c) => {
         }
 
         // Build callback URL from request
-        const host = c.req.header('host') || 'localhost:8788';
+        const host = c.req.header('host') || 'localhost:41788';
         const protocol = c.req.header('x-forwarded-proto') || 'http';
         const callbackUrl = `${protocol}://${host}/api/github/callback`;
 

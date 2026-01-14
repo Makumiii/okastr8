@@ -16,9 +16,9 @@ app.route('/api', api);
 // Serve static files
 app.use('/*', serveStatic({ root: './public' }));
 
-console.log('Hono server listening on port 8788');
+console.log('Hono server listening on port 41788');
 
 export default {
-  port: 8788,
+  port: 41788,
   fetch: app.fetch,
 };

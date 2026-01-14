@@ -75,7 +75,7 @@ export function addGitHubCommands(program: Command) {
                 }
 
                 // Use manager's callback (requires manager to be running)
-                const callbackUrl = `http://localhost:8788/api/github/callback`;
+                const callbackUrl = `http://localhost:41788/api/github/callback`;
 
                 const { getAuthUrl } = await import('./github');
                 const authUrl = getAuthUrl(config.clientId, callbackUrl);
