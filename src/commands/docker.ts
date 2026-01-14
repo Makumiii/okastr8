@@ -96,6 +96,11 @@ export async function runContainer(
             `${port}:${port}`,
             "--restart",
             "unless-stopped",
+            // Inject HOST=0.0.0.0 so dev servers (Vite, CRA, Next.js, etc.)
+            // bind to all interfaces instead of localhost-only.
+            // This makes them accessible through Docker's port mapping.
+            "-e",
+            "HOST=0.0.0.0",
         ];
 
         // Add env file if provided

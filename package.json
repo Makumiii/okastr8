@@ -3,6 +3,9 @@
   "module": "main.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "build": "bun build src/main.ts --outdir=build --target=node"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
