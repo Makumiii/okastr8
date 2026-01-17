@@ -24,7 +24,7 @@ Okastr8 (pronounced "orchestrate") is a self-hosted Platform-as-a-Service that b
 
 ---
 
-## 📦 Installation
+## 📦 Installation (For Users)
 
 ### Requirements
 - A fresh or existing Linux server (Debian/Ubuntu recommended).
@@ -101,44 +101,68 @@ okastr8 deploy trigger my-awesome-app
 
 We welcome contributions! Okastr8 is built with **TypeScript**, **Bun**, **Hono**, and **SvelteKit**.
 
-### Prerequisite
-- [Bun Runtime](https://bun.sh) (latest)
+**Note for Contributors**: Do not run the `install.sh` script on your development machine if you intend to modify the code. That script is for end-users and installs to a specific system path. Instead, follow the manual setup steps below.
 
-### 1. Clone & Setup
+### 1. Prerequisite
+- [Bun Runtime](https://bun.sh) (latest)
+- Git
+
+### 2. Clone & Install Dependencies
 ```bash
+# Clone the repository
 git clone https://github.com/Makumiii/okastr8.git
 cd okastr8
+
+# Install backend/CLI dependencies
 bun install
-```
 
-### 2. Build the Dashboard (UI)
-The dashboard is a SvelteKit app located in `dashboard/`. It builds to the `public/` directory at the root, which the manager server serves.
-
-```bash
+# Install dashboard (frontend) dependencies
 cd dashboard
 npm install
-npm run build  # Builds to ../public
 cd ..
 ```
 
-### 3. Start Development Server
-Run the manager server locally. This serves the API and the static UI from `public/`.
+### 3. Setup Config & Permissions
+Okastr8 relies on running certain system commands (like systemd, docker, or caddy) without password prompts. We include a helper to configure this for you safely (it creates a file in `/etc/sudoers.d/`).
 
 ```bash
-# Run the manager (API + Static UI)
+# Run the sudoers setup (required for fully functional CLI testing)
+sudo bun run src/main.ts setup sudoers
+```
+*You only need to run this once.*
+
+### 4. Build the Dashboard
+The manager server serves the static UI files from the `public/` directory. You must build the dashboard first:
+
+```bash
+cd dashboard
+npm run build
+cd ..
+# Check that 'public/' folder now exists
+ls -d public
+```
+
+### 5. Running Locally
+You can now run the services directly from your source code.
+
+**Start the Manager Server (API + UI):**
+```bash
 bun run src/managerServer.ts
 ```
-
 The server will start at `http://localhost:41788`.
 
-### 4. Running the CLI Locally
-To test CLI commands during development:
+**Run CLI Commands:**
+Use `bun run src/main.ts` to execute CLI commands against your local code:
 
 ```bash
-# Run commands using bun directly
+bun run src/main.ts --help
 bun run src/main.ts app list
-bun run src/main.ts deploy history my-app
+bun run src/main.ts deploy trigger my-test-app
 ```
+
+### 6. Development Workflow
+- **Frontend Changes**: Edit files in `dashboard/src`. Run `npm run build` in `dashboard/` to update the static output, or run `npm run dev` in `dashboard/` for a separate HMR dev server (note: api calls might need proxy configuration if running separately).
+- **Backend/CLI Changes**: Edit files in `src/`. Bun runs TypeScript natively, so no build step is needed for testing backend logic.
 
 ---
 
