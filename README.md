@@ -59,6 +59,51 @@ Access your dashboard at: `http://<your-server-ip>:41788`
 
 ---
 
+## 🔗 GitHub Integration Setup
+
+To enable GitHub-based deployments, you need to create a GitHub OAuth App and configure Okastr8.
+
+### Step 1: Create a GitHub OAuth App
+
+1. Go to **GitHub → Settings → Developer Settings → OAuth Apps → New OAuth App**
+2. Fill in the form:
+   - **Application name**: `Okastr8` (or any name you prefer)
+   - **Homepage URL**: `http://your-server-ip:41788`
+   - **Authorization callback URL**: `http://your-server-ip:41788/api/github/callback`
+3. Click **Register application**
+4. Copy the **Client ID**
+5. Click **Generate a new client secret** and copy it
+
+> **Using a tunnel?** If you're using Cloudflare Tunnel (e.g., `https://okastr8.yourdomain.com`), use that URL instead of the IP address.
+
+### Step 2: Add Credentials to Okastr8
+
+Create or edit `~/.okastr8/system.yaml`:
+
+```bash
+mkdir -p ~/.okastr8
+nano ~/.okastr8/system.yaml
+```
+
+Add your credentials:
+
+```yaml
+manager:
+  github:
+    client_id: "Ov23liXXXXXXXXXXXXXX"
+    client_secret: "your_client_secret_here"
+```
+
+### Step 3: Connect Your Account
+
+```bash
+okastr8 github connect
+```
+
+This will open a browser for GitHub authorization. Once complete, your access token is automatically saved.
+
+---
+
 ## 🛠️ Usage
 
 ### 1. Authenticate
