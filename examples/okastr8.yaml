@@ -18,5 +18,13 @@ domain: myapp.example.com
 
 env:
   NODE_ENV: production
-  DATABASE_URL: postgresql://user:pass@localhost:5432/db
   API_KEY: your-secret-api-key
+
+# Optional: Provision managed resources
+database:
+  type: postgres # or mysql, redis, mongo
+  version: "15"
+
+cache:
+  type: redis
+  version: "7"
