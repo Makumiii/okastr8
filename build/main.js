@@ -16727,15 +16727,3172 @@ var init_config = __esm(() => {
   CONFIG_FILE = join6(OKASTR8_HOME, "system.yaml");
 });
 
+// node_modules/chalk/source/vendor/ansi-styles/index.js
+function assembleStyles() {
+  const codes = new Map;
+  for (const [groupName, group] of Object.entries(styles)) {
+    for (const [styleName, style] of Object.entries(group)) {
+      styles[styleName] = {
+        open: `\x1B[${style[0]}m`,
+        close: `\x1B[${style[1]}m`
+      };
+      group[styleName] = styles[styleName];
+      codes.set(style[0], style[1]);
+    }
+    Object.defineProperty(styles, groupName, {
+      value: group,
+      enumerable: false
+    });
+  }
+  Object.defineProperty(styles, "codes", {
+    value: codes,
+    enumerable: false
+  });
+  styles.color.close = "\x1B[39m";
+  styles.bgColor.close = "\x1B[49m";
+  styles.color.ansi = wrapAnsi16();
+  styles.color.ansi256 = wrapAnsi256();
+  styles.color.ansi16m = wrapAnsi16m();
+  styles.bgColor.ansi = wrapAnsi16(ANSI_BACKGROUND_OFFSET);
+  styles.bgColor.ansi256 = wrapAnsi256(ANSI_BACKGROUND_OFFSET);
+  styles.bgColor.ansi16m = wrapAnsi16m(ANSI_BACKGROUND_OFFSET);
+  Object.defineProperties(styles, {
+    rgbToAnsi256: {
+      value(red, green, blue) {
+        if (red === green && green === blue) {
+          if (red < 8) {
+            return 16;
+          }
+          if (red > 248) {
+            return 231;
+          }
+          return Math.round((red - 8) / 247 * 24) + 232;
+        }
+        return 16 + 36 * Math.round(red / 255 * 5) + 6 * Math.round(green / 255 * 5) + Math.round(blue / 255 * 5);
+      },
+      enumerable: false
+    },
+    hexToRgb: {
+      value(hex) {
+        const matches = /[a-f\d]{6}|[a-f\d]{3}/i.exec(hex.toString(16));
+        if (!matches) {
+          return [0, 0, 0];
+        }
+        let [colorString] = matches;
+        if (colorString.length === 3) {
+          colorString = [...colorString].map((character) => character + character).join("");
+        }
+        const integer = Number.parseInt(colorString, 16);
+        return [
+          integer >> 16 & 255,
+          integer >> 8 & 255,
+          integer & 255
+        ];
+      },
+      enumerable: false
+    },
+    hexToAnsi256: {
+      value: (hex) => styles.rgbToAnsi256(...styles.hexToRgb(hex)),
+      enumerable: false
+    },
+    ansi256ToAnsi: {
+      value(code) {
+        if (code < 8) {
+          return 30 + code;
+        }
+        if (code < 16) {
+          return 90 + (code - 8);
+        }
+        let red;
+        let green;
+        let blue;
+        if (code >= 232) {
+          red = ((code - 232) * 10 + 8) / 255;
+          green = red;
+          blue = red;
+        } else {
+          code -= 16;
+          const remainder = code % 36;
+          red = Math.floor(code / 36) / 5;
+          green = Math.floor(remainder / 6) / 5;
+          blue = remainder % 6 / 5;
+        }
+        const value = Math.max(red, green, blue) * 2;
+        if (value === 0) {
+          return 30;
+        }
+        let result = 30 + (Math.round(blue) << 2 | Math.round(green) << 1 | Math.round(red));
+        if (value === 2) {
+          result += 60;
+        }
+        return result;
+      },
+      enumerable: false
+    },
+    rgbToAnsi: {
+      value: (red, green, blue) => styles.ansi256ToAnsi(styles.rgbToAnsi256(red, green, blue)),
+      enumerable: false
+    },
+    hexToAnsi: {
+      value: (hex) => styles.ansi256ToAnsi(styles.hexToAnsi256(hex)),
+      enumerable: false
+    }
+  });
+  return styles;
+}
+var ANSI_BACKGROUND_OFFSET = 10, wrapAnsi16 = (offset = 0) => (code) => `\x1B[${code + offset}m`, wrapAnsi256 = (offset = 0) => (code) => `\x1B[${38 + offset};5;${code}m`, wrapAnsi16m = (offset = 0) => (red, green, blue) => `\x1B[${38 + offset};2;${red};${green};${blue}m`, styles, modifierNames, foregroundColorNames, backgroundColorNames, colorNames, ansiStyles, ansi_styles_default;
+var init_ansi_styles = __esm(() => {
+  styles = {
+    modifier: {
+      reset: [0, 0],
+      bold: [1, 22],
+      dim: [2, 22],
+      italic: [3, 23],
+      underline: [4, 24],
+      overline: [53, 55],
+      inverse: [7, 27],
+      hidden: [8, 28],
+      strikethrough: [9, 29]
+    },
+    color: {
+      black: [30, 39],
+      red: [31, 39],
+      green: [32, 39],
+      yellow: [33, 39],
+      blue: [34, 39],
+      magenta: [35, 39],
+      cyan: [36, 39],
+      white: [37, 39],
+      blackBright: [90, 39],
+      gray: [90, 39],
+      grey: [90, 39],
+      redBright: [91, 39],
+      greenBright: [92, 39],
+      yellowBright: [93, 39],
+      blueBright: [94, 39],
+      magentaBright: [95, 39],
+      cyanBright: [96, 39],
+      whiteBright: [97, 39]
+    },
+    bgColor: {
+      bgBlack: [40, 49],
+      bgRed: [41, 49],
+      bgGreen: [42, 49],
+      bgYellow: [43, 49],
+      bgBlue: [44, 49],
+      bgMagenta: [45, 49],
+      bgCyan: [46, 49],
+      bgWhite: [47, 49],
+      bgBlackBright: [100, 49],
+      bgGray: [100, 49],
+      bgGrey: [100, 49],
+      bgRedBright: [101, 49],
+      bgGreenBright: [102, 49],
+      bgYellowBright: [103, 49],
+      bgBlueBright: [104, 49],
+      bgMagentaBright: [105, 49],
+      bgCyanBright: [106, 49],
+      bgWhiteBright: [107, 49]
+    }
+  };
+  modifierNames = Object.keys(styles.modifier);
+  foregroundColorNames = Object.keys(styles.color);
+  backgroundColorNames = Object.keys(styles.bgColor);
+  colorNames = [...foregroundColorNames, ...backgroundColorNames];
+  ansiStyles = assembleStyles();
+  ansi_styles_default = ansiStyles;
+});
+
+// node_modules/chalk/source/vendor/supports-color/index.js
+import process2 from "node:process";
+import os from "node:os";
+import tty from "node:tty";
+function hasFlag(flag, argv = globalThis.Deno ? globalThis.Deno.args : process2.argv) {
+  const prefix = flag.startsWith("-") ? "" : flag.length === 1 ? "-" : "--";
+  const position = argv.indexOf(prefix + flag);
+  const terminatorPosition = argv.indexOf("--");
+  return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
+}
+function envForceColor() {
+  if ("FORCE_COLOR" in env) {
+    if (env.FORCE_COLOR === "true") {
+      return 1;
+    }
+    if (env.FORCE_COLOR === "false") {
+      return 0;
+    }
+    return env.FORCE_COLOR.length === 0 ? 1 : Math.min(Number.parseInt(env.FORCE_COLOR, 10), 3);
+  }
+}
+function translateLevel(level) {
+  if (level === 0) {
+    return false;
+  }
+  return {
+    level,
+    hasBasic: true,
+    has256: level >= 2,
+    has16m: level >= 3
+  };
+}
+function _supportsColor(haveStream, { streamIsTTY, sniffFlags = true } = {}) {
+  const noFlagForceColor = envForceColor();
+  if (noFlagForceColor !== undefined) {
+    flagForceColor = noFlagForceColor;
+  }
+  const forceColor = sniffFlags ? flagForceColor : noFlagForceColor;
+  if (forceColor === 0) {
+    return 0;
+  }
+  if (sniffFlags) {
+    if (hasFlag("color=16m") || hasFlag("color=full") || hasFlag("color=truecolor")) {
+      return 3;
+    }
+    if (hasFlag("color=256")) {
+      return 2;
+    }
+  }
+  if ("TF_BUILD" in env && "AGENT_NAME" in env) {
+    return 1;
+  }
+  if (haveStream && !streamIsTTY && forceColor === undefined) {
+    return 0;
+  }
+  const min = forceColor || 0;
+  if (env.TERM === "dumb") {
+    return min;
+  }
+  if (process2.platform === "win32") {
+    const osRelease = os.release().split(".");
+    if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
+      return Number(osRelease[2]) >= 14931 ? 3 : 2;
+    }
+    return 1;
+  }
+  if ("CI" in env) {
+    if (["GITHUB_ACTIONS", "GITEA_ACTIONS", "CIRCLECI"].some((key) => (key in env))) {
+      return 3;
+    }
+    if (["TRAVIS", "APPVEYOR", "GITLAB_CI", "BUILDKITE", "DRONE"].some((sign) => (sign in env)) || env.CI_NAME === "codeship") {
+      return 1;
+    }
+    return min;
+  }
+  if ("TEAMCITY_VERSION" in env) {
+    return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
+  }
+  if (env.COLORTERM === "truecolor") {
+    return 3;
+  }
+  if (env.TERM === "xterm-kitty") {
+    return 3;
+  }
+  if (env.TERM === "xterm-ghostty") {
+    return 3;
+  }
+  if (env.TERM === "wezterm") {
+    return 3;
+  }
+  if ("TERM_PROGRAM" in env) {
+    const version = Number.parseInt((env.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
+    switch (env.TERM_PROGRAM) {
+      case "iTerm.app": {
+        return version >= 3 ? 3 : 2;
+      }
+      case "Apple_Terminal": {
+        return 2;
+      }
+    }
+  }
+  if (/-256(color)?$/i.test(env.TERM)) {
+    return 2;
+  }
+  if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
+    return 1;
+  }
+  if ("COLORTERM" in env) {
+    return 1;
+  }
+  return min;
+}
+function createSupportsColor(stream, options = {}) {
+  const level = _supportsColor(stream, {
+    streamIsTTY: stream && stream.isTTY,
+    ...options
+  });
+  return translateLevel(level);
+}
+var env, flagForceColor, supportsColor, supports_color_default;
+var init_supports_color = __esm(() => {
+  ({ env } = process2);
+  if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never")) {
+    flagForceColor = 0;
+  } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
+    flagForceColor = 1;
+  }
+  supportsColor = {
+    stdout: createSupportsColor({ isTTY: tty.isatty(1) }),
+    stderr: createSupportsColor({ isTTY: tty.isatty(2) })
+  };
+  supports_color_default = supportsColor;
+});
+
+// node_modules/chalk/source/utilities.js
+function stringReplaceAll(string, substring, replacer) {
+  let index = string.indexOf(substring);
+  if (index === -1) {
+    return string;
+  }
+  const substringLength = substring.length;
+  let endIndex = 0;
+  let returnValue = "";
+  do {
+    returnValue += string.slice(endIndex, index) + substring + replacer;
+    endIndex = index + substringLength;
+    index = string.indexOf(substring, endIndex);
+  } while (index !== -1);
+  returnValue += string.slice(endIndex);
+  return returnValue;
+}
+function stringEncaseCRLFWithFirstIndex(string, prefix, postfix, index) {
+  let endIndex = 0;
+  let returnValue = "";
+  do {
+    const gotCR = string[index - 1] === "\r";
+    returnValue += string.slice(endIndex, gotCR ? index - 1 : index) + prefix + (gotCR ? `\r
+` : `
+`) + postfix;
+    endIndex = index + 1;
+    index = string.indexOf(`
+`, endIndex);
+  } while (index !== -1);
+  returnValue += string.slice(endIndex);
+  return returnValue;
+}
+
+// node_modules/chalk/source/index.js
+function createChalk(options) {
+  return chalkFactory(options);
+}
+var stdoutColor, stderrColor, GENERATOR, STYLER, IS_EMPTY, levelMapping, styles2, applyOptions = (object, options = {}) => {
+  if (options.level && !(Number.isInteger(options.level) && options.level >= 0 && options.level <= 3)) {
+    throw new Error("The `level` option should be an integer from 0 to 3");
+  }
+  const colorLevel = stdoutColor ? stdoutColor.level : 0;
+  object.level = options.level === undefined ? colorLevel : options.level;
+}, chalkFactory = (options) => {
+  const chalk = (...strings) => strings.join(" ");
+  applyOptions(chalk, options);
+  Object.setPrototypeOf(chalk, createChalk.prototype);
+  return chalk;
+}, getModelAnsi = (model, level, type2, ...arguments_) => {
+  if (model === "rgb") {
+    if (level === "ansi16m") {
+      return ansi_styles_default[type2].ansi16m(...arguments_);
+    }
+    if (level === "ansi256") {
+      return ansi_styles_default[type2].ansi256(ansi_styles_default.rgbToAnsi256(...arguments_));
+    }
+    return ansi_styles_default[type2].ansi(ansi_styles_default.rgbToAnsi(...arguments_));
+  }
+  if (model === "hex") {
+    return getModelAnsi("rgb", level, type2, ...ansi_styles_default.hexToRgb(...arguments_));
+  }
+  return ansi_styles_default[type2][model](...arguments_);
+}, usedModels, proto, createStyler = (open, close, parent) => {
+  let openAll;
+  let closeAll;
+  if (parent === undefined) {
+    openAll = open;
+    closeAll = close;
+  } else {
+    openAll = parent.openAll + open;
+    closeAll = close + parent.closeAll;
+  }
+  return {
+    open,
+    close,
+    openAll,
+    closeAll,
+    parent
+  };
+}, createBuilder = (self, _styler, _isEmpty) => {
+  const builder = (...arguments_) => applyStyle(builder, arguments_.length === 1 ? "" + arguments_[0] : arguments_.join(" "));
+  Object.setPrototypeOf(builder, proto);
+  builder[GENERATOR] = self;
+  builder[STYLER] = _styler;
+  builder[IS_EMPTY] = _isEmpty;
+  return builder;
+}, applyStyle = (self, string) => {
+  if (self.level <= 0 || !string) {
+    return self[IS_EMPTY] ? "" : string;
+  }
+  let styler = self[STYLER];
+  if (styler === undefined) {
+    return string;
+  }
+  const { openAll, closeAll } = styler;
+  if (string.includes("\x1B")) {
+    while (styler !== undefined) {
+      string = stringReplaceAll(string, styler.close, styler.open);
+      styler = styler.parent;
+    }
+  }
+  const lfIndex = string.indexOf(`
+`);
+  if (lfIndex !== -1) {
+    string = stringEncaseCRLFWithFirstIndex(string, closeAll, openAll, lfIndex);
+  }
+  return openAll + string + closeAll;
+}, chalk, chalkStderr, source_default;
+var init_source = __esm(() => {
+  init_ansi_styles();
+  init_supports_color();
+  ({ stdout: stdoutColor, stderr: stderrColor } = supports_color_default);
+  GENERATOR = Symbol("GENERATOR");
+  STYLER = Symbol("STYLER");
+  IS_EMPTY = Symbol("IS_EMPTY");
+  levelMapping = [
+    "ansi",
+    "ansi",
+    "ansi256",
+    "ansi16m"
+  ];
+  styles2 = Object.create(null);
+  Object.setPrototypeOf(createChalk.prototype, Function.prototype);
+  for (const [styleName, style] of Object.entries(ansi_styles_default)) {
+    styles2[styleName] = {
+      get() {
+        const builder = createBuilder(this, createStyler(style.open, style.close, this[STYLER]), this[IS_EMPTY]);
+        Object.defineProperty(this, styleName, { value: builder });
+        return builder;
+      }
+    };
+  }
+  styles2.visible = {
+    get() {
+      const builder = createBuilder(this, this[STYLER], true);
+      Object.defineProperty(this, "visible", { value: builder });
+      return builder;
+    }
+  };
+  usedModels = ["rgb", "hex", "ansi256"];
+  for (const model of usedModels) {
+    styles2[model] = {
+      get() {
+        const { level } = this;
+        return function(...arguments_) {
+          const styler = createStyler(getModelAnsi(model, levelMapping[level], "color", ...arguments_), ansi_styles_default.color.close, this[STYLER]);
+          return createBuilder(this, styler, this[IS_EMPTY]);
+        };
+      }
+    };
+    const bgModel = "bg" + model[0].toUpperCase() + model.slice(1);
+    styles2[bgModel] = {
+      get() {
+        const { level } = this;
+        return function(...arguments_) {
+          const styler = createStyler(getModelAnsi(model, levelMapping[level], "bgColor", ...arguments_), ansi_styles_default.bgColor.close, this[STYLER]);
+          return createBuilder(this, styler, this[IS_EMPTY]);
+        };
+      }
+    };
+  }
+  proto = Object.defineProperties(() => {}, {
+    ...styles2,
+    level: {
+      enumerable: true,
+      get() {
+        return this[GENERATOR].level;
+      },
+      set(level) {
+        this[GENERATOR].level = level;
+      }
+    }
+  });
+  Object.defineProperties(createChalk.prototype, styles2);
+  chalk = createChalk();
+  chalkStderr = createChalk({ level: stderrColor ? stderrColor.level : 0 });
+  source_default = chalk;
+});
+
+// node_modules/mimic-function/index.js
+function mimicFunction(to, from, { ignoreNonConfigurable = false } = {}) {
+  const { name } = to;
+  for (const property of Reflect.ownKeys(from)) {
+    copyProperty(to, from, property, ignoreNonConfigurable);
+  }
+  changePrototype(to, from);
+  changeToString(to, from, name);
+  return to;
+}
+var copyProperty = (to, from, property, ignoreNonConfigurable) => {
+  if (property === "length" || property === "prototype") {
+    return;
+  }
+  if (property === "arguments" || property === "caller") {
+    return;
+  }
+  const toDescriptor = Object.getOwnPropertyDescriptor(to, property);
+  const fromDescriptor = Object.getOwnPropertyDescriptor(from, property);
+  if (!canCopyProperty(toDescriptor, fromDescriptor) && ignoreNonConfigurable) {
+    return;
+  }
+  Object.defineProperty(to, property, fromDescriptor);
+}, canCopyProperty = function(toDescriptor, fromDescriptor) {
+  return toDescriptor === undefined || toDescriptor.configurable || toDescriptor.writable === fromDescriptor.writable && toDescriptor.enumerable === fromDescriptor.enumerable && toDescriptor.configurable === fromDescriptor.configurable && (toDescriptor.writable || toDescriptor.value === fromDescriptor.value);
+}, changePrototype = (to, from) => {
+  const fromPrototype = Object.getPrototypeOf(from);
+  if (fromPrototype === Object.getPrototypeOf(to)) {
+    return;
+  }
+  Object.setPrototypeOf(to, fromPrototype);
+}, wrappedToString = (withName, fromBody) => `/* Wrapped ${withName}*/
+${fromBody}`, toStringDescriptor, toStringName, changeToString = (to, from, name) => {
+  const withName = name === "" ? "" : `with ${name.trim()}() `;
+  const newToString = wrappedToString.bind(null, withName, from.toString());
+  Object.defineProperty(newToString, "name", toStringName);
+  const { writable, enumerable, configurable } = toStringDescriptor;
+  Object.defineProperty(to, "toString", { value: newToString, writable, enumerable, configurable });
+};
+var init_mimic_function = __esm(() => {
+  toStringDescriptor = Object.getOwnPropertyDescriptor(Function.prototype, "toString");
+  toStringName = Object.getOwnPropertyDescriptor(Function.prototype.toString, "name");
+});
+
+// node_modules/onetime/index.js
+var calledFunctions, onetime = (function_, options = {}) => {
+  if (typeof function_ !== "function") {
+    throw new TypeError("Expected a function");
+  }
+  let returnValue;
+  let callCount = 0;
+  const functionName = function_.displayName || function_.name || "<anonymous>";
+  const onetime2 = function(...arguments_) {
+    calledFunctions.set(onetime2, ++callCount);
+    if (callCount === 1) {
+      returnValue = function_.apply(this, arguments_);
+      function_ = undefined;
+    } else if (options.throw === true) {
+      throw new Error(`Function \`${functionName}\` can only be called once`);
+    }
+    return returnValue;
+  };
+  mimicFunction(onetime2, function_);
+  calledFunctions.set(onetime2, callCount);
+  return onetime2;
+}, onetime_default;
+var init_onetime = __esm(() => {
+  init_mimic_function();
+  calledFunctions = new WeakMap;
+  onetime.callCount = (function_) => {
+    if (!calledFunctions.has(function_)) {
+      throw new Error(`The given function \`${function_.name}\` is not wrapped by the \`onetime\` package`);
+    }
+    return calledFunctions.get(function_);
+  };
+  onetime_default = onetime;
+});
+
+// node_modules/signal-exit/dist/mjs/signals.js
+var signals;
+var init_signals = __esm(() => {
+  signals = [];
+  signals.push("SIGHUP", "SIGINT", "SIGTERM");
+  if (process.platform !== "win32") {
+    signals.push("SIGALRM", "SIGABRT", "SIGVTALRM", "SIGXCPU", "SIGXFSZ", "SIGUSR2", "SIGTRAP", "SIGSYS", "SIGQUIT", "SIGIOT");
+  }
+  if (process.platform === "linux") {
+    signals.push("SIGIO", "SIGPOLL", "SIGPWR", "SIGSTKFLT");
+  }
+});
+
+// node_modules/signal-exit/dist/mjs/index.js
+class Emitter {
+  emitted = {
+    afterExit: false,
+    exit: false
+  };
+  listeners = {
+    afterExit: [],
+    exit: []
+  };
+  count = 0;
+  id = Math.random();
+  constructor() {
+    if (global[kExitEmitter]) {
+      return global[kExitEmitter];
+    }
+    ObjectDefineProperty(global, kExitEmitter, {
+      value: this,
+      writable: false,
+      enumerable: false,
+      configurable: false
+    });
+  }
+  on(ev, fn) {
+    this.listeners[ev].push(fn);
+  }
+  removeListener(ev, fn) {
+    const list = this.listeners[ev];
+    const i2 = list.indexOf(fn);
+    if (i2 === -1) {
+      return;
+    }
+    if (i2 === 0 && list.length === 1) {
+      list.length = 0;
+    } else {
+      list.splice(i2, 1);
+    }
+  }
+  emit(ev, code, signal) {
+    if (this.emitted[ev]) {
+      return false;
+    }
+    this.emitted[ev] = true;
+    let ret = false;
+    for (const fn of this.listeners[ev]) {
+      ret = fn(code, signal) === true || ret;
+    }
+    if (ev === "exit") {
+      ret = this.emit("afterExit", code, signal) || ret;
+    }
+    return ret;
+  }
+}
+
+class SignalExitBase {
+}
+var processOk = (process3) => !!process3 && typeof process3 === "object" && typeof process3.removeListener === "function" && typeof process3.emit === "function" && typeof process3.reallyExit === "function" && typeof process3.listeners === "function" && typeof process3.kill === "function" && typeof process3.pid === "number" && typeof process3.on === "function", kExitEmitter, global, ObjectDefineProperty, signalExitWrap = (handler) => {
+  return {
+    onExit(cb, opts) {
+      return handler.onExit(cb, opts);
+    },
+    load() {
+      return handler.load();
+    },
+    unload() {
+      return handler.unload();
+    }
+  };
+}, SignalExitFallback, SignalExit, process3, onExit, load2, unload;
+var init_mjs = __esm(() => {
+  init_signals();
+  kExitEmitter = Symbol.for("signal-exit emitter");
+  global = globalThis;
+  ObjectDefineProperty = Object.defineProperty.bind(Object);
+  SignalExitFallback = class SignalExitFallback extends SignalExitBase {
+    onExit() {
+      return () => {};
+    }
+    load() {}
+    unload() {}
+  };
+  SignalExit = class SignalExit extends SignalExitBase {
+    #hupSig = process3.platform === "win32" ? "SIGINT" : "SIGHUP";
+    #emitter = new Emitter;
+    #process;
+    #originalProcessEmit;
+    #originalProcessReallyExit;
+    #sigListeners = {};
+    #loaded = false;
+    constructor(process3) {
+      super();
+      this.#process = process3;
+      this.#sigListeners = {};
+      for (const sig of signals) {
+        this.#sigListeners[sig] = () => {
+          const listeners = this.#process.listeners(sig);
+          let { count } = this.#emitter;
+          const p = process3;
+          if (typeof p.__signal_exit_emitter__ === "object" && typeof p.__signal_exit_emitter__.count === "number") {
+            count += p.__signal_exit_emitter__.count;
+          }
+          if (listeners.length === count) {
+            this.unload();
+            const ret = this.#emitter.emit("exit", null, sig);
+            const s = sig === "SIGHUP" ? this.#hupSig : sig;
+            if (!ret)
+              process3.kill(process3.pid, s);
+          }
+        };
+      }
+      this.#originalProcessReallyExit = process3.reallyExit;
+      this.#originalProcessEmit = process3.emit;
+    }
+    onExit(cb, opts) {
+      if (!processOk(this.#process)) {
+        return () => {};
+      }
+      if (this.#loaded === false) {
+        this.load();
+      }
+      const ev = opts?.alwaysLast ? "afterExit" : "exit";
+      this.#emitter.on(ev, cb);
+      return () => {
+        this.#emitter.removeListener(ev, cb);
+        if (this.#emitter.listeners["exit"].length === 0 && this.#emitter.listeners["afterExit"].length === 0) {
+          this.unload();
+        }
+      };
+    }
+    load() {
+      if (this.#loaded) {
+        return;
+      }
+      this.#loaded = true;
+      this.#emitter.count += 1;
+      for (const sig of signals) {
+        try {
+          const fn = this.#sigListeners[sig];
+          if (fn)
+            this.#process.on(sig, fn);
+        } catch (_) {}
+      }
+      this.#process.emit = (ev, ...a) => {
+        return this.#processEmit(ev, ...a);
+      };
+      this.#process.reallyExit = (code) => {
+        return this.#processReallyExit(code);
+      };
+    }
+    unload() {
+      if (!this.#loaded) {
+        return;
+      }
+      this.#loaded = false;
+      signals.forEach((sig) => {
+        const listener = this.#sigListeners[sig];
+        if (!listener) {
+          throw new Error("Listener not defined for signal: " + sig);
+        }
+        try {
+          this.#process.removeListener(sig, listener);
+        } catch (_) {}
+      });
+      this.#process.emit = this.#originalProcessEmit;
+      this.#process.reallyExit = this.#originalProcessReallyExit;
+      this.#emitter.count -= 1;
+    }
+    #processReallyExit(code) {
+      if (!processOk(this.#process)) {
+        return 0;
+      }
+      this.#process.exitCode = code || 0;
+      this.#emitter.emit("exit", this.#process.exitCode, null);
+      return this.#originalProcessReallyExit.call(this.#process, this.#process.exitCode);
+    }
+    #processEmit(ev, ...args) {
+      const og = this.#originalProcessEmit;
+      if (ev === "exit" && processOk(this.#process)) {
+        if (typeof args[0] === "number") {
+          this.#process.exitCode = args[0];
+        }
+        const ret = og.call(this.#process, ev, ...args);
+        this.#emitter.emit("exit", this.#process.exitCode, null);
+        return ret;
+      } else {
+        return og.call(this.#process, ev, ...args);
+      }
+    }
+  };
+  process3 = globalThis.process;
+  ({
+    onExit,
+    load: load2,
+    unload
+  } = signalExitWrap(processOk(process3) ? new SignalExit(process3) : new SignalExitFallback));
+});
+
+// node_modules/restore-cursor/index.js
+import process4 from "node:process";
+var terminal, restoreCursor, restore_cursor_default;
+var init_restore_cursor = __esm(() => {
+  init_onetime();
+  init_mjs();
+  terminal = process4.stderr.isTTY ? process4.stderr : process4.stdout.isTTY ? process4.stdout : undefined;
+  restoreCursor = terminal ? onetime_default(() => {
+    onExit(() => {
+      terminal.write("\x1B[?25h");
+    }, { alwaysLast: true });
+  }) : () => {};
+  restore_cursor_default = restoreCursor;
+});
+
+// node_modules/cli-cursor/index.js
+import process5 from "node:process";
+var isHidden = false, cliCursor, cli_cursor_default;
+var init_cli_cursor = __esm(() => {
+  init_restore_cursor();
+  cliCursor = {};
+  cliCursor.show = (writableStream = process5.stderr) => {
+    if (!writableStream.isTTY) {
+      return;
+    }
+    isHidden = false;
+    writableStream.write("\x1B[?25h");
+  };
+  cliCursor.hide = (writableStream = process5.stderr) => {
+    if (!writableStream.isTTY) {
+      return;
+    }
+    restore_cursor_default();
+    isHidden = true;
+    writableStream.write("\x1B[?25l");
+  };
+  cliCursor.toggle = (force, writableStream) => {
+    if (force !== undefined) {
+      isHidden = force;
+    }
+    if (isHidden) {
+      cliCursor.show(writableStream);
+    } else {
+      cliCursor.hide(writableStream);
+    }
+  };
+  cli_cursor_default = cliCursor;
+});
+
+// node_modules/cli-spinners/spinners.json
+var spinners_default;
+var init_spinners = __esm(() => {
+  spinners_default = {
+    dots: {
+      interval: 80,
+      frames: [
+        "⠋",
+        "⠙",
+        "⠹",
+        "⠸",
+        "⠼",
+        "⠴",
+        "⠦",
+        "⠧",
+        "⠇",
+        "⠏"
+      ]
+    },
+    dots2: {
+      interval: 80,
+      frames: [
+        "⣾",
+        "⣽",
+        "⣻",
+        "⢿",
+        "⡿",
+        "⣟",
+        "⣯",
+        "⣷"
+      ]
+    },
+    dots3: {
+      interval: 80,
+      frames: [
+        "⠋",
+        "⠙",
+        "⠚",
+        "⠞",
+        "⠖",
+        "⠦",
+        "⠴",
+        "⠲",
+        "⠳",
+        "⠓"
+      ]
+    },
+    dots4: {
+      interval: 80,
+      frames: [
+        "⠄",
+        "⠆",
+        "⠇",
+        "⠋",
+        "⠙",
+        "⠸",
+        "⠰",
+        "⠠",
+        "⠰",
+        "⠸",
+        "⠙",
+        "⠋",
+        "⠇",
+        "⠆"
+      ]
+    },
+    dots5: {
+      interval: 80,
+      frames: [
+        "⠋",
+        "⠙",
+        "⠚",
+        "⠒",
+        "⠂",
+        "⠂",
+        "⠒",
+        "⠲",
+        "⠴",
+        "⠦",
+        "⠖",
+        "⠒",
+        "⠐",
+        "⠐",
+        "⠒",
+        "⠓",
+        "⠋"
+      ]
+    },
+    dots6: {
+      interval: 80,
+      frames: [
+        "⠁",
+        "⠉",
+        "⠙",
+        "⠚",
+        "⠒",
+        "⠂",
+        "⠂",
+        "⠒",
+        "⠲",
+        "⠴",
+        "⠤",
+        "⠄",
+        "⠄",
+        "⠤",
+        "⠴",
+        "⠲",
+        "⠒",
+        "⠂",
+        "⠂",
+        "⠒",
+        "⠚",
+        "⠙",
+        "⠉",
+        "⠁"
+      ]
+    },
+    dots7: {
+      interval: 80,
+      frames: [
+        "⠈",
+        "⠉",
+        "⠋",
+        "⠓",
+        "⠒",
+        "⠐",
+        "⠐",
+        "⠒",
+        "⠖",
+        "⠦",
+        "⠤",
+        "⠠",
+        "⠠",
+        "⠤",
+        "⠦",
+        "⠖",
+        "⠒",
+        "⠐",
+        "⠐",
+        "⠒",
+        "⠓",
+        "⠋",
+        "⠉",
+        "⠈"
+      ]
+    },
+    dots8: {
+      interval: 80,
+      frames: [
+        "⠁",
+        "⠁",
+        "⠉",
+        "⠙",
+        "⠚",
+        "⠒",
+        "⠂",
+        "⠂",
+        "⠒",
+        "⠲",
+        "⠴",
+        "⠤",
+        "⠄",
+        "⠄",
+        "⠤",
+        "⠠",
+        "⠠",
+        "⠤",
+        "⠦",
+        "⠖",
+        "⠒",
+        "⠐",
+        "⠐",
+        "⠒",
+        "⠓",
+        "⠋",
+        "⠉",
+        "⠈",
+        "⠈"
+      ]
+    },
+    dots9: {
+      interval: 80,
+      frames: [
+        "⢹",
+        "⢺",
+        "⢼",
+        "⣸",
+        "⣇",
+        "⡧",
+        "⡗",
+        "⡏"
+      ]
+    },
+    dots10: {
+      interval: 80,
+      frames: [
+        "⢄",
+        "⢂",
+        "⢁",
+        "⡁",
+        "⡈",
+        "⡐",
+        "⡠"
+      ]
+    },
+    dots11: {
+      interval: 100,
+      frames: [
+        "⠁",
+        "⠂",
+        "⠄",
+        "⡀",
+        "⢀",
+        "⠠",
+        "⠐",
+        "⠈"
+      ]
+    },
+    dots12: {
+      interval: 80,
+      frames: [
+        "⢀⠀",
+        "⡀⠀",
+        "⠄⠀",
+        "⢂⠀",
+        "⡂⠀",
+        "⠅⠀",
+        "⢃⠀",
+        "⡃⠀",
+        "⠍⠀",
+        "⢋⠀",
+        "⡋⠀",
+        "⠍⠁",
+        "⢋⠁",
+        "⡋⠁",
+        "⠍⠉",
+        "⠋⠉",
+        "⠋⠉",
+        "⠉⠙",
+        "⠉⠙",
+        "⠉⠩",
+        "⠈⢙",
+        "⠈⡙",
+        "⢈⠩",
+        "⡀⢙",
+        "⠄⡙",
+        "⢂⠩",
+        "⡂⢘",
+        "⠅⡘",
+        "⢃⠨",
+        "⡃⢐",
+        "⠍⡐",
+        "⢋⠠",
+        "⡋⢀",
+        "⠍⡁",
+        "⢋⠁",
+        "⡋⠁",
+        "⠍⠉",
+        "⠋⠉",
+        "⠋⠉",
+        "⠉⠙",
+        "⠉⠙",
+        "⠉⠩",
+        "⠈⢙",
+        "⠈⡙",
+        "⠈⠩",
+        "⠀⢙",
+        "⠀⡙",
+        "⠀⠩",
+        "⠀⢘",
+        "⠀⡘",
+        "⠀⠨",
+        "⠀⢐",
+        "⠀⡐",
+        "⠀⠠",
+        "⠀⢀",
+        "⠀⡀"
+      ]
+    },
+    dots13: {
+      interval: 80,
+      frames: [
+        "⣼",
+        "⣹",
+        "⢻",
+        "⠿",
+        "⡟",
+        "⣏",
+        "⣧",
+        "⣶"
+      ]
+    },
+    dots14: {
+      interval: 80,
+      frames: [
+        "⠉⠉",
+        "⠈⠙",
+        "⠀⠹",
+        "⠀⢸",
+        "⠀⣰",
+        "⢀⣠",
+        "⣀⣀",
+        "⣄⡀",
+        "⣆⠀",
+        "⡇⠀",
+        "⠏⠀",
+        "⠋⠁"
+      ]
+    },
+    dots8Bit: {
+      interval: 80,
+      frames: [
+        "⠀",
+        "⠁",
+        "⠂",
+        "⠃",
+        "⠄",
+        "⠅",
+        "⠆",
+        "⠇",
+        "⡀",
+        "⡁",
+        "⡂",
+        "⡃",
+        "⡄",
+        "⡅",
+        "⡆",
+        "⡇",
+        "⠈",
+        "⠉",
+        "⠊",
+        "⠋",
+        "⠌",
+        "⠍",
+        "⠎",
+        "⠏",
+        "⡈",
+        "⡉",
+        "⡊",
+        "⡋",
+        "⡌",
+        "⡍",
+        "⡎",
+        "⡏",
+        "⠐",
+        "⠑",
+        "⠒",
+        "⠓",
+        "⠔",
+        "⠕",
+        "⠖",
+        "⠗",
+        "⡐",
+        "⡑",
+        "⡒",
+        "⡓",
+        "⡔",
+        "⡕",
+        "⡖",
+        "⡗",
+        "⠘",
+        "⠙",
+        "⠚",
+        "⠛",
+        "⠜",
+        "⠝",
+        "⠞",
+        "⠟",
+        "⡘",
+        "⡙",
+        "⡚",
+        "⡛",
+        "⡜",
+        "⡝",
+        "⡞",
+        "⡟",
+        "⠠",
+        "⠡",
+        "⠢",
+        "⠣",
+        "⠤",
+        "⠥",
+        "⠦",
+        "⠧",
+        "⡠",
+        "⡡",
+        "⡢",
+        "⡣",
+        "⡤",
+        "⡥",
+        "⡦",
+        "⡧",
+        "⠨",
+        "⠩",
+        "⠪",
+        "⠫",
+        "⠬",
+        "⠭",
+        "⠮",
+        "⠯",
+        "⡨",
+        "⡩",
+        "⡪",
+        "⡫",
+        "⡬",
+        "⡭",
+        "⡮",
+        "⡯",
+        "⠰",
+        "⠱",
+        "⠲",
+        "⠳",
+        "⠴",
+        "⠵",
+        "⠶",
+        "⠷",
+        "⡰",
+        "⡱",
+        "⡲",
+        "⡳",
+        "⡴",
+        "⡵",
+        "⡶",
+        "⡷",
+        "⠸",
+        "⠹",
+        "⠺",
+        "⠻",
+        "⠼",
+        "⠽",
+        "⠾",
+        "⠿",
+        "⡸",
+        "⡹",
+        "⡺",
+        "⡻",
+        "⡼",
+        "⡽",
+        "⡾",
+        "⡿",
+        "⢀",
+        "⢁",
+        "⢂",
+        "⢃",
+        "⢄",
+        "⢅",
+        "⢆",
+        "⢇",
+        "⣀",
+        "⣁",
+        "⣂",
+        "⣃",
+        "⣄",
+        "⣅",
+        "⣆",
+        "⣇",
+        "⢈",
+        "⢉",
+        "⢊",
+        "⢋",
+        "⢌",
+        "⢍",
+        "⢎",
+        "⢏",
+        "⣈",
+        "⣉",
+        "⣊",
+        "⣋",
+        "⣌",
+        "⣍",
+        "⣎",
+        "⣏",
+        "⢐",
+        "⢑",
+        "⢒",
+        "⢓",
+        "⢔",
+        "⢕",
+        "⢖",
+        "⢗",
+        "⣐",
+        "⣑",
+        "⣒",
+        "⣓",
+        "⣔",
+        "⣕",
+        "⣖",
+        "⣗",
+        "⢘",
+        "⢙",
+        "⢚",
+        "⢛",
+        "⢜",
+        "⢝",
+        "⢞",
+        "⢟",
+        "⣘",
+        "⣙",
+        "⣚",
+        "⣛",
+        "⣜",
+        "⣝",
+        "⣞",
+        "⣟",
+        "⢠",
+        "⢡",
+        "⢢",
+        "⢣",
+        "⢤",
+        "⢥",
+        "⢦",
+        "⢧",
+        "⣠",
+        "⣡",
+        "⣢",
+        "⣣",
+        "⣤",
+        "⣥",
+        "⣦",
+        "⣧",
+        "⢨",
+        "⢩",
+        "⢪",
+        "⢫",
+        "⢬",
+        "⢭",
+        "⢮",
+        "⢯",
+        "⣨",
+        "⣩",
+        "⣪",
+        "⣫",
+        "⣬",
+        "⣭",
+        "⣮",
+        "⣯",
+        "⢰",
+        "⢱",
+        "⢲",
+        "⢳",
+        "⢴",
+        "⢵",
+        "⢶",
+        "⢷",
+        "⣰",
+        "⣱",
+        "⣲",
+        "⣳",
+        "⣴",
+        "⣵",
+        "⣶",
+        "⣷",
+        "⢸",
+        "⢹",
+        "⢺",
+        "⢻",
+        "⢼",
+        "⢽",
+        "⢾",
+        "⢿",
+        "⣸",
+        "⣹",
+        "⣺",
+        "⣻",
+        "⣼",
+        "⣽",
+        "⣾",
+        "⣿"
+      ]
+    },
+    dotsCircle: {
+      interval: 80,
+      frames: [
+        "⢎ ",
+        "⠎⠁",
+        "⠊⠑",
+        "⠈⠱",
+        " ⡱",
+        "⢀⡰",
+        "⢄⡠",
+        "⢆⡀"
+      ]
+    },
+    sand: {
+      interval: 80,
+      frames: [
+        "⠁",
+        "⠂",
+        "⠄",
+        "⡀",
+        "⡈",
+        "⡐",
+        "⡠",
+        "⣀",
+        "⣁",
+        "⣂",
+        "⣄",
+        "⣌",
+        "⣔",
+        "⣤",
+        "⣥",
+        "⣦",
+        "⣮",
+        "⣶",
+        "⣷",
+        "⣿",
+        "⡿",
+        "⠿",
+        "⢟",
+        "⠟",
+        "⡛",
+        "⠛",
+        "⠫",
+        "⢋",
+        "⠋",
+        "⠍",
+        "⡉",
+        "⠉",
+        "⠑",
+        "⠡",
+        "⢁"
+      ]
+    },
+    line: {
+      interval: 130,
+      frames: [
+        "-",
+        "\\",
+        "|",
+        "/"
+      ]
+    },
+    line2: {
+      interval: 100,
+      frames: [
+        "⠂",
+        "-",
+        "–",
+        "—",
+        "–",
+        "-"
+      ]
+    },
+    rollingLine: {
+      interval: 80,
+      frames: [
+        "/  ",
+        " - ",
+        " \\ ",
+        "  |",
+        "  |",
+        " \\ ",
+        " - ",
+        "/  "
+      ]
+    },
+    pipe: {
+      interval: 100,
+      frames: [
+        "┤",
+        "┘",
+        "┴",
+        "└",
+        "├",
+        "┌",
+        "┬",
+        "┐"
+      ]
+    },
+    simpleDots: {
+      interval: 400,
+      frames: [
+        ".  ",
+        ".. ",
+        "...",
+        "   "
+      ]
+    },
+    simpleDotsScrolling: {
+      interval: 200,
+      frames: [
+        ".  ",
+        ".. ",
+        "...",
+        " ..",
+        "  .",
+        "   "
+      ]
+    },
+    star: {
+      interval: 70,
+      frames: [
+        "✶",
+        "✸",
+        "✹",
+        "✺",
+        "✹",
+        "✷"
+      ]
+    },
+    star2: {
+      interval: 80,
+      frames: [
+        "+",
+        "x",
+        "*"
+      ]
+    },
+    flip: {
+      interval: 70,
+      frames: [
+        "_",
+        "_",
+        "_",
+        "-",
+        "`",
+        "`",
+        "'",
+        "´",
+        "-",
+        "_",
+        "_",
+        "_"
+      ]
+    },
+    hamburger: {
+      interval: 100,
+      frames: [
+        "☱",
+        "☲",
+        "☴"
+      ]
+    },
+    growVertical: {
+      interval: 120,
+      frames: [
+        "▁",
+        "▃",
+        "▄",
+        "▅",
+        "▆",
+        "▇",
+        "▆",
+        "▅",
+        "▄",
+        "▃"
+      ]
+    },
+    growHorizontal: {
+      interval: 120,
+      frames: [
+        "▏",
+        "▎",
+        "▍",
+        "▌",
+        "▋",
+        "▊",
+        "▉",
+        "▊",
+        "▋",
+        "▌",
+        "▍",
+        "▎"
+      ]
+    },
+    balloon: {
+      interval: 140,
+      frames: [
+        " ",
+        ".",
+        "o",
+        "O",
+        "@",
+        "*",
+        " "
+      ]
+    },
+    balloon2: {
+      interval: 120,
+      frames: [
+        ".",
+        "o",
+        "O",
+        "°",
+        "O",
+        "o",
+        "."
+      ]
+    },
+    noise: {
+      interval: 100,
+      frames: [
+        "▓",
+        "▒",
+        "░"
+      ]
+    },
+    bounce: {
+      interval: 120,
+      frames: [
+        "⠁",
+        "⠂",
+        "⠄",
+        "⠂"
+      ]
+    },
+    boxBounce: {
+      interval: 120,
+      frames: [
+        "▖",
+        "▘",
+        "▝",
+        "▗"
+      ]
+    },
+    boxBounce2: {
+      interval: 100,
+      frames: [
+        "▌",
+        "▀",
+        "▐",
+        "▄"
+      ]
+    },
+    triangle: {
+      interval: 50,
+      frames: [
+        "◢",
+        "◣",
+        "◤",
+        "◥"
+      ]
+    },
+    binary: {
+      interval: 80,
+      frames: [
+        "010010",
+        "001100",
+        "100101",
+        "111010",
+        "111101",
+        "010111",
+        "101011",
+        "111000",
+        "110011",
+        "110101"
+      ]
+    },
+    arc: {
+      interval: 100,
+      frames: [
+        "◜",
+        "◠",
+        "◝",
+        "◞",
+        "◡",
+        "◟"
+      ]
+    },
+    circle: {
+      interval: 120,
+      frames: [
+        "◡",
+        "⊙",
+        "◠"
+      ]
+    },
+    squareCorners: {
+      interval: 180,
+      frames: [
+        "◰",
+        "◳",
+        "◲",
+        "◱"
+      ]
+    },
+    circleQuarters: {
+      interval: 120,
+      frames: [
+        "◴",
+        "◷",
+        "◶",
+        "◵"
+      ]
+    },
+    circleHalves: {
+      interval: 50,
+      frames: [
+        "◐",
+        "◓",
+        "◑",
+        "◒"
+      ]
+    },
+    squish: {
+      interval: 100,
+      frames: [
+        "╫",
+        "╪"
+      ]
+    },
+    toggle: {
+      interval: 250,
+      frames: [
+        "⊶",
+        "⊷"
+      ]
+    },
+    toggle2: {
+      interval: 80,
+      frames: [
+        "▫",
+        "▪"
+      ]
+    },
+    toggle3: {
+      interval: 120,
+      frames: [
+        "□",
+        "■"
+      ]
+    },
+    toggle4: {
+      interval: 100,
+      frames: [
+        "■",
+        "□",
+        "▪",
+        "▫"
+      ]
+    },
+    toggle5: {
+      interval: 100,
+      frames: [
+        "▮",
+        "▯"
+      ]
+    },
+    toggle6: {
+      interval: 300,
+      frames: [
+        "ဝ",
+        "၀"
+      ]
+    },
+    toggle7: {
+      interval: 80,
+      frames: [
+        "⦾",
+        "⦿"
+      ]
+    },
+    toggle8: {
+      interval: 100,
+      frames: [
+        "◍",
+        "◌"
+      ]
+    },
+    toggle9: {
+      interval: 100,
+      frames: [
+        "◉",
+        "◎"
+      ]
+    },
+    toggle10: {
+      interval: 100,
+      frames: [
+        "㊂",
+        "㊀",
+        "㊁"
+      ]
+    },
+    toggle11: {
+      interval: 50,
+      frames: [
+        "⧇",
+        "⧆"
+      ]
+    },
+    toggle12: {
+      interval: 120,
+      frames: [
+        "☗",
+        "☖"
+      ]
+    },
+    toggle13: {
+      interval: 80,
+      frames: [
+        "=",
+        "*",
+        "-"
+      ]
+    },
+    arrow: {
+      interval: 100,
+      frames: [
+        "←",
+        "↖",
+        "↑",
+        "↗",
+        "→",
+        "↘",
+        "↓",
+        "↙"
+      ]
+    },
+    arrow2: {
+      interval: 80,
+      frames: [
+        "⬆️ ",
+        "↗️ ",
+        "➡️ ",
+        "↘️ ",
+        "⬇️ ",
+        "↙️ ",
+        "⬅️ ",
+        "↖️ "
+      ]
+    },
+    arrow3: {
+      interval: 120,
+      frames: [
+        "▹▹▹▹▹",
+        "▸▹▹▹▹",
+        "▹▸▹▹▹",
+        "▹▹▸▹▹",
+        "▹▹▹▸▹",
+        "▹▹▹▹▸"
+      ]
+    },
+    bouncingBar: {
+      interval: 80,
+      frames: [
+        "[    ]",
+        "[=   ]",
+        "[==  ]",
+        "[=== ]",
+        "[====]",
+        "[ ===]",
+        "[  ==]",
+        "[   =]",
+        "[    ]",
+        "[   =]",
+        "[  ==]",
+        "[ ===]",
+        "[====]",
+        "[=== ]",
+        "[==  ]",
+        "[=   ]"
+      ]
+    },
+    bouncingBall: {
+      interval: 80,
+      frames: [
+        "( ●    )",
+        "(  ●   )",
+        "(   ●  )",
+        "(    ● )",
+        "(     ●)",
+        "(    ● )",
+        "(   ●  )",
+        "(  ●   )",
+        "( ●    )",
+        "(●     )"
+      ]
+    },
+    smiley: {
+      interval: 200,
+      frames: [
+        "😄 ",
+        "😝 "
+      ]
+    },
+    monkey: {
+      interval: 300,
+      frames: [
+        "🙈 ",
+        "🙈 ",
+        "🙉 ",
+        "🙊 "
+      ]
+    },
+    hearts: {
+      interval: 100,
+      frames: [
+        "💛 ",
+        "💙 ",
+        "💜 ",
+        "💚 ",
+        "💗 "
+      ]
+    },
+    clock: {
+      interval: 100,
+      frames: [
+        "🕛 ",
+        "🕐 ",
+        "🕑 ",
+        "🕒 ",
+        "🕓 ",
+        "🕔 ",
+        "🕕 ",
+        "🕖 ",
+        "🕗 ",
+        "🕘 ",
+        "🕙 ",
+        "🕚 "
+      ]
+    },
+    earth: {
+      interval: 180,
+      frames: [
+        "🌍 ",
+        "🌎 ",
+        "🌏 "
+      ]
+    },
+    material: {
+      interval: 17,
+      frames: [
+        "█▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁",
+        "██▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁",
+        "███▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁",
+        "████▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁",
+        "██████▁▁▁▁▁▁▁▁▁▁▁▁▁▁",
+        "██████▁▁▁▁▁▁▁▁▁▁▁▁▁▁",
+        "███████▁▁▁▁▁▁▁▁▁▁▁▁▁",
+        "████████▁▁▁▁▁▁▁▁▁▁▁▁",
+        "█████████▁▁▁▁▁▁▁▁▁▁▁",
+        "█████████▁▁▁▁▁▁▁▁▁▁▁",
+        "██████████▁▁▁▁▁▁▁▁▁▁",
+        "███████████▁▁▁▁▁▁▁▁▁",
+        "█████████████▁▁▁▁▁▁▁",
+        "██████████████▁▁▁▁▁▁",
+        "██████████████▁▁▁▁▁▁",
+        "▁██████████████▁▁▁▁▁",
+        "▁██████████████▁▁▁▁▁",
+        "▁██████████████▁▁▁▁▁",
+        "▁▁██████████████▁▁▁▁",
+        "▁▁▁██████████████▁▁▁",
+        "▁▁▁▁█████████████▁▁▁",
+        "▁▁▁▁██████████████▁▁",
+        "▁▁▁▁██████████████▁▁",
+        "▁▁▁▁▁██████████████▁",
+        "▁▁▁▁▁██████████████▁",
+        "▁▁▁▁▁██████████████▁",
+        "▁▁▁▁▁▁██████████████",
+        "▁▁▁▁▁▁██████████████",
+        "▁▁▁▁▁▁▁█████████████",
+        "▁▁▁▁▁▁▁█████████████",
+        "▁▁▁▁▁▁▁▁████████████",
+        "▁▁▁▁▁▁▁▁████████████",
+        "▁▁▁▁▁▁▁▁▁███████████",
+        "▁▁▁▁▁▁▁▁▁███████████",
+        "▁▁▁▁▁▁▁▁▁▁██████████",
+        "▁▁▁▁▁▁▁▁▁▁██████████",
+        "▁▁▁▁▁▁▁▁▁▁▁▁████████",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁███████",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁██████",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█████",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█████",
+        "█▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁████",
+        "██▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁███",
+        "██▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁███",
+        "███▁▁▁▁▁▁▁▁▁▁▁▁▁▁███",
+        "████▁▁▁▁▁▁▁▁▁▁▁▁▁▁██",
+        "█████▁▁▁▁▁▁▁▁▁▁▁▁▁▁█",
+        "█████▁▁▁▁▁▁▁▁▁▁▁▁▁▁█",
+        "██████▁▁▁▁▁▁▁▁▁▁▁▁▁█",
+        "████████▁▁▁▁▁▁▁▁▁▁▁▁",
+        "█████████▁▁▁▁▁▁▁▁▁▁▁",
+        "█████████▁▁▁▁▁▁▁▁▁▁▁",
+        "█████████▁▁▁▁▁▁▁▁▁▁▁",
+        "█████████▁▁▁▁▁▁▁▁▁▁▁",
+        "███████████▁▁▁▁▁▁▁▁▁",
+        "████████████▁▁▁▁▁▁▁▁",
+        "████████████▁▁▁▁▁▁▁▁",
+        "██████████████▁▁▁▁▁▁",
+        "██████████████▁▁▁▁▁▁",
+        "▁██████████████▁▁▁▁▁",
+        "▁██████████████▁▁▁▁▁",
+        "▁▁▁█████████████▁▁▁▁",
+        "▁▁▁▁▁████████████▁▁▁",
+        "▁▁▁▁▁████████████▁▁▁",
+        "▁▁▁▁▁▁███████████▁▁▁",
+        "▁▁▁▁▁▁▁▁█████████▁▁▁",
+        "▁▁▁▁▁▁▁▁█████████▁▁▁",
+        "▁▁▁▁▁▁▁▁▁█████████▁▁",
+        "▁▁▁▁▁▁▁▁▁█████████▁▁",
+        "▁▁▁▁▁▁▁▁▁▁█████████▁",
+        "▁▁▁▁▁▁▁▁▁▁▁████████▁",
+        "▁▁▁▁▁▁▁▁▁▁▁████████▁",
+        "▁▁▁▁▁▁▁▁▁▁▁▁███████▁",
+        "▁▁▁▁▁▁▁▁▁▁▁▁███████▁",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁███████",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁███████",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█████",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁████",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁████",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁████",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁███",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁███",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁██",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁██",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁██",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁",
+        "▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁"
+      ]
+    },
+    moon: {
+      interval: 80,
+      frames: [
+        "🌑 ",
+        "🌒 ",
+        "🌓 ",
+        "🌔 ",
+        "🌕 ",
+        "🌖 ",
+        "🌗 ",
+        "🌘 "
+      ]
+    },
+    runner: {
+      interval: 140,
+      frames: [
+        "🚶 ",
+        "🏃 "
+      ]
+    },
+    pong: {
+      interval: 80,
+      frames: [
+        "▐⠂       ▌",
+        "▐⠈       ▌",
+        "▐ ⠂      ▌",
+        "▐ ⠠      ▌",
+        "▐  ⡀     ▌",
+        "▐  ⠠     ▌",
+        "▐   ⠂    ▌",
+        "▐   ⠈    ▌",
+        "▐    ⠂   ▌",
+        "▐    ⠠   ▌",
+        "▐     ⡀  ▌",
+        "▐     ⠠  ▌",
+        "▐      ⠂ ▌",
+        "▐      ⠈ ▌",
+        "▐       ⠂▌",
+        "▐       ⠠▌",
+        "▐       ⡀▌",
+        "▐      ⠠ ▌",
+        "▐      ⠂ ▌",
+        "▐     ⠈  ▌",
+        "▐     ⠂  ▌",
+        "▐    ⠠   ▌",
+        "▐    ⡀   ▌",
+        "▐   ⠠    ▌",
+        "▐   ⠂    ▌",
+        "▐  ⠈     ▌",
+        "▐  ⠂     ▌",
+        "▐ ⠠      ▌",
+        "▐ ⡀      ▌",
+        "▐⠠       ▌"
+      ]
+    },
+    shark: {
+      interval: 120,
+      frames: [
+        "▐|\\____________▌",
+        "▐_|\\___________▌",
+        "▐__|\\__________▌",
+        "▐___|\\_________▌",
+        "▐____|\\________▌",
+        "▐_____|\\_______▌",
+        "▐______|\\______▌",
+        "▐_______|\\_____▌",
+        "▐________|\\____▌",
+        "▐_________|\\___▌",
+        "▐__________|\\__▌",
+        "▐___________|\\_▌",
+        "▐____________|\\▌",
+        "▐____________/|▌",
+        "▐___________/|_▌",
+        "▐__________/|__▌",
+        "▐_________/|___▌",
+        "▐________/|____▌",
+        "▐_______/|_____▌",
+        "▐______/|______▌",
+        "▐_____/|_______▌",
+        "▐____/|________▌",
+        "▐___/|_________▌",
+        "▐__/|__________▌",
+        "▐_/|___________▌",
+        "▐/|____________▌"
+      ]
+    },
+    dqpb: {
+      interval: 100,
+      frames: [
+        "d",
+        "q",
+        "p",
+        "b"
+      ]
+    },
+    weather: {
+      interval: 100,
+      frames: [
+        "☀️ ",
+        "☀️ ",
+        "☀️ ",
+        "🌤 ",
+        "⛅️ ",
+        "🌥 ",
+        "☁️ ",
+        "🌧 ",
+        "🌨 ",
+        "🌧 ",
+        "🌨 ",
+        "🌧 ",
+        "🌨 ",
+        "⛈ ",
+        "🌨 ",
+        "🌧 ",
+        "🌨 ",
+        "☁️ ",
+        "🌥 ",
+        "⛅️ ",
+        "🌤 ",
+        "☀️ ",
+        "☀️ "
+      ]
+    },
+    christmas: {
+      interval: 400,
+      frames: [
+        "🌲",
+        "🎄"
+      ]
+    },
+    grenade: {
+      interval: 80,
+      frames: [
+        "،  ",
+        "′  ",
+        " ´ ",
+        " ‾ ",
+        "  ⸌",
+        "  ⸊",
+        "  |",
+        "  ⁎",
+        "  ⁕",
+        " ෴ ",
+        "  ⁓",
+        "   ",
+        "   ",
+        "   "
+      ]
+    },
+    point: {
+      interval: 125,
+      frames: [
+        "∙∙∙",
+        "●∙∙",
+        "∙●∙",
+        "∙∙●",
+        "∙∙∙"
+      ]
+    },
+    layer: {
+      interval: 150,
+      frames: [
+        "-",
+        "=",
+        "≡"
+      ]
+    },
+    betaWave: {
+      interval: 80,
+      frames: [
+        "ρββββββ",
+        "βρβββββ",
+        "ββρββββ",
+        "βββρβββ",
+        "ββββρββ",
+        "βββββρβ",
+        "ββββββρ"
+      ]
+    },
+    fingerDance: {
+      interval: 160,
+      frames: [
+        "🤘 ",
+        "🤟 ",
+        "🖖 ",
+        "✋ ",
+        "🤚 ",
+        "👆 "
+      ]
+    },
+    fistBump: {
+      interval: 80,
+      frames: [
+        "🤜　　　　🤛 ",
+        "🤜　　　　🤛 ",
+        "🤜　　　　🤛 ",
+        "　🤜　　🤛　 ",
+        "　　🤜🤛　　 ",
+        "　🤜✨🤛　　 ",
+        "🤜　✨　🤛　 "
+      ]
+    },
+    soccerHeader: {
+      interval: 80,
+      frames: [
+        " 🧑⚽️       🧑 ",
+        "🧑  ⚽️      🧑 ",
+        "🧑   ⚽️     🧑 ",
+        "🧑    ⚽️    🧑 ",
+        "🧑     ⚽️   🧑 ",
+        "🧑      ⚽️  🧑 ",
+        "🧑       ⚽️🧑  ",
+        "🧑      ⚽️  🧑 ",
+        "🧑     ⚽️   🧑 ",
+        "🧑    ⚽️    🧑 ",
+        "🧑   ⚽️     🧑 ",
+        "🧑  ⚽️      🧑 "
+      ]
+    },
+    mindblown: {
+      interval: 160,
+      frames: [
+        "😐 ",
+        "😐 ",
+        "😮 ",
+        "😮 ",
+        "😦 ",
+        "😦 ",
+        "😧 ",
+        "😧 ",
+        "🤯 ",
+        "💥 ",
+        "✨ ",
+        "　 ",
+        "　 ",
+        "　 "
+      ]
+    },
+    speaker: {
+      interval: 160,
+      frames: [
+        "🔈 ",
+        "🔉 ",
+        "🔊 ",
+        "🔉 "
+      ]
+    },
+    orangePulse: {
+      interval: 100,
+      frames: [
+        "🔸 ",
+        "🔶 ",
+        "🟠 ",
+        "🟠 ",
+        "🔶 "
+      ]
+    },
+    bluePulse: {
+      interval: 100,
+      frames: [
+        "🔹 ",
+        "🔷 ",
+        "🔵 ",
+        "🔵 ",
+        "🔷 "
+      ]
+    },
+    orangeBluePulse: {
+      interval: 100,
+      frames: [
+        "🔸 ",
+        "🔶 ",
+        "🟠 ",
+        "🟠 ",
+        "🔶 ",
+        "🔹 ",
+        "🔷 ",
+        "🔵 ",
+        "🔵 ",
+        "🔷 "
+      ]
+    },
+    timeTravel: {
+      interval: 100,
+      frames: [
+        "🕛 ",
+        "🕚 ",
+        "🕙 ",
+        "🕘 ",
+        "🕗 ",
+        "🕖 ",
+        "🕕 ",
+        "🕔 ",
+        "🕓 ",
+        "🕒 ",
+        "🕑 ",
+        "🕐 "
+      ]
+    },
+    aesthetic: {
+      interval: 80,
+      frames: [
+        "▰▱▱▱▱▱▱",
+        "▰▰▱▱▱▱▱",
+        "▰▰▰▱▱▱▱",
+        "▰▰▰▰▱▱▱",
+        "▰▰▰▰▰▱▱",
+        "▰▰▰▰▰▰▱",
+        "▰▰▰▰▰▰▰",
+        "▰▱▱▱▱▱▱"
+      ]
+    },
+    dwarfFortress: {
+      interval: 80,
+      frames: [
+        " ██████£££  ",
+        "☺██████£££  ",
+        "☺██████£££  ",
+        "☺▓█████£££  ",
+        "☺▓█████£££  ",
+        "☺▒█████£££  ",
+        "☺▒█████£££  ",
+        "☺░█████£££  ",
+        "☺░█████£££  ",
+        "☺ █████£££  ",
+        " ☺█████£££  ",
+        " ☺█████£££  ",
+        " ☺▓████£££  ",
+        " ☺▓████£££  ",
+        " ☺▒████£££  ",
+        " ☺▒████£££  ",
+        " ☺░████£££  ",
+        " ☺░████£££  ",
+        " ☺ ████£££  ",
+        "  ☺████£££  ",
+        "  ☺████£££  ",
+        "  ☺▓███£££  ",
+        "  ☺▓███£££  ",
+        "  ☺▒███£££  ",
+        "  ☺▒███£££  ",
+        "  ☺░███£££  ",
+        "  ☺░███£££  ",
+        "  ☺ ███£££  ",
+        "   ☺███£££  ",
+        "   ☺███£££  ",
+        "   ☺▓██£££  ",
+        "   ☺▓██£££  ",
+        "   ☺▒██£££  ",
+        "   ☺▒██£££  ",
+        "   ☺░██£££  ",
+        "   ☺░██£££  ",
+        "   ☺ ██£££  ",
+        "    ☺██£££  ",
+        "    ☺██£££  ",
+        "    ☺▓█£££  ",
+        "    ☺▓█£££  ",
+        "    ☺▒█£££  ",
+        "    ☺▒█£££  ",
+        "    ☺░█£££  ",
+        "    ☺░█£££  ",
+        "    ☺ █£££  ",
+        "     ☺█£££  ",
+        "     ☺█£££  ",
+        "     ☺▓£££  ",
+        "     ☺▓£££  ",
+        "     ☺▒£££  ",
+        "     ☺▒£££  ",
+        "     ☺░£££  ",
+        "     ☺░£££  ",
+        "     ☺ £££  ",
+        "      ☺£££  ",
+        "      ☺£££  ",
+        "      ☺▓££  ",
+        "      ☺▓££  ",
+        "      ☺▒££  ",
+        "      ☺▒££  ",
+        "      ☺░££  ",
+        "      ☺░££  ",
+        "      ☺ ££  ",
+        "       ☺££  ",
+        "       ☺££  ",
+        "       ☺▓£  ",
+        "       ☺▓£  ",
+        "       ☺▒£  ",
+        "       ☺▒£  ",
+        "       ☺░£  ",
+        "       ☺░£  ",
+        "       ☺ £  ",
+        "        ☺£  ",
+        "        ☺£  ",
+        "        ☺▓  ",
+        "        ☺▓  ",
+        "        ☺▒  ",
+        "        ☺▒  ",
+        "        ☺░  ",
+        "        ☺░  ",
+        "        ☺   ",
+        "        ☺  &",
+        "        ☺ ☼&",
+        "       ☺ ☼ &",
+        "       ☺☼  &",
+        "      ☺☼  & ",
+        "      ‼   & ",
+        "     ☺   &  ",
+        "    ‼    &  ",
+        "   ☺    &   ",
+        "  ‼     &   ",
+        " ☺     &    ",
+        "‼      &    ",
+        "      &     ",
+        "      &     ",
+        "     &   ░  ",
+        "     &   ▒  ",
+        "    &    ▓  ",
+        "    &    £  ",
+        "   &    ░£  ",
+        "   &    ▒£  ",
+        "  &     ▓£  ",
+        "  &     ££  ",
+        " &     ░££  ",
+        " &     ▒££  ",
+        "&      ▓££  ",
+        "&      £££  ",
+        "      ░£££  ",
+        "      ▒£££  ",
+        "      ▓£££  ",
+        "      █£££  ",
+        "     ░█£££  ",
+        "     ▒█£££  ",
+        "     ▓█£££  ",
+        "     ██£££  ",
+        "    ░██£££  ",
+        "    ▒██£££  ",
+        "    ▓██£££  ",
+        "    ███£££  ",
+        "   ░███£££  ",
+        "   ▒███£££  ",
+        "   ▓███£££  ",
+        "   ████£££  ",
+        "  ░████£££  ",
+        "  ▒████£££  ",
+        "  ▓████£££  ",
+        "  █████£££  ",
+        " ░█████£££  ",
+        " ▒█████£££  ",
+        " ▓█████£££  ",
+        " ██████£££  ",
+        " ██████£££  "
+      ]
+    },
+    fish: {
+      interval: 80,
+      frames: [
+        "~~~~~~~~~~~~~~~~~~~~",
+        "> ~~~~~~~~~~~~~~~~~~",
+        "º> ~~~~~~~~~~~~~~~~~",
+        "(º> ~~~~~~~~~~~~~~~~",
+        "((º> ~~~~~~~~~~~~~~~",
+        "<((º> ~~~~~~~~~~~~~~",
+        "><((º> ~~~~~~~~~~~~~",
+        " ><((º> ~~~~~~~~~~~~",
+        "~ ><((º> ~~~~~~~~~~~",
+        "~~ <>((º> ~~~~~~~~~~",
+        "~~~ ><((º> ~~~~~~~~~",
+        "~~~~ <>((º> ~~~~~~~~",
+        "~~~~~ ><((º> ~~~~~~~",
+        "~~~~~~ <>((º> ~~~~~~",
+        "~~~~~~~ ><((º> ~~~~~",
+        "~~~~~~~~ <>((º> ~~~~",
+        "~~~~~~~~~ ><((º> ~~~",
+        "~~~~~~~~~~ <>((º> ~~",
+        "~~~~~~~~~~~ ><((º> ~",
+        "~~~~~~~~~~~~ <>((º> ",
+        "~~~~~~~~~~~~~ ><((º>",
+        "~~~~~~~~~~~~~~ <>((º",
+        "~~~~~~~~~~~~~~~ ><((",
+        "~~~~~~~~~~~~~~~~ <>(",
+        "~~~~~~~~~~~~~~~~~ ><",
+        "~~~~~~~~~~~~~~~~~~ <",
+        "~~~~~~~~~~~~~~~~~~~~"
+      ]
+    }
+  };
+});
+
+// node_modules/cli-spinners/index.js
+var cli_spinners_default, spinnersList;
+var init_cli_spinners = __esm(() => {
+  init_spinners();
+  cli_spinners_default = spinners_default;
+  spinnersList = Object.keys(spinners_default);
+});
+
+// node_modules/yoctocolors/base.js
+import tty2 from "node:tty";
+var hasColors, format = (open, close) => {
+  if (!hasColors) {
+    return (input) => input;
+  }
+  const openCode = `\x1B[${open}m`;
+  const closeCode = `\x1B[${close}m`;
+  return (input) => {
+    const string = input + "";
+    let index = string.indexOf(closeCode);
+    if (index === -1) {
+      return openCode + string + closeCode;
+    }
+    let result = openCode;
+    let lastIndex = 0;
+    const reopenOnNestedClose = close === 22;
+    const replaceCode = (reopenOnNestedClose ? closeCode : "") + openCode;
+    while (index !== -1) {
+      result += string.slice(lastIndex, index) + replaceCode;
+      lastIndex = index + closeCode.length;
+      index = string.indexOf(closeCode, lastIndex);
+    }
+    result += string.slice(lastIndex) + closeCode;
+    return result;
+  };
+}, reset, bold, dim, italic, underline, overline, inverse, hidden, strikethrough, black, red, green, yellow, blue, magenta, cyan, white, gray, bgBlack, bgRed, bgGreen, bgYellow, bgBlue, bgMagenta, bgCyan, bgWhite, bgGray, redBright, greenBright, yellowBright, blueBright, magentaBright, cyanBright, whiteBright, bgRedBright, bgGreenBright, bgYellowBright, bgBlueBright, bgMagentaBright, bgCyanBright, bgWhiteBright;
+var init_base = __esm(() => {
+  hasColors = tty2?.WriteStream?.prototype?.hasColors?.() ?? false;
+  reset = format(0, 0);
+  bold = format(1, 22);
+  dim = format(2, 22);
+  italic = format(3, 23);
+  underline = format(4, 24);
+  overline = format(53, 55);
+  inverse = format(7, 27);
+  hidden = format(8, 28);
+  strikethrough = format(9, 29);
+  black = format(30, 39);
+  red = format(31, 39);
+  green = format(32, 39);
+  yellow = format(33, 39);
+  blue = format(34, 39);
+  magenta = format(35, 39);
+  cyan = format(36, 39);
+  white = format(37, 39);
+  gray = format(90, 39);
+  bgBlack = format(40, 49);
+  bgRed = format(41, 49);
+  bgGreen = format(42, 49);
+  bgYellow = format(43, 49);
+  bgBlue = format(44, 49);
+  bgMagenta = format(45, 49);
+  bgCyan = format(46, 49);
+  bgWhite = format(47, 49);
+  bgGray = format(100, 49);
+  redBright = format(91, 39);
+  greenBright = format(92, 39);
+  yellowBright = format(93, 39);
+  blueBright = format(94, 39);
+  magentaBright = format(95, 39);
+  cyanBright = format(96, 39);
+  whiteBright = format(97, 39);
+  bgRedBright = format(101, 49);
+  bgGreenBright = format(102, 49);
+  bgYellowBright = format(103, 49);
+  bgBlueBright = format(104, 49);
+  bgMagentaBright = format(105, 49);
+  bgCyanBright = format(106, 49);
+  bgWhiteBright = format(107, 49);
+});
+
+// node_modules/yoctocolors/index.js
+var init_yoctocolors = __esm(() => {
+  init_base();
+  init_base();
+});
+
+// node_modules/is-unicode-supported/index.js
+import process6 from "node:process";
+function isUnicodeSupported() {
+  const { env: env2 } = process6;
+  const { TERM, TERM_PROGRAM } = env2;
+  if (process6.platform !== "win32") {
+    return TERM !== "linux";
+  }
+  return Boolean(env2.WT_SESSION) || Boolean(env2.TERMINUS_SUBLIME) || env2.ConEmuTask === "{cmd::Cmder}" || TERM_PROGRAM === "Terminus-Sublime" || TERM_PROGRAM === "vscode" || TERM === "xterm-256color" || TERM === "alacritty" || TERM === "rxvt-unicode" || TERM === "rxvt-unicode-256color" || env2.TERMINAL_EMULATOR === "JetBrains-JediTerm";
+}
+var init_is_unicode_supported = () => {};
+
+// node_modules/log-symbols/symbols.js
+var exports_symbols = {};
+__export(exports_symbols, {
+  warning: () => warning,
+  success: () => success,
+  info: () => info,
+  error: () => error
+});
+var _isUnicodeSupported, info, success, warning, error;
+var init_symbols = __esm(() => {
+  init_yoctocolors();
+  init_is_unicode_supported();
+  _isUnicodeSupported = isUnicodeSupported();
+  info = blue(_isUnicodeSupported ? "ℹ" : "i");
+  success = green(_isUnicodeSupported ? "✔" : "√");
+  warning = yellow(_isUnicodeSupported ? "⚠" : "‼");
+  error = red(_isUnicodeSupported ? "✖" : "×");
+});
+
+// node_modules/log-symbols/index.js
+var init_log_symbols = __esm(() => {
+  init_symbols();
+});
+
+// node_modules/ora/node_modules/strip-ansi/node_modules/ansi-regex/index.js
+function ansiRegex({ onlyFirst = false } = {}) {
+  const ST = "(?:\\u0007|\\u001B\\u005C|\\u009C)";
+  const osc = `(?:\\u001B\\][\\s\\S]*?${ST})`;
+  const csi = "[\\u001B\\u009B][[\\]()#;?]*(?:\\d{1,4}(?:[;:]\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]";
+  const pattern = `${osc}|${csi}`;
+  return new RegExp(pattern, onlyFirst ? undefined : "g");
+}
+
+// node_modules/ora/node_modules/strip-ansi/index.js
+function stripAnsi(string) {
+  if (typeof string !== "string") {
+    throw new TypeError(`Expected a \`string\`, got \`${typeof string}\``);
+  }
+  return string.replace(regex, "");
+}
+var regex;
+var init_strip_ansi = __esm(() => {
+  regex = ansiRegex();
+});
+
+// node_modules/string-width/node_modules/strip-ansi/node_modules/ansi-regex/index.js
+function ansiRegex2({ onlyFirst = false } = {}) {
+  const ST = "(?:\\u0007|\\u001B\\u005C|\\u009C)";
+  const osc = `(?:\\u001B\\][\\s\\S]*?${ST})`;
+  const csi = "[\\u001B\\u009B][[\\]()#;?]*(?:\\d{1,4}(?:[;:]\\d{0,4})*)?[\\dA-PR-TZcf-nq-uy=><~]";
+  const pattern = `${osc}|${csi}`;
+  return new RegExp(pattern, onlyFirst ? undefined : "g");
+}
+
+// node_modules/string-width/node_modules/strip-ansi/index.js
+function stripAnsi2(string) {
+  if (typeof string !== "string") {
+    throw new TypeError(`Expected a \`string\`, got \`${typeof string}\``);
+  }
+  return string.replace(regex2, "");
+}
+var regex2;
+var init_strip_ansi2 = __esm(() => {
+  regex2 = ansiRegex2();
+});
+
+// node_modules/get-east-asian-width/lookup.js
+function isAmbiguous(x) {
+  return x === 161 || x === 164 || x === 167 || x === 168 || x === 170 || x === 173 || x === 174 || x >= 176 && x <= 180 || x >= 182 && x <= 186 || x >= 188 && x <= 191 || x === 198 || x === 208 || x === 215 || x === 216 || x >= 222 && x <= 225 || x === 230 || x >= 232 && x <= 234 || x === 236 || x === 237 || x === 240 || x === 242 || x === 243 || x >= 247 && x <= 250 || x === 252 || x === 254 || x === 257 || x === 273 || x === 275 || x === 283 || x === 294 || x === 295 || x === 299 || x >= 305 && x <= 307 || x === 312 || x >= 319 && x <= 322 || x === 324 || x >= 328 && x <= 331 || x === 333 || x === 338 || x === 339 || x === 358 || x === 359 || x === 363 || x === 462 || x === 464 || x === 466 || x === 468 || x === 470 || x === 472 || x === 474 || x === 476 || x === 593 || x === 609 || x === 708 || x === 711 || x >= 713 && x <= 715 || x === 717 || x === 720 || x >= 728 && x <= 731 || x === 733 || x === 735 || x >= 768 && x <= 879 || x >= 913 && x <= 929 || x >= 931 && x <= 937 || x >= 945 && x <= 961 || x >= 963 && x <= 969 || x === 1025 || x >= 1040 && x <= 1103 || x === 1105 || x === 8208 || x >= 8211 && x <= 8214 || x === 8216 || x === 8217 || x === 8220 || x === 8221 || x >= 8224 && x <= 8226 || x >= 8228 && x <= 8231 || x === 8240 || x === 8242 || x === 8243 || x === 8245 || x === 8251 || x === 8254 || x === 8308 || x === 8319 || x >= 8321 && x <= 8324 || x === 8364 || x === 8451 || x === 8453 || x === 8457 || x === 8467 || x === 8470 || x === 8481 || x === 8482 || x === 8486 || x === 8491 || x === 8531 || x === 8532 || x >= 8539 && x <= 8542 || x >= 8544 && x <= 8555 || x >= 8560 && x <= 8569 || x === 8585 || x >= 8592 && x <= 8601 || x === 8632 || x === 8633 || x === 8658 || x === 8660 || x === 8679 || x === 8704 || x === 8706 || x === 8707 || x === 8711 || x === 8712 || x === 8715 || x === 8719 || x === 8721 || x === 8725 || x === 8730 || x >= 8733 && x <= 8736 || x === 8739 || x === 8741 || x >= 8743 && x <= 8748 || x === 8750 || x >= 8756 && x <= 8759 || x === 8764 || x === 8765 || x === 8776 || x === 8780 || x === 8786 || x === 8800 || x === 8801 || x >= 8804 && x <= 8807 || x === 8810 || x === 8811 || x === 8814 || x === 8815 || x === 8834 || x === 8835 || x === 8838 || x === 8839 || x === 8853 || x === 8857 || x === 8869 || x === 8895 || x === 8978 || x >= 9312 && x <= 9449 || x >= 9451 && x <= 9547 || x >= 9552 && x <= 9587 || x >= 9600 && x <= 9615 || x >= 9618 && x <= 9621 || x === 9632 || x === 9633 || x >= 9635 && x <= 9641 || x === 9650 || x === 9651 || x === 9654 || x === 9655 || x === 9660 || x === 9661 || x === 9664 || x === 9665 || x >= 9670 && x <= 9672 || x === 9675 || x >= 9678 && x <= 9681 || x >= 9698 && x <= 9701 || x === 9711 || x === 9733 || x === 9734 || x === 9737 || x === 9742 || x === 9743 || x === 9756 || x === 9758 || x === 9792 || x === 9794 || x === 9824 || x === 9825 || x >= 9827 && x <= 9829 || x >= 9831 && x <= 9834 || x === 9836 || x === 9837 || x === 9839 || x === 9886 || x === 9887 || x === 9919 || x >= 9926 && x <= 9933 || x >= 9935 && x <= 9939 || x >= 9941 && x <= 9953 || x === 9955 || x === 9960 || x === 9961 || x >= 9963 && x <= 9969 || x === 9972 || x >= 9974 && x <= 9977 || x === 9979 || x === 9980 || x === 9982 || x === 9983 || x === 10045 || x >= 10102 && x <= 10111 || x >= 11094 && x <= 11097 || x >= 12872 && x <= 12879 || x >= 57344 && x <= 63743 || x >= 65024 && x <= 65039 || x === 65533 || x >= 127232 && x <= 127242 || x >= 127248 && x <= 127277 || x >= 127280 && x <= 127337 || x >= 127344 && x <= 127373 || x === 127375 || x === 127376 || x >= 127387 && x <= 127404 || x >= 917760 && x <= 917999 || x >= 983040 && x <= 1048573 || x >= 1048576 && x <= 1114109;
+}
+function isFullWidth(x) {
+  return x === 12288 || x >= 65281 && x <= 65376 || x >= 65504 && x <= 65510;
+}
+function isWide(x) {
+  return x >= 4352 && x <= 4447 || x === 8986 || x === 8987 || x === 9001 || x === 9002 || x >= 9193 && x <= 9196 || x === 9200 || x === 9203 || x === 9725 || x === 9726 || x === 9748 || x === 9749 || x >= 9776 && x <= 9783 || x >= 9800 && x <= 9811 || x === 9855 || x >= 9866 && x <= 9871 || x === 9875 || x === 9889 || x === 9898 || x === 9899 || x === 9917 || x === 9918 || x === 9924 || x === 9925 || x === 9934 || x === 9940 || x === 9962 || x === 9970 || x === 9971 || x === 9973 || x === 9978 || x === 9981 || x === 9989 || x === 9994 || x === 9995 || x === 10024 || x === 10060 || x === 10062 || x >= 10067 && x <= 10069 || x === 10071 || x >= 10133 && x <= 10135 || x === 10160 || x === 10175 || x === 11035 || x === 11036 || x === 11088 || x === 11093 || x >= 11904 && x <= 11929 || x >= 11931 && x <= 12019 || x >= 12032 && x <= 12245 || x >= 12272 && x <= 12287 || x >= 12289 && x <= 12350 || x >= 12353 && x <= 12438 || x >= 12441 && x <= 12543 || x >= 12549 && x <= 12591 || x >= 12593 && x <= 12686 || x >= 12688 && x <= 12773 || x >= 12783 && x <= 12830 || x >= 12832 && x <= 12871 || x >= 12880 && x <= 42124 || x >= 42128 && x <= 42182 || x >= 43360 && x <= 43388 || x >= 44032 && x <= 55203 || x >= 63744 && x <= 64255 || x >= 65040 && x <= 65049 || x >= 65072 && x <= 65106 || x >= 65108 && x <= 65126 || x >= 65128 && x <= 65131 || x >= 94176 && x <= 94180 || x >= 94192 && x <= 94198 || x >= 94208 && x <= 101589 || x >= 101631 && x <= 101662 || x >= 101760 && x <= 101874 || x >= 110576 && x <= 110579 || x >= 110581 && x <= 110587 || x === 110589 || x === 110590 || x >= 110592 && x <= 110882 || x === 110898 || x >= 110928 && x <= 110930 || x === 110933 || x >= 110948 && x <= 110951 || x >= 110960 && x <= 111355 || x >= 119552 && x <= 119638 || x >= 119648 && x <= 119670 || x === 126980 || x === 127183 || x === 127374 || x >= 127377 && x <= 127386 || x >= 127488 && x <= 127490 || x >= 127504 && x <= 127547 || x >= 127552 && x <= 127560 || x === 127568 || x === 127569 || x >= 127584 && x <= 127589 || x >= 127744 && x <= 127776 || x >= 127789 && x <= 127797 || x >= 127799 && x <= 127868 || x >= 127870 && x <= 127891 || x >= 127904 && x <= 127946 || x >= 127951 && x <= 127955 || x >= 127968 && x <= 127984 || x === 127988 || x >= 127992 && x <= 128062 || x === 128064 || x >= 128066 && x <= 128252 || x >= 128255 && x <= 128317 || x >= 128331 && x <= 128334 || x >= 128336 && x <= 128359 || x === 128378 || x === 128405 || x === 128406 || x === 128420 || x >= 128507 && x <= 128591 || x >= 128640 && x <= 128709 || x === 128716 || x >= 128720 && x <= 128722 || x >= 128725 && x <= 128728 || x >= 128732 && x <= 128735 || x === 128747 || x === 128748 || x >= 128756 && x <= 128764 || x >= 128992 && x <= 129003 || x === 129008 || x >= 129292 && x <= 129338 || x >= 129340 && x <= 129349 || x >= 129351 && x <= 129535 || x >= 129648 && x <= 129660 || x >= 129664 && x <= 129674 || x >= 129678 && x <= 129734 || x === 129736 || x >= 129741 && x <= 129756 || x >= 129759 && x <= 129770 || x >= 129775 && x <= 129784 || x >= 131072 && x <= 196605 || x >= 196608 && x <= 262141;
+}
+var init_lookup = () => {};
+
+// node_modules/get-east-asian-width/index.js
+function validate(codePoint) {
+  if (!Number.isSafeInteger(codePoint)) {
+    throw new TypeError(`Expected a code point, got \`${typeof codePoint}\`.`);
+  }
+}
+function eastAsianWidth(codePoint, { ambiguousAsWide = false } = {}) {
+  validate(codePoint);
+  if (isFullWidth(codePoint) || isWide(codePoint) || ambiguousAsWide && isAmbiguous(codePoint)) {
+    return 2;
+  }
+  return 1;
+}
+var init_get_east_asian_width = __esm(() => {
+  init_lookup();
+});
+
+// node_modules/string-width/index.js
+function baseVisible(segment) {
+  return segment.replace(leadingNonPrintingRegex, "");
+}
+function isZeroWidthCluster(segment) {
+  return zeroWidthClusterRegex.test(segment);
+}
+function trailingHalfwidthWidth(segment, eastAsianWidthOptions) {
+  let extra = 0;
+  if (segment.length > 1) {
+    for (const char of segment.slice(1)) {
+      if (char >= "＀" && char <= "￯") {
+        extra += eastAsianWidth(char.codePointAt(0), eastAsianWidthOptions);
+      }
+    }
+  }
+  return extra;
+}
+function stringWidth(input, options = {}) {
+  if (typeof input !== "string" || input.length === 0) {
+    return 0;
+  }
+  const {
+    ambiguousIsNarrow = true,
+    countAnsiEscapeCodes = false
+  } = options;
+  let string = input;
+  if (!countAnsiEscapeCodes) {
+    string = stripAnsi2(string);
+  }
+  if (string.length === 0) {
+    return 0;
+  }
+  let width = 0;
+  const eastAsianWidthOptions = { ambiguousAsWide: !ambiguousIsNarrow };
+  for (const { segment } of segmenter.segment(string)) {
+    if (isZeroWidthCluster(segment)) {
+      continue;
+    }
+    if (rgiEmojiRegex.test(segment)) {
+      width += 2;
+      continue;
+    }
+    const codePoint = baseVisible(segment).codePointAt(0);
+    width += eastAsianWidth(codePoint, eastAsianWidthOptions);
+    width += trailingHalfwidthWidth(segment, eastAsianWidthOptions);
+  }
+  return width;
+}
+var segmenter, zeroWidthClusterRegex, leadingNonPrintingRegex, rgiEmojiRegex;
+var init_string_width = __esm(() => {
+  init_strip_ansi2();
+  init_get_east_asian_width();
+  segmenter = new Intl.Segmenter;
+  zeroWidthClusterRegex = /^(?:\p{Default_Ignorable_Code_Point}|\p{Control}|\p{Mark}|\p{Surrogate})+$/v;
+  leadingNonPrintingRegex = /^[\p{Default_Ignorable_Code_Point}\p{Control}\p{Format}\p{Mark}\p{Surrogate}]+/v;
+  rgiEmojiRegex = /^\p{RGI_Emoji}$/v;
+});
+
+// node_modules/is-interactive/index.js
+function isInteractive({ stream = process.stdout } = {}) {
+  return Boolean(stream && stream.isTTY && process.env.TERM !== "dumb" && !("CI" in process.env));
+}
+
+// node_modules/stdin-discarder/index.js
+import process7 from "node:process";
+
+class StdinDiscarder {
+  #activeCount = 0;
+  start() {
+    this.#activeCount++;
+    if (this.#activeCount === 1) {
+      this.#realStart();
+    }
+  }
+  stop() {
+    if (this.#activeCount <= 0) {
+      throw new Error("`stop` called more times than `start`");
+    }
+    this.#activeCount--;
+    if (this.#activeCount === 0) {
+      this.#realStop();
+    }
+  }
+  #realStart() {
+    if (process7.platform === "win32" || !process7.stdin.isTTY) {
+      return;
+    }
+    process7.stdin.setRawMode(true);
+    process7.stdin.on("data", this.#handleInput);
+    process7.stdin.resume();
+  }
+  #realStop() {
+    if (!process7.stdin.isTTY) {
+      return;
+    }
+    process7.stdin.off("data", this.#handleInput);
+    process7.stdin.pause();
+    process7.stdin.setRawMode(false);
+  }
+  #handleInput(chunk) {
+    if (chunk[0] === ASCII_ETX_CODE) {
+      process7.emit("SIGINT");
+    }
+  }
+}
+var ASCII_ETX_CODE = 3, stdinDiscarder, stdin_discarder_default;
+var init_stdin_discarder = __esm(() => {
+  stdinDiscarder = new StdinDiscarder;
+  stdin_discarder_default = stdinDiscarder;
+});
+
+// node_modules/ora/index.js
+import process8 from "node:process";
+
+class Ora {
+  #linesToClear = 0;
+  #isDiscardingStdin = false;
+  #lineCount = 0;
+  #frameIndex = -1;
+  #lastSpinnerFrameTime = 0;
+  #lastIndent = 0;
+  #options;
+  #spinner;
+  #stream;
+  #id;
+  #initialInterval;
+  #isEnabled;
+  #isSilent;
+  #indent;
+  #text;
+  #prefixText;
+  #suffixText;
+  color;
+  constructor(options) {
+    if (typeof options === "string") {
+      options = {
+        text: options
+      };
+    }
+    this.#options = {
+      color: "cyan",
+      stream: process8.stderr,
+      discardStdin: true,
+      hideCursor: true,
+      ...options
+    };
+    this.color = this.#options.color;
+    this.spinner = this.#options.spinner;
+    this.#initialInterval = this.#options.interval;
+    this.#stream = this.#options.stream;
+    this.#isEnabled = typeof this.#options.isEnabled === "boolean" ? this.#options.isEnabled : isInteractive({ stream: this.#stream });
+    this.#isSilent = typeof this.#options.isSilent === "boolean" ? this.#options.isSilent : false;
+    this.text = this.#options.text;
+    this.prefixText = this.#options.prefixText;
+    this.suffixText = this.#options.suffixText;
+    this.indent = this.#options.indent;
+    if (process8.env.NODE_ENV === "test") {
+      this._stream = this.#stream;
+      this._isEnabled = this.#isEnabled;
+      Object.defineProperty(this, "_linesToClear", {
+        get() {
+          return this.#linesToClear;
+        },
+        set(newValue) {
+          this.#linesToClear = newValue;
+        }
+      });
+      Object.defineProperty(this, "_frameIndex", {
+        get() {
+          return this.#frameIndex;
+        }
+      });
+      Object.defineProperty(this, "_lineCount", {
+        get() {
+          return this.#lineCount;
+        }
+      });
+    }
+  }
+  get indent() {
+    return this.#indent;
+  }
+  set indent(indent = 0) {
+    if (!(indent >= 0 && Number.isInteger(indent))) {
+      throw new Error("The `indent` option must be an integer from 0 and up");
+    }
+    this.#indent = indent;
+    this.#updateLineCount();
+  }
+  get interval() {
+    return this.#initialInterval ?? this.#spinner.interval ?? 100;
+  }
+  get spinner() {
+    return this.#spinner;
+  }
+  set spinner(spinner) {
+    this.#frameIndex = -1;
+    this.#initialInterval = undefined;
+    if (typeof spinner === "object") {
+      if (!Array.isArray(spinner.frames) || spinner.frames.length === 0 || spinner.frames.some((frame) => typeof frame !== "string")) {
+        throw new Error("The given spinner must have a non-empty `frames` array of strings");
+      }
+      if (spinner.interval !== undefined && !(Number.isInteger(spinner.interval) && spinner.interval > 0)) {
+        throw new Error("`spinner.interval` must be a positive integer if provided");
+      }
+      this.#spinner = spinner;
+    } else if (!isUnicodeSupported()) {
+      this.#spinner = cli_spinners_default.line;
+    } else if (spinner === undefined) {
+      this.#spinner = cli_spinners_default.dots;
+    } else if (spinner !== "default" && cli_spinners_default[spinner]) {
+      this.#spinner = cli_spinners_default[spinner];
+    } else {
+      throw new Error(`There is no built-in spinner named '${spinner}'. See https://github.com/sindresorhus/cli-spinners/blob/main/spinners.json for a full list.`);
+    }
+  }
+  get text() {
+    return this.#text;
+  }
+  set text(value = "") {
+    this.#text = value;
+    this.#updateLineCount();
+  }
+  get prefixText() {
+    return this.#prefixText;
+  }
+  set prefixText(value = "") {
+    this.#prefixText = value;
+    this.#updateLineCount();
+  }
+  get suffixText() {
+    return this.#suffixText;
+  }
+  set suffixText(value = "") {
+    this.#suffixText = value;
+    this.#updateLineCount();
+  }
+  get isSpinning() {
+    return this.#id !== undefined;
+  }
+  #formatAffix(value, separator, placeBefore = false) {
+    const resolved = typeof value === "function" ? value() : value;
+    if (typeof resolved === "string" && resolved !== "") {
+      return placeBefore ? separator + resolved : resolved + separator;
+    }
+    return "";
+  }
+  #getFullPrefixText(prefixText = this.#prefixText, postfix = " ") {
+    return this.#formatAffix(prefixText, postfix, false);
+  }
+  #getFullSuffixText(suffixText = this.#suffixText, prefix = " ") {
+    return this.#formatAffix(suffixText, prefix, true);
+  }
+  #computeLineCountFrom(text, columns) {
+    let count = 0;
+    for (const line of stripAnsi(text).split(`
+`)) {
+      count += Math.max(1, Math.ceil(stringWidth(line) / columns));
+    }
+    return count;
+  }
+  #updateLineCount() {
+    const columns = this.#stream.columns ?? 80;
+    const prefixText = typeof this.#prefixText === "function" ? "" : this.#prefixText;
+    const suffixText = typeof this.#suffixText === "function" ? "" : this.#suffixText;
+    const fullPrefixText = typeof prefixText === "string" && prefixText !== "" ? prefixText + " " : "";
+    const fullSuffixText = typeof suffixText === "string" && suffixText !== "" ? " " + suffixText : "";
+    const spinnerChar = "-";
+    const fullText = " ".repeat(this.#indent) + fullPrefixText + spinnerChar + (typeof this.#text === "string" ? " " + this.#text : "") + fullSuffixText;
+    this.#lineCount = this.#computeLineCountFrom(fullText, columns);
+  }
+  get isEnabled() {
+    return this.#isEnabled && !this.#isSilent;
+  }
+  set isEnabled(value) {
+    if (typeof value !== "boolean") {
+      throw new TypeError("The `isEnabled` option must be a boolean");
+    }
+    this.#isEnabled = value;
+  }
+  get isSilent() {
+    return this.#isSilent;
+  }
+  set isSilent(value) {
+    if (typeof value !== "boolean") {
+      throw new TypeError("The `isSilent` option must be a boolean");
+    }
+    this.#isSilent = value;
+  }
+  frame() {
+    const now = Date.now();
+    if (this.#frameIndex === -1 || now - this.#lastSpinnerFrameTime >= this.interval) {
+      this.#frameIndex = ++this.#frameIndex % this.#spinner.frames.length;
+      this.#lastSpinnerFrameTime = now;
+    }
+    const { frames } = this.#spinner;
+    let frame = frames[this.#frameIndex];
+    if (this.color) {
+      frame = source_default[this.color](frame);
+    }
+    const fullPrefixText = this.#getFullPrefixText(this.#prefixText, " ");
+    const fullText = typeof this.text === "string" ? " " + this.text : "";
+    const fullSuffixText = this.#getFullSuffixText(this.#suffixText, " ");
+    return fullPrefixText + frame + fullText + fullSuffixText;
+  }
+  clear() {
+    if (!this.#isEnabled || !this.#stream.isTTY) {
+      return this;
+    }
+    this.#stream.cursorTo(0);
+    for (let index = 0;index < this.#linesToClear; index++) {
+      if (index > 0) {
+        this.#stream.moveCursor(0, -1);
+      }
+      this.#stream.clearLine(1);
+    }
+    if (this.#indent || this.#lastIndent !== this.#indent) {
+      this.#stream.cursorTo(this.#indent);
+    }
+    this.#lastIndent = this.#indent;
+    this.#linesToClear = 0;
+    return this;
+  }
+  render() {
+    if (!this.#isEnabled || this.#isSilent) {
+      return this;
+    }
+    this.clear();
+    let frameContent = this.frame();
+    const columns = this.#stream.columns ?? 80;
+    const actualLineCount = this.#computeLineCountFrom(frameContent, columns);
+    const consoleHeight = this.#stream.rows;
+    if (consoleHeight && consoleHeight > 1 && actualLineCount > consoleHeight) {
+      const lines = frameContent.split(`
+`);
+      const maxLines = consoleHeight - 1;
+      frameContent = [...lines.slice(0, maxLines), "... (content truncated to fit terminal)"].join(`
+`);
+    }
+    this.#stream.write(frameContent);
+    this.#linesToClear = this.#computeLineCountFrom(frameContent, columns);
+    return this;
+  }
+  start(text) {
+    if (text) {
+      this.text = text;
+    }
+    if (this.#isSilent) {
+      return this;
+    }
+    if (!this.#isEnabled) {
+      const line = " ".repeat(this.#indent) + this.#getFullPrefixText(this.#prefixText, " ") + (this.text ? `- ${this.text}` : "") + this.#getFullSuffixText(this.#suffixText, " ");
+      if (line.trim() !== "") {
+        this.#stream.write(line + `
+`);
+      }
+      return this;
+    }
+    if (this.isSpinning) {
+      return this;
+    }
+    if (this.#options.hideCursor) {
+      cli_cursor_default.hide(this.#stream);
+    }
+    if (this.#options.discardStdin && process8.stdin.isTTY) {
+      this.#isDiscardingStdin = true;
+      stdin_discarder_default.start();
+    }
+    this.render();
+    this.#id = setInterval(this.render.bind(this), this.interval);
+    return this;
+  }
+  stop() {
+    clearInterval(this.#id);
+    this.#id = undefined;
+    this.#frameIndex = 0;
+    if (this.#isEnabled) {
+      this.clear();
+      if (this.#options.hideCursor) {
+        cli_cursor_default.show(this.#stream);
+      }
+    }
+    if (this.#options.discardStdin && process8.stdin.isTTY && this.#isDiscardingStdin) {
+      stdin_discarder_default.stop();
+      this.#isDiscardingStdin = false;
+    }
+    return this;
+  }
+  succeed(text) {
+    return this.stopAndPersist({ symbol: exports_symbols.success, text });
+  }
+  fail(text) {
+    return this.stopAndPersist({ symbol: exports_symbols.error, text });
+  }
+  warn(text) {
+    return this.stopAndPersist({ symbol: exports_symbols.warning, text });
+  }
+  info(text) {
+    return this.stopAndPersist({ symbol: exports_symbols.info, text });
+  }
+  stopAndPersist(options = {}) {
+    if (this.#isSilent) {
+      return this;
+    }
+    const prefixText = options.prefixText ?? this.#prefixText;
+    const fullPrefixText = this.#getFullPrefixText(prefixText, " ");
+    const symbolText = options.symbol ?? " ";
+    const text = options.text ?? this.text;
+    const separatorText = symbolText ? " " : "";
+    const fullText = typeof text === "string" ? separatorText + text : "";
+    const suffixText = options.suffixText ?? this.#suffixText;
+    const fullSuffixText = this.#getFullSuffixText(suffixText, " ");
+    const textToWrite = fullPrefixText + symbolText + fullText + fullSuffixText + `
+`;
+    this.stop();
+    this.#stream.write(textToWrite);
+    return this;
+  }
+}
+function ora(options) {
+  return new Ora(options);
+}
+var init_ora = __esm(() => {
+  init_source();
+  init_cli_cursor();
+  init_cli_spinners();
+  init_log_symbols();
+  init_strip_ansi();
+  init_string_width();
+  init_is_unicode_supported();
+  init_stdin_discarder();
+});
+
 // src/utils/cli-logger.ts
 class TaskProgress {
   steps;
   currentStepKey = null;
-  spinnerIndex = 0;
-  spinnerInterval = null;
-  lastMessage = "";
+  spinner;
   constructor(steps) {
     this.steps = steps;
+    this.spinner = ora({
+      spinner: "dots",
+      color: "cyan"
+    });
   }
   get currentStepIndex() {
     if (!this.currentStepKey)
@@ -16743,54 +19900,34 @@ class TaskProgress {
     const index = this.steps.indexOf(this.currentStepKey);
     return index !== -1 ? index + 1 : 0;
   }
-  render(message, isFinal = false, status = "progress") {
+  formatMessage(message) {
     const stepIndex = this.currentStepIndex;
     const stepTotal = this.steps.length;
     const progressPrefix = stepTotal > 0 ? `[${stepIndex}/${stepTotal}] ` : "";
-    let symbol = "";
-    if (isFinal) {
-      symbol = status === "success" ? `${colors.green}DONE${colors.reset}` : `${colors.red}FAIL${colors.reset}`;
-    } else {
-      symbol = `${colors.cyan}${frames[this.spinnerIndex]}${colors.reset}`;
-    }
-    const line = `\r${symbol} ${colors.bold}${progressPrefix}${colors.reset}${message}`;
-    process.stdout.write("\x1B[2K");
-    process.stdout.write(line + (isFinal ? `
-` : ""));
-    this.lastMessage = message;
+    return `${colors.bold}${progressPrefix}${colors.reset}${message}`;
   }
   step(key, message) {
     this.currentStepKey = key;
-    this.lastMessage = message;
-    if (!this.spinnerInterval) {
-      this.spinnerInterval = setInterval(() => {
-        this.spinnerIndex = (this.spinnerIndex + 1) % frames.length;
-        this.render(this.lastMessage);
-      }, 80);
+    const formattedMessage = this.formatMessage(message);
+    if (this.spinner.isSpinning) {
+      this.spinner.text = formattedMessage;
+    } else {
+      this.spinner.start(formattedMessage);
     }
-    this.render(message);
   }
   log(message) {
-    this.lastMessage = message;
-    this.render(message);
+    this.spinner.text = this.formatMessage(message);
   }
   success(message) {
-    this.stopSpinner();
-    this.render(message, true, "success");
+    this.spinner.succeed(this.formatMessage(message));
   }
   fail(message) {
-    this.stopSpinner();
-    this.render(message, true, "fail");
-  }
-  stopSpinner() {
-    if (this.spinnerInterval) {
-      clearInterval(this.spinnerInterval);
-      this.spinnerInterval = null;
-    }
+    this.spinner.fail(this.formatMessage(message));
   }
 }
-var colors, frames;
+var colors;
 var init_cli_logger = __esm(() => {
+  init_ora();
   colors = {
     red: "\x1B[31m",
     green: "\x1B[32m",
@@ -16801,7 +19938,6 @@ var init_cli_logger = __esm(() => {
     bold: "\x1B[1m",
     dim: "\x1B[2m"
   };
-  frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 });
 
 // src/utils/runtime-detector.ts
@@ -17328,10 +20464,10 @@ async function buildImage(appName, tag, context, dockerfilePath = "Dockerfile") 
       success: true,
       message: `Successfully built image: ${tag}`
     };
-  } catch (error) {
+  } catch (error2) {
     return {
       success: false,
-      message: `Build error: ${error.message}`
+      message: `Build error: ${error2.message}`
     };
   }
 }
@@ -17365,10 +20501,10 @@ async function runContainer(appName, image, port, envFilePath) {
       success: true,
       message: `Container ${containerName} started successfully`
     };
-  } catch (error) {
+  } catch (error2) {
     return {
       success: false,
-      message: `Run error: ${error.message}`
+      message: `Run error: ${error2.message}`
     };
   }
 }
@@ -17387,10 +20523,10 @@ async function composeUp(composePaths, projectName) {
       success: true,
       message: `Services started successfully`
     };
-  } catch (error) {
+  } catch (error2) {
     return {
       success: false,
-      message: `Compose error: ${error.message}`
+      message: `Compose error: ${error2.message}`
     };
   }
 }
@@ -17407,10 +20543,10 @@ async function composeDown(composePath, projectName) {
       success: true,
       message: `Services stopped successfully`
     };
-  } catch (error) {
+  } catch (error2) {
     return {
       success: false,
-      message: `Compose error: ${error.message}`
+      message: `Compose error: ${error2.message}`
     };
   }
 }
@@ -17427,10 +20563,10 @@ async function stopContainer(containerName) {
       success: true,
       message: `Container ${containerName} stopped`
     };
-  } catch (error) {
+  } catch (error2) {
     return {
       success: false,
-      message: `Stop error: ${error.message}`
+      message: `Stop error: ${error2.message}`
     };
   }
 }
@@ -17447,10 +20583,10 @@ async function removeContainer(containerName) {
       success: true,
       message: `Container ${containerName} removed`
     };
-  } catch (error) {
+  } catch (error2) {
     return {
       success: false,
-      message: `Remove error: ${error.message}`
+      message: `Remove error: ${error2.message}`
     };
   }
 }
@@ -17467,10 +20603,10 @@ async function restartContainer(containerName) {
       success: true,
       message: `Container ${containerName} restarted`
     };
-  } catch (error) {
+  } catch (error2) {
     return {
       success: false,
-      message: `Restart error: ${error.message}`
+      message: `Restart error: ${error2.message}`
     };
   }
 }
@@ -17497,7 +20633,7 @@ async function containerStatus(containerName) {
       status,
       health
     };
-  } catch (error) {
+  } catch (error2) {
     return {
       running: false,
       status: "error"
@@ -17513,8 +20649,8 @@ async function containerLogs(containerName, lines = 50) {
       containerName
     ]);
     return result.stdout || result.stderr || "No logs available";
-  } catch (error) {
-    return `Error fetching logs: ${error.message}`;
+  } catch (error2) {
+    return `Error fetching logs: ${error2.message}`;
   }
 }
 async function listContainers() {
@@ -17536,7 +20672,7 @@ async function listContainers() {
       const [name = "", status = "", state = "", ports = ""] = line.split("|");
       return { name, status, state, ports };
     });
-  } catch (error) {
+  } catch (error2) {
     return [];
   }
 }
@@ -17560,7 +20696,7 @@ async function getProjectContainers(projectName) {
       const health = healthRaw && healthRaw !== "<no value>" ? healthRaw : undefined;
       return { name, status, health };
     });
-  } catch (error) {
+  } catch (error2) {
     return [];
   }
 }
@@ -17634,8 +20770,8 @@ async function loadEnvVars(appName) {
       }
     });
     return vars;
-  } catch (error) {
-    throw new Error(`Failed to load env vars: ${error.message}`);
+  } catch (error2) {
+    throw new Error(`Failed to load env vars: ${error2.message}`);
   }
 }
 async function importEnvFile(appName, filePath) {
@@ -17657,8 +20793,8 @@ async function importEnvFile(appName, filePath) {
       }
     });
     await saveEnvVars(appName, vars);
-  } catch (error) {
-    throw new Error(`Failed to import env file: ${error.message}`);
+  } catch (error2) {
+    throw new Error(`Failed to import env file: ${error2.message}`);
   }
 }
 async function exportEnvFile(appName, outputPath) {
@@ -17698,132 +20834,20 @@ var init_env_manager = __esm(() => {
   APPS_DIR = join9(OKASTR8_HOME, "apps");
 });
 
-// src/commands/systemd.ts
-var exports_systemd = {};
-__export(exports_systemd, {
-  stopService: () => stopService2,
-  statusService: () => statusService2,
-  startService: () => startService2,
-  restartService: () => restartService2,
-  reloadDaemon: () => reloadDaemon2,
-  logsService: () => logsService2,
-  listServices: () => listServices2,
-  enableService: () => enableService2,
-  disableService: () => disableService2,
-  deleteService: () => deleteService2,
-  createService: () => createService2,
-  addSystemdCommands: () => addSystemdCommands2
-});
-import * as path3 from "path";
-async function createService2(service_name, description, exec_start, working_directory, user, wanted_by, auto_start) {
-  return await runCommand("sudo", [
-    path3.join(SCRIPT_BASE_PATH3, "create.sh"),
-    service_name,
-    description,
-    exec_start,
-    working_directory,
-    user,
-    wanted_by,
-    auto_start ? "true" : "false"
-  ]);
-}
-async function deleteService2(service_name) {
-  return await runCommand("sudo", [path3.join(SCRIPT_BASE_PATH3, "delete.sh"), service_name]);
-}
-async function startService2(service_name) {
-  return await runCommand("sudo", [path3.join(SCRIPT_BASE_PATH3, "start.sh"), service_name]);
-}
-async function stopService2(service_name) {
-  return await runCommand("sudo", [path3.join(SCRIPT_BASE_PATH3, "stop.sh"), service_name]);
-}
-async function restartService2(service_name) {
-  return await runCommand("sudo", [path3.join(SCRIPT_BASE_PATH3, "restart.sh"), service_name]);
-}
-async function statusService2(service_name) {
-  return await runCommand("sudo", [path3.join(SCRIPT_BASE_PATH3, "status.sh"), service_name]);
-}
-async function logsService2(service_name) {
-  return await runCommand("sudo", [path3.join(SCRIPT_BASE_PATH3, "logs.sh"), service_name]);
-}
-async function enableService2(service_name) {
-  return await runCommand("sudo", [path3.join(SCRIPT_BASE_PATH3, "enable.sh"), service_name]);
-}
-async function disableService2(service_name) {
-  return await runCommand("sudo", [path3.join(SCRIPT_BASE_PATH3, "disable.sh"), service_name]);
-}
-async function reloadDaemon2() {
-  return await runCommand("sudo", [path3.join(SCRIPT_BASE_PATH3, "reload.sh")]);
-}
-async function listServices2() {
-  return await runCommand("sudo", [path3.join(SCRIPT_BASE_PATH3, "list.sh")]);
-}
-function addSystemdCommands2(program2) {
-  const systemd = program2.command("systemd").description("Manage systemd services");
-  systemd.command("create").description("Create a systemd service unit file").argument("<service_name>", "Name of the service").argument("<description>", "Description of the service").argument("<exec_start>", "Command to execute").argument("<working_directory>", "Working directory for the service").argument("<user>", "User to run the service as").argument("<wanted_by>", "Target to be wanted by (e.g., multi-user.target)").option("-a, --auto-start <boolean>", "Whether to enable and start the service automatically (default: true)", "true").action(async (service_name, description, exec_start, working_directory, user, wanted_by, options) => {
-    const result = await createService2(service_name, description, exec_start, working_directory, user, wanted_by, options.autoStart === "true");
-    console.log(result.stdout || result.stderr);
-  });
-  systemd.command("delete").description("Delete a systemd service unit file").argument("<service_name>", "Name of the service to delete").action(async (service_name) => {
-    const result = await deleteService2(service_name);
-    console.log(result.stdout || result.stderr);
-  });
-  systemd.command("start").description("Start a systemd service").argument("<service_name>", "Name of the service to start").action(async (service_name) => {
-    const result = await startService2(service_name);
-    console.log(result.stdout || result.stderr);
-  });
-  systemd.command("stop").description("Stop a systemd service").argument("<service_name>", "Name of the service to stop").action(async (service_name) => {
-    const result = await stopService2(service_name);
-    console.log(result.stdout || result.stderr);
-  });
-  systemd.command("restart").description("Restart a systemd service").argument("<service_name>", "Name of the service to restart").action(async (service_name) => {
-    const result = await restartService2(service_name);
-    console.log(result.stdout || result.stderr);
-  });
-  systemd.command("status").description("Show the status of a systemd service").argument("<service_name>", "Name of the service to check status").action(async (service_name) => {
-    const result = await statusService2(service_name);
-    console.log(result.stdout || result.stderr);
-  });
-  systemd.command("logs").description("Show the last 50 log lines for a systemd service").argument("<service_name>", "Name of the service to show logs for").action(async (service_name) => {
-    const result = await logsService2(service_name);
-    console.log(result.stdout || result.stderr);
-  });
-  systemd.command("enable").description("Enable a systemd service").argument("<service_name>", "Name of the service to enable").action(async (service_name) => {
-    const result = await enableService2(service_name);
-    console.log(result.stdout || result.stderr);
-  });
-  systemd.command("disable").description("Disable a systemd service").argument("<service_name>", "Name of the service to disable").action(async (service_name) => {
-    const result = await disableService2(service_name);
-    console.log(result.stdout || result.stderr);
-  });
-  systemd.command("reload").description("Reload the systemd daemon").action(async () => {
-    const result = await reloadDaemon2();
-    console.log(result.stdout || result.stderr);
-  });
-  systemd.command("list").description("List all okastr8 systemd service files").action(async () => {
-    const result = await listServices2();
-    console.log(result.stdout || result.stderr);
-  });
-}
-var SCRIPT_BASE_PATH3;
-var init_systemd = __esm(() => {
-  init_command();
-  SCRIPT_BASE_PATH3 = path3.join(process.cwd(), "scripts", "systemd");
-});
-
 // src/utils/deploy-docker.ts
 var exports_deploy_docker = {};
 __export(exports_deploy_docker, {
   detectDockerStrategy: () => detectDockerStrategy,
   deployWithDocker: () => deployWithDocker
 });
-import { join as join11 } from "path";
+import { join as join10 } from "path";
 import { existsSync as existsSync6 } from "fs";
 import { writeFile as writeFile5, readFile as readFile4 } from "fs/promises";
 async function detectDockerStrategy(releasePath, config) {
-  if (existsSync6(join11(releasePath, "docker-compose.yml"))) {
+  if (existsSync6(join10(releasePath, "docker-compose.yml"))) {
     return "user-compose";
   }
-  if (existsSync6(join11(releasePath, "Dockerfile"))) {
+  if (existsSync6(join10(releasePath, "Dockerfile"))) {
     return "user-dockerfile";
   }
   if (config.database || config.cache) {
@@ -17860,7 +20884,7 @@ async function deployWithDocker(options, config) {
   const { appName, releasePath, versionId, onProgress } = options;
   const log = onProgress || ((msg) => console.log(msg));
   const { saveEnvVars: saveEnvVars2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
-  const repoEnvPath = join11(releasePath, ".env");
+  const repoEnvPath = join10(releasePath, ".env");
   if (existsSync6(repoEnvPath)) {
     log("Importing .env from repository...");
     await importEnvFile(appName, repoEnvPath);
@@ -17869,24 +20893,15 @@ async function deployWithDocker(options, config) {
     log(`Applying ${Object.keys(options.env).length} manual environment variables...`);
     await saveEnvVars2(appName, options.env);
   }
-  const persistentEnvPath = join11(APPS_DIR2, appName, ".env.production");
+  const persistentEnvPath = join10(APPS_DIR2, appName, ".env.production");
   const envFilePath = existsSync6(persistentEnvPath) ? persistentEnvPath : undefined;
   log("Ensuring clean slate for deployment...");
   await stopContainer(appName).catch(() => {});
   await removeContainer(appName).catch(() => {});
-  const currentComposePath = join11(APPS_DIR2, appName, "current", "docker-compose.yml");
+  const currentComposePath = join10(APPS_DIR2, appName, "current", "docker-compose.yml");
   if (existsSync6(currentComposePath)) {
     log("Stopping existing Compose services...");
     await composeDown(currentComposePath, appName).catch(() => {});
-  }
-  const { stopService: stopService3, disableService: disableService3 } = await Promise.resolve().then(() => (init_systemd(), exports_systemd));
-  const serviceNames = [appName, appName.replace(/-/g, "_")];
-  for (const serviceName of serviceNames) {
-    try {
-      log(`Checking legacy systemd service: ${serviceName}...`);
-      await stopService3(serviceName).catch(() => {});
-      await disableService3(serviceName).catch(() => {});
-    } catch {}
   }
   const strategy = await detectDockerStrategy(releasePath, config);
   log(`Docker strategy: ${strategy}`);
@@ -17905,7 +20920,7 @@ async function deployWithCompose(appName, releasePath, config, strategy, envFile
     composePath = files.compose;
     log(`   Generated: ${composePath}`);
   } else {
-    composePath = join11(releasePath, "docker-compose.yml");
+    composePath = join10(releasePath, "docker-compose.yml");
     log(`   Using existing: ${composePath}`);
     if (envFilePath) {
       try {
@@ -17923,7 +20938,7 @@ async function deployWithCompose(appName, releasePath, config, strategy, envFile
               env_file: [envFilePath]
             };
           }
-          overridePath = join11(releasePath, "docker-compose.override.yml");
+          overridePath = join10(releasePath, "docker-compose.override.yml");
           await writeFile5(overridePath, dump(override));
           log(`   Created override: ${overridePath}`);
         }
@@ -17975,7 +20990,7 @@ async function deployWithDockerfile(appName, releasePath, config, versionId, str
   const tag = `${appName}:v${versionId}`;
   log(`Building Docker image: ${tag}...`);
   const dockerfileName = strategy === "auto-dockerfile" ? "Dockerfile.generated" : "Dockerfile";
-  const dockerfilePath = join11(releasePath, dockerfileName);
+  const dockerfilePath = join10(releasePath, dockerfileName);
   const buildResult = await buildImage(appName, tag, releasePath, dockerfilePath);
   if (!buildResult.success) {
     return {
@@ -18015,7 +21030,7 @@ var init_deploy_docker = __esm(() => {
   init_docker();
   init_config();
   init_env_manager();
-  APPS_DIR2 = join11(OKASTR8_HOME, "apps");
+  APPS_DIR2 = join10(OKASTR8_HOME, "apps");
 });
 
 // src/commands/version.ts
@@ -18033,19 +21048,19 @@ __export(exports_version, {
 });
 import { readFile as readFile5, writeFile as writeFile6, mkdir as mkdir4, rm, symlink, unlink as unlink2, rename } from "fs/promises";
 import { existsSync as existsSync7 } from "fs";
-import { join as join12 } from "path";
+import { join as join11 } from "path";
 function getAppJsonPath(appName) {
-  return join12(APPS_DIR3, appName, "app.json");
+  return join11(APPS_DIR3, appName, "app.json");
 }
 function getReleasesDir(appName) {
-  return join12(APPS_DIR3, appName, "releases");
+  return join11(APPS_DIR3, appName, "releases");
 }
 function getCurrentPath(appName) {
-  return join12(APPS_DIR3, appName, "current");
+  return join11(APPS_DIR3, appName, "current");
 }
 async function getVersions(appName) {
   const appJsonPath = getAppJsonPath(appName);
-  const versionsJsonPath = join12(APPS_DIR3, appName, "versions.json");
+  const versionsJsonPath = join11(APPS_DIR3, appName, "versions.json");
   let versions = [];
   let currentVersionId = null;
   if (existsSync7(versionsJsonPath)) {
@@ -18079,7 +21094,7 @@ async function getVersions(appName) {
 async function updateAppJson(appName, updates) {
   const appJsonPath = getAppJsonPath(appName);
   let currentData = {};
-  const appDir = join12(APPS_DIR3, appName);
+  const appDir = join11(APPS_DIR3, appName);
   if (!existsSync7(appDir)) {
     await mkdir4(appDir, { recursive: true });
   }
@@ -18115,7 +21130,7 @@ async function createVersion(appName, commit, branch) {
   };
   data.versions.push(newVersion);
   await saveVersions(appName, data.versions, data.current);
-  const releasePath = join12(releasesDir, `v${newId}`);
+  const releasePath = join11(releasesDir, `v${newId}`);
   return { versionId: newId, releasePath };
 }
 async function updateVersionStatus(appName, versionId, status, message) {
@@ -18133,7 +21148,7 @@ async function setCurrentVersion(appName, versionId) {
   const version = data.versions.find((v) => v.id === versionId);
   if (!version)
     return false;
-  const releasePath = join12(getReleasesDir(appName), `v${versionId}`);
+  const releasePath = join11(getReleasesDir(appName), `v${versionId}`);
   const currentPath = getCurrentPath(appName);
   if (!existsSync7(releasePath))
     return false;
@@ -18148,6 +21163,7 @@ async function setCurrentVersion(appName, versionId) {
 }
 async function rollback(appName, versionId, onProgress) {
   const log = onProgress || ((msg) => console.log(msg));
+  const progressHandler = onProgress ? log : undefined;
   const data = await getVersions(appName);
   const version = data.versions.find((v) => v.id === versionId);
   if (!version) {
@@ -18156,7 +21172,7 @@ async function rollback(appName, versionId, onProgress) {
   if (version.status !== "success") {
     return { success: false, message: `Cannot rollback to ${version.status} version` };
   }
-  const releasePath = join12(getReleasesDir(appName), `v${versionId}`);
+  const releasePath = join11(getReleasesDir(appName), `v${versionId}`);
   if (!existsSync7(releasePath)) {
     return { success: false, message: `Release artifact v${versionId} missing` };
   }
@@ -18167,7 +21183,7 @@ async function rollback(appName, versionId, onProgress) {
     releasePath,
     versionId,
     gitBranch: version.branch,
-    onProgress: log
+    onProgress: progressHandler
   });
   if (result.success) {
     log(`✅ Rollback to v${versionId} complete!`);
@@ -18177,7 +21193,7 @@ async function rollback(appName, versionId, onProgress) {
   return result;
 }
 async function removeVersion(appName, versionId) {
-  const releasePath = join12(getReleasesDir(appName), `v${versionId}`);
+  const releasePath = join11(getReleasesDir(appName), `v${versionId}`);
   try {
     await rm(releasePath, { recursive: true, force: true });
   } catch {}
@@ -18197,7 +21213,7 @@ async function cleanOldVersions(appName) {
   const failedVersions = successfulVersions.length > 0 ? data.versions.filter((v) => v.status === "failed" && v.id < successfulVersions[0].id) : [];
   const allToDelete = [...versionsToDelete, ...failedVersions];
   for (const version of allToDelete) {
-    const releasePath = join12(getReleasesDir(appName), `v${version.id}`);
+    const releasePath = join11(getReleasesDir(appName), `v${version.id}`);
     try {
       await rm(releasePath, { recursive: true, force: true });
     } catch {}
@@ -18211,10 +21227,10 @@ async function initializeVersioning(appName) {
   const data = await getVersions(appName);
   if (data.versions.length > 0)
     return;
-  const appDir = join12(APPS_DIR3, appName);
-  const legacyRepo = join12(appDir, "repo");
+  const appDir = join11(APPS_DIR3, appName);
+  const legacyRepo = join11(appDir, "repo");
   const releasesDir = getReleasesDir(appName);
-  const v1Path = join12(releasesDir, "v1");
+  const v1Path = join11(releasesDir, "v1");
   const currentPath = getCurrentPath(appName);
   if (existsSync7(legacyRepo)) {
     await mkdir4(releasesDir, { recursive: true });
@@ -18244,7 +21260,7 @@ async function getCurrentVersion(appName) {
 var APPS_DIR3;
 var init_version = __esm(() => {
   init_config();
-  APPS_DIR3 = join12(OKASTR8_HOME, "apps");
+  APPS_DIR3 = join11(OKASTR8_HOME, "apps");
 });
 
 // src/utils/genCaddyFile.ts
@@ -18252,15 +21268,15 @@ var exports_genCaddyFile = {};
 __export(exports_genCaddyFile, {
   genCaddyFile: () => genCaddyFile
 });
-import { join as join13, dirname as dirname3 } from "path";
+import { join as join12, dirname as dirname3 } from "path";
 import { fileURLToPath as fileURLToPath2 } from "url";
 import { homedir as homedir3 } from "os";
-async function genCaddyFile() {
+async function genCaddyFile(onLog) {
   try {
     const { readdir, readFile: readFile6, stat } = await import("fs/promises");
-    const { join: join14 } = await import("path");
+    const { join: join13 } = await import("path");
     const { OKASTR8_HOME: OKASTR8_HOME2 } = await Promise.resolve().then(() => (init_config(), exports_config));
-    const appsDir = join14(OKASTR8_HOME2, "apps");
+    const appsDir = join13(OKASTR8_HOME2, "apps");
     let appsToCheck = [];
     try {
       appsToCheck = await readdir(appsDir);
@@ -18270,7 +21286,7 @@ async function genCaddyFile() {
     const caddyEntries = [];
     for (const appName of appsToCheck) {
       try {
-        const appMetadataPath = join14(appsDir, appName, "app.json");
+        const appMetadataPath = join13(appsDir, appName, "app.json");
         const content = await readFile6(appMetadataPath, "utf-8");
         const metadata = JSON.parse(content);
         const domain = metadata.networking?.domain || metadata.domain;
@@ -18280,7 +21296,8 @@ async function genCaddyFile() {
           caddyEntries.push(`${scheme}${domain} {
   reverse_proxy localhost:${port}
 }`);
-          console.log(`  Added route: ${domain} -> :${port} (${appName})`);
+          if (onLog)
+            onLog(`  Added route: ${domain} -> :${port} (${appName})`);
         }
       } catch (e) {
         continue;
@@ -18296,14 +21313,15 @@ async function genCaddyFile() {
 
 `) + `
 `;
-    const pathToWriteCaddyfile = join14(PROJECT_ROOT2, "scripts", "caddy", "writeCaddyfile.sh");
+    const pathToWriteCaddyfile = join13(PROJECT_ROOT2, "scripts", "caddy", "writeCaddyfile.sh");
     const writeResult = await runCommand("sudo", [pathToWriteCaddyfile], undefined, caddyFile);
     if (writeResult.exitCode !== 0) {
       throw new Error(`Failed to write Caddyfile: ${writeResult.stderr}`);
     }
-    const pathToReloadCaddy = join14(PROJECT_ROOT2, "scripts", "caddy", "reloadCaddy.sh");
+    const pathToReloadCaddy = join13(PROJECT_ROOT2, "scripts", "caddy", "reloadCaddy.sh");
     await runCommand("sudo", [pathToReloadCaddy]);
-    console.log(`Caddyfile regenerated with ${caddyEntries.length} routes at ${caddyFilePath}`);
+    if (onLog)
+      onLog(`Caddyfile regenerated with ${caddyEntries.length} routes at ${caddyFilePath}`);
   } catch (e) {
     console.error("❌ Error generating Caddyfile:", e);
   }
@@ -18313,7 +21331,7 @@ var init_genCaddyFile = __esm(() => {
   init_command();
   __filename3 = fileURLToPath2(import.meta.url);
   __dirname3 = dirname3(__filename3);
-  PROJECT_ROOT2 = join13(__dirname3, "..", "..");
+  PROJECT_ROOT2 = join12(__dirname3, "..", "..");
   userConfigPath = `${homedir3()}/.okastr8/config.json`;
 });
 
@@ -18322,7 +21340,7 @@ var exports_deploy_core = {};
 __export(exports_deploy_core, {
   deployFromPath: () => deployFromPath
 });
-import { join as join14 } from "path";
+import { join as join13 } from "path";
 import { readFile as readFile6, readdir } from "fs/promises";
 import { existsSync as existsSync8 } from "fs";
 async function deployFromPath(options) {
@@ -18336,17 +21354,41 @@ async function deployFromPath(options) {
     "metadata",
     "proxy"
   ]);
+  const useTaskProgress = !onProgress;
+  const step = (key, message) => {
+    if (useTaskProgress) {
+      task.step(key, message);
+    }
+    if (onProgress)
+      onProgress(message);
+  };
   const log = (msg) => {
-    task.log(msg);
+    if (useTaskProgress) {
+      task.log(msg);
+    }
     if (onProgress)
       onProgress(msg);
   };
-  const appDir = join14(APPS_DIR4, appName);
-  const currentPath = join14(appDir, "current");
-  task.step("config", "Loading application configuration...");
-  const configPath = join14(releasePath, "okastr8.yaml");
+  const fail = (message) => {
+    if (useTaskProgress) {
+      task.fail(message);
+    } else if (onProgress) {
+      onProgress(message);
+    }
+  };
+  const success2 = (message) => {
+    if (useTaskProgress) {
+      task.success(message);
+    } else if (onProgress) {
+      onProgress(message);
+    }
+  };
+  const appDir = join13(APPS_DIR4, appName);
+  const currentPath = join13(appDir, "current");
+  step("config", "Loading application configuration...");
+  const configPath = join13(releasePath, "okastr8.yaml");
   if (!existsSync8(configPath)) {
-    task.fail(`okastr8.yaml not found at ${configPath}`);
+    fail(`okastr8.yaml not found at ${configPath}`);
     return {
       success: false,
       message: `okastr8.yaml not found at ${configPath}`
@@ -18354,9 +21396,9 @@ async function deployFromPath(options) {
   }
   let config;
   try {
-    const { load: load2 } = await Promise.resolve().then(() => (init_js_yaml(), exports_js_yaml));
+    const { load: load3 } = await Promise.resolve().then(() => (init_js_yaml(), exports_js_yaml));
     const configContent = await readFile6(configPath, "utf-8");
-    const rawConfig = load2(configContent);
+    const rawConfig = load3(configContent);
     config = {
       runtime: rawConfig.runtime,
       buildSteps: rawConfig.build || [],
@@ -18367,15 +21409,15 @@ async function deployFromPath(options) {
       cache: rawConfig.cache
     };
     log(`Configuration loaded`);
-  } catch (error) {
-    task.fail(`Failed to parse okastr8.yaml: ${error.message}`);
+  } catch (error2) {
+    fail(`Failed to parse okastr8.yaml: ${error2.message}`);
     return {
       success: false,
-      message: `Failed to parse okastr8.yaml: ${error.message}`
+      message: `Failed to parse okastr8.yaml: ${error2.message}`
     };
   }
   if (!config.startCommand) {
-    task.fail("No start command specified in okastr8.yaml");
+    fail("No start command specified in okastr8.yaml");
     return {
       success: false,
       message: "No start command specified in okastr8.yaml",
@@ -18383,7 +21425,7 @@ async function deployFromPath(options) {
     };
   }
   if (!config.port) {
-    task.fail("No port specified in okastr8.yaml");
+    fail("No port specified in okastr8.yaml");
     return {
       success: false,
       message: "No port specified in okastr8.yaml. Port is required for health checks.",
@@ -18391,46 +21433,46 @@ async function deployFromPath(options) {
     };
   }
   try {
-    task.step("port", `Checking port ${config.port} availability...`);
+    step("port", `Checking port ${config.port} availability...`);
     await checkPortAvailability(config.port, appName, log);
-  } catch (error) {
-    task.fail(`Port conflict: ${error.message}`);
+  } catch (error2) {
+    fail(`Port conflict: ${error2.message}`);
     return {
       success: false,
-      message: `Port conflict detected: ${error.message}`,
+      message: `Port conflict detected: ${error2.message}`,
       config
     };
   }
   if (!config.runtime) {
-    task.step("runtime", "Auto-detecting runtime...");
+    step("runtime", "Auto-detecting runtime...");
     const { detectRuntime: detectRuntime2 } = await Promise.resolve().then(() => (init_runtime_detector(), exports_runtime_detector));
     try {
       config.runtime = await detectRuntime2(releasePath);
       log(`Detected: ${config.runtime}`);
-    } catch (error) {
-      task.fail(error.message);
+    } catch (error2) {
+      fail(error2.message);
       return {
         success: false,
-        message: error.message,
+        message: error2.message,
         config
       };
     }
   } else {
     log(`Runtime: ${config.runtime}`);
   }
-  task.step("deploy", "Deploying with Docker...");
+  step("deploy", "Deploying with Docker...");
   log(`\uD83D\uDCA1 Tip: Apps must bind to 0.0.0.0 (not localhost) to be accessible. We inject HOST=0.0.0.0 automatically.`);
   const { deployWithDocker: deployWithDocker2 } = await Promise.resolve().then(() => (init_deploy_docker(), exports_deploy_docker));
   const deployResult = await deployWithDocker2(options, config);
   if (!deployResult.success) {
-    task.fail(deployResult.message);
+    fail(deployResult.message);
     return deployResult;
   }
-  task.step("symlink", "Switching to new version...");
+  step("symlink", "Switching to new version...");
   const { setCurrentVersion: setCurrentVersion2 } = await Promise.resolve().then(() => (init_version(), exports_version));
   await setCurrentVersion2(appName, versionId);
-  task.step("metadata", "Updating application metadata...");
-  const metadataPath = join14(appDir, "app.json");
+  step("metadata", "Updating application metadata...");
+  const metadataPath = join13(appDir, "app.json");
   let existingMetadata = {};
   try {
     const content = await readFile6(metadataPath, "utf-8");
@@ -18457,13 +21499,13 @@ async function deployFromPath(options) {
     currentVersionId: versionId
   }, null, 2));
   try {
-    task.step("proxy", "Updating reverse proxy configuration...");
+    step("proxy", "Updating reverse proxy configuration...");
     const { genCaddyFile: genCaddyFile2 } = await Promise.resolve().then(() => (init_genCaddyFile(), exports_genCaddyFile));
-    await genCaddyFile2();
+    await genCaddyFile2(log);
   } catch (e) {
     log(`Failed to update Caddy: ${e instanceof Error ? e.message : String(e)}`);
   }
-  task.success(`Successfully deployed ${appName} (v${versionId})`);
+  success2(`Successfully deployed ${appName} (v${versionId})`);
   return {
     success: true,
     message: `Successfully deployed ${appName} (v${versionId}) with Docker`,
@@ -18504,7 +21546,7 @@ async function checkRegistryConflict(port, myAppName) {
     for (const app of apps) {
       if (app === myAppName)
         continue;
-      const metaPath = join14(APPS_DIR4, app, "app.json");
+      const metaPath = join13(APPS_DIR4, app, "app.json");
       try {
         const content = await readFile6(metaPath, "utf-8");
         const meta = JSON.parse(content);
@@ -18524,7 +21566,7 @@ var init_deploy_core = __esm(() => {
   init_config();
   init_command();
   init_cli_logger();
-  APPS_DIR4 = join14(OKASTR8_HOME, "apps");
+  APPS_DIR4 = join13(OKASTR8_HOME, "apps");
 });
 
 // src/utils/deploymentLogger.ts
@@ -18551,8 +21593,8 @@ function streamLog(deploymentId, message) {
     stream.callbacks.forEach((callback) => {
       try {
         callback(message);
-      } catch (error) {
-        console.error(`[DeploymentLogger] Callback error:`, error);
+      } catch (error2) {
+        console.error(`[DeploymentLogger] Callback error:`, error2);
       }
     });
   }
@@ -18577,8 +21619,8 @@ function endDeploymentStream(deploymentId) {
     stream.callbacks.forEach((callback) => {
       try {
         callback("[DEPLOYMENT_STREAM_END]");
-      } catch (error) {
-        console.error(`[DeploymentLogger] End callback error:`, error);
+      } catch (error2) {
+        console.error(`[DeploymentLogger] End callback error:`, error2);
       }
     });
     deploymentStreams.delete(deploymentId);
@@ -18627,14 +21669,14 @@ async function detectRuntime2(name) {
       const match = output.match(check.regex);
       const version = match ? match[1] : undefined;
       const whichResult = await runCommand("which", [check.cmd]);
-      const path4 = whichResult.exitCode === 0 ? whichResult.stdout.trim() : undefined;
+      const path3 = whichResult.exitCode === 0 ? whichResult.stdout.trim() : undefined;
       return {
         installed: true,
         version,
-        path: path4
+        path: path3
       };
     }
-  } catch (error) {}
+  } catch (error2) {}
   return { installed: false };
 }
 async function detectAllRuntimes() {
@@ -18657,8 +21699,8 @@ async function checkRuntimeInstalled(name) {
   if (config.environments?.[runtimeName]?.installed) {
     return true;
   }
-  const info = await detectRuntime2(runtimeName);
-  return info.installed;
+  const info2 = await detectRuntime2(runtimeName);
+  return info2.installed;
 }
 async function getRuntimeInfo(name) {
   const config = await getSystemConfig();
@@ -18789,7 +21831,7 @@ __export(exports_github, {
   checkRepoConfig: () => checkRepoConfig,
   checkFileExists: () => checkFileExists
 });
-import { join as join16, dirname as dirname5 } from "path";
+import { join as join15, dirname as dirname5 } from "path";
 import { fileURLToPath as fileURLToPath4 } from "url";
 import { readFile as readFile8, mkdir as mkdir6, rm as rm3 } from "fs/promises";
 import { existsSync as existsSync10 } from "fs";
@@ -18845,8 +21887,8 @@ async function exchangeCodeForToken(clientId, clientSecret, code) {
       return { accessToken: "", error: data.error_description || data.error };
     }
     return { accessToken: data.access_token || "" };
-  } catch (error) {
-    return { accessToken: "", error: error.message };
+  } catch (error2) {
+    return { accessToken: "", error: error2.message };
   }
 }
 async function getGitHubUser(accessToken) {
@@ -18915,8 +21957,8 @@ async function createSSHKey(accessToken, title, publicKey) {
       return { success: false, message: errorData.message || response.statusText };
     }
     return { success: true, message: "SSH key added to GitHub successfully!" };
-  } catch (error) {
-    return { success: false, message: error.message };
+  } catch (error2) {
+    return { success: false, message: error2.message };
   }
 }
 async function listRepos(accessToken) {
@@ -19055,7 +22097,7 @@ Visit https://github.com/${repo.full_name}/new/${branch} to create the file.`,
       log(`Saving ${Object.keys(options.env).length} environment variables...`);
       await saveEnvVars2(appName, options.env);
     }
-    const appDir = join16(APPS_DIR6, appName);
+    const appDir = join15(APPS_DIR6, appName);
     await mkdir6(appDir, { recursive: true });
     await initializeVersioning2(appName);
     log(`Preparing deployment for ${repo.full_name} (${branch})...`);
@@ -19066,7 +22108,7 @@ Visit https://github.com/${repo.full_name}/new/${branch} to create the file.`,
         const { stopContainer: stopContainer2, removeContainer: removeContainer2, composeDown: composeDown2 } = await Promise.resolve().then(() => (init_docker(), exports_docker));
         await stopContainer2(appName).catch(() => {});
         await removeContainer2(appName).catch(() => {});
-        const composePath = join16(releasePath, "docker-compose.yml");
+        const composePath = join15(releasePath, "docker-compose.yml");
         if (existsSync10(composePath)) {
           await composeDown2(composePath, appName).catch(() => {});
         }
@@ -19116,12 +22158,12 @@ Visit https://github.com/${repo.full_name}/new/${branch} to create the file.`,
       const commitRes = await runCommand2("git", ["rev-parse", "HEAD"], releasePath);
     } catch {}
     log("Loading okastr8.yaml configuration...");
-    const configPath = join16(releasePath, "okastr8.yaml");
+    const configPath = join15(releasePath, "okastr8.yaml");
     let detectedConfig;
     try {
-      const { load: load2 } = await Promise.resolve().then(() => (init_js_yaml(), exports_js_yaml));
+      const { load: load3 } = await Promise.resolve().then(() => (init_js_yaml(), exports_js_yaml));
       const configContent = await readFile8(configPath, "utf-8");
-      const config = load2(configContent);
+      const config = load3(configContent);
       detectedConfig = {
         runtime: config.runtime || "custom",
         buildSteps: config.build || [],
@@ -19131,12 +22173,12 @@ Visit https://github.com/${repo.full_name}/new/${branch} to create the file.`,
         env: config.env
       };
       log(`✅ Configuration loaded from okastr8.yaml`);
-    } catch (error) {
+    } catch (error2) {
       await updateVersionStatus2(appName, versionId, "failed", "Invalid okastr8.yaml");
       await cleanupFailedDeployment("Invalid configuration");
       return {
         success: false,
-        message: `Failed to parse okastr8.yaml: ${error.message}`,
+        message: `Failed to parse okastr8.yaml: ${error2.message}`,
         appName
       };
     }
@@ -19232,8 +22274,8 @@ ${buildResult.stderr}` };
       appName,
       config: detectedConfig
     };
-  } catch (error) {
-    return { success: false, message: error.message };
+  } catch (error2) {
+    return { success: false, message: error2.message };
   }
 }
 async function disconnectGitHub() {
@@ -19334,8 +22376,8 @@ var init_github = __esm(() => {
   init_config();
   __filename5 = fileURLToPath4(import.meta.url);
   __dirname5 = dirname5(__filename5);
-  PROJECT_ROOT4 = join16(__dirname5, "..", "..");
-  APPS_DIR6 = join16(OKASTR8_HOME, "apps");
+  PROJECT_ROOT4 = join15(__dirname5, "..", "..");
+  APPS_DIR6 = join15(OKASTR8_HOME, "apps");
 });
 
 // src/commands/app.ts
@@ -19355,14 +22397,14 @@ __export(exports_app, {
   createApp: () => createApp2,
   addAppCommands: () => addAppCommands2
 });
-import { join as join17, dirname as dirname6 } from "path";
+import { join as join16, dirname as dirname6 } from "path";
 import { mkdir as mkdir7, writeFile as writeFile9, readFile as readFile9, rm as rm4, readdir as readdir3 } from "fs/promises";
 import { existsSync as existsSync11 } from "fs";
 import { fileURLToPath as fileURLToPath5 } from "url";
 async function ensureAppDirs2(appName) {
-  const appDir = join17(APPS_DIR7, appName);
-  const repoDir = join17(appDir, "repo");
-  const logsDir = join17(appDir, "logs");
+  const appDir = join16(APPS_DIR7, appName);
+  const repoDir = join16(appDir, "repo");
+  const logsDir = join16(appDir, "logs");
   await mkdir7(appDir, { recursive: true });
   await mkdir7(repoDir, { recursive: true });
   await mkdir7(logsDir, { recursive: true });
@@ -19371,7 +22413,7 @@ async function ensureAppDirs2(appName) {
 async function createApp2(config) {
   try {
     const { appDir, repoDir, logsDir } = await ensureAppDirs2(config.name);
-    const metadataPath = join17(appDir, "app.json");
+    const metadataPath = join16(appDir, "app.json");
     const metadata = {
       ...config,
       createdAt: new Date().toISOString(),
@@ -19392,9 +22434,9 @@ async function createApp2(config) {
       appDir,
       message: "App registered. Please use deploy command or git push to start it."
     };
-  } catch (error) {
-    console.error(`Error creating app ${config.name}:`, error);
-    throw error;
+  } catch (error2) {
+    console.error(`Error creating app ${config.name}:`, error2);
+    throw error2;
   }
 }
 async function deleteApp2(appName) {
@@ -19403,25 +22445,25 @@ async function deleteApp2(appName) {
     console.log(`\uD83E\uDDF9 Cleaning up Docker resources for ${appName}...`);
     await stopContainer(appName).catch(() => {});
     await removeContainer(appName).catch(() => {});
-    const currentComposePath = join17(APPS_DIR7, appName, "current", "docker-compose.yml");
+    const currentComposePath = join16(APPS_DIR7, appName, "current", "docker-compose.yml");
     if (existsSync11(currentComposePath)) {
       const { composeDown: composeDown2 } = await Promise.resolve().then(() => (init_docker(), exports_docker));
       await composeDown2(currentComposePath, appName).catch(() => {});
     }
-    const appDir = join17(APPS_DIR7, appName);
+    const appDir = join16(APPS_DIR7, appName);
     console.log(`Removing app directory: ${appDir}`);
     await rm4(appDir, { recursive: true, force: true });
     return {
       success: true,
       message: `App '${appName}' deleted successfully`
     };
-  } catch (error) {
-    console.error(`Error deleting app ${appName}:`, error);
-    const appDir = join17(APPS_DIR7, appName);
+  } catch (error2) {
+    console.error(`Error deleting app ${appName}:`, error2);
+    const appDir = join16(APPS_DIR7, appName);
     await rm4(appDir, { recursive: true, force: true }).catch(() => {});
     return {
       success: false,
-      message: `Failed to delete app cleanly: ${error instanceof Error ? error.message : String(error)}`
+      message: `Failed to delete app cleanly: ${error2 instanceof Error ? error2.message : String(error2)}`
     };
   }
 }
@@ -19434,7 +22476,7 @@ async function listApps2() {
     const runningMap = new Map(runningContainers.map((c) => [c.name, c.state]));
     for (const entry of entries) {
       if (entry.isDirectory()) {
-        const metadataPath = join17(APPS_DIR7, entry.name, "app.json");
+        const metadataPath = join16(APPS_DIR7, entry.name, "app.json");
         try {
           const metadata = JSON.parse(await readFile9(metadataPath, "utf-8"));
           const state = runningMap.get(entry.name);
@@ -19449,9 +22491,9 @@ async function listApps2() {
       }
     }
     return { success: true, apps };
-  } catch (error) {
-    console.error("Error listing apps:", error);
-    throw error;
+  } catch (error2) {
+    console.error("Error listing apps:", error2);
+    throw error2;
   }
 }
 async function getAppStatus2(appName) {
@@ -19479,17 +22521,17 @@ async function getAppLogs2(appName, lines = 50) {
 }
 async function exportAppLogs2(appName) {
   try {
-    const appDir = join17(APPS_DIR7, appName);
-    const logsDir = join17(appDir, "logs");
+    const appDir = join16(APPS_DIR7, appName);
+    const logsDir = join16(appDir, "logs");
     await mkdir7(logsDir, { recursive: true });
     const timestamp2 = new Date().toISOString().replace(/[:.]/g, "-");
-    const logFile = join17(logsDir, `${appName}-${timestamp2}.log`);
+    const logFile = join16(logsDir, `${appName}-${timestamp2}.log`);
     const logs = await containerLogs(appName, 1e4);
     await writeFile9(logFile, logs);
     return { success: true, logFile, message: `Logs exported to ${logFile}` };
-  } catch (error) {
-    console.error(`Error exporting logs for ${appName}:`, error);
-    throw error;
+  } catch (error2) {
+    console.error(`Error exporting logs for ${appName}:`, error2);
+    throw error2;
   }
 }
 async function startApp2(appName) {
@@ -19517,8 +22559,8 @@ async function restartApp2(appName) {
   }
 }
 async function getAppMetadata2(appName) {
-  const appDir = join17(APPS_DIR7, appName);
-  const metadataPath = join17(appDir, "app.json");
+  const appDir = join16(APPS_DIR7, appName);
+  const metadataPath = join16(appDir, "app.json");
   try {
     const content = await readFile9(metadataPath, "utf-8");
     return JSON.parse(content);
@@ -19526,7 +22568,7 @@ async function getAppMetadata2(appName) {
     throw new Error(`App ${appName} not found or corrupted`);
   }
 }
-async function updateApp(appName, env) {
+async function updateApp(appName, env2) {
   let versionId = 0;
   let releasePath = "";
   try {
@@ -19568,8 +22610,7 @@ async function updateApp(appName, env) {
       versionId,
       gitRepo: metadata.gitRepo,
       gitBranch: branch,
-      env,
-      onProgress: (msg) => console.log(msg)
+      env: env2
     });
     if (!deployResult.success) {
       console.log("Deployment failed. Cleaning up...");
@@ -19578,20 +22619,20 @@ async function updateApp(appName, env) {
       throw new Error(deployResult.message);
     }
     return { success: true, message: `App updated to v${versionId}` };
-  } catch (error) {
-    console.error(`Error updating app ${appName}:`, error);
+  } catch (error2) {
+    console.error(`Error updating app ${appName}:`, error2);
     if (versionId && releasePath) {
       try {
         await rm4(releasePath, { recursive: true, force: true });
         await removeVersion(appName, versionId);
       } catch {}
     }
-    throw error;
+    throw error2;
   }
 }
 async function setAppWebhookAutoDeploy2(appName, enabled) {
-  const appDir = join17(APPS_DIR7, appName);
-  const metadataPath = join17(appDir, "app.json");
+  const appDir = join16(APPS_DIR7, appName);
+  const metadataPath = join16(appDir, "app.json");
   try {
     const content = await readFile9(metadataPath, "utf-8");
     const metadata = JSON.parse(content);
@@ -19607,7 +22648,7 @@ function addAppCommands2(program2) {
   app.command("create").description("Create a new application").argument("<name>", "Application name").argument("<exec_start>", "Command to run (e.g., 'bun run start')").option("-d, --description <desc>", "Service description", "Okastr8 managed app").option("-u, --user <user>", "User to run as", process.env.USER || "root").option("-w, --working-dir <dir>", "Working directory").option("-p, --port <port>", "Application port").option("--domain <domain>", "Domain for Caddy reverse proxy").option("--git-repo <url>", "Git repository URL").option("--git-branch <branch>", "Git branch to track", "main").option("--database <type:version>", "Database service (e.g., 'postgres:15')").option("--cache <type:version>", "Cache service (e.g., 'redis:7')").option("--env <vars...>", "Environment variables (KEY=VALUE)").option("--env-file <path>", "Path to .env file").action(async (name, execStart, options) => {
     console.log(`Creating app '${name}'...`);
     try {
-      let env2 = {};
+      let env3 = {};
       if (options.envFile) {
         if (existsSync11(options.envFile)) {
           const content = await readFile9(options.envFile, "utf-8");
@@ -19618,7 +22659,7 @@ function addAppCommands2(program2) {
               return;
             const [k, ...v] = line.split("=");
             if (k && v.length > 0)
-              env2[k.trim()] = v.join("=").trim();
+              env3[k.trim()] = v.join("=").trim();
           });
         } else {
           console.error(`❌ Env file not found: ${options.envFile}`);
@@ -19629,12 +22670,12 @@ function addAppCommands2(program2) {
         options.env.forEach((pair) => {
           const [k, ...v] = pair.split("=");
           if (k && v.length > 0)
-            env2[k.trim()] = v.join("=").trim();
+            env3[k.trim()] = v.join("=").trim();
         });
       }
-      if (Object.keys(env2).length > 0) {
+      if (Object.keys(env3).length > 0) {
         const { saveEnvVars: saveEnvVars2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
-        await saveEnvVars2(name, env2);
+        await saveEnvVars2(name, env3);
       }
       const result = await createApp2({
         name,
@@ -19651,8 +22692,8 @@ function addAppCommands2(program2) {
       });
       console.log(result.message);
       console.log(`App created at ${result.appDir}`);
-    } catch (error) {
-      console.error(`Failed to create app:`, error.message);
+    } catch (error2) {
+      console.error(`Failed to create app:`, error2.message);
       process.exit(1);
     }
   });
@@ -19662,8 +22703,8 @@ function addAppCommands2(program2) {
       const result = await deleteApp2(name);
       console.log(result.message);
       console.log(`App '${name}' deleted`);
-    } catch (error) {
-      console.error(`Failed to delete app:`, error.message);
+    } catch (error2) {
+      console.error(`Failed to delete app:`, error2.message);
       process.exit(1);
     }
   });
@@ -19678,8 +22719,8 @@ function addAppCommands2(program2) {
           console.log(`  • ${app2.name}${app2.description ? ` - ${app2.description}` : ""}`);
         }
       }
-    } catch (error) {
-      console.error(`Failed to list apps:`, error.message);
+    } catch (error2) {
+      console.error(`Failed to list apps:`, error2.message);
       process.exit(1);
     }
   });
@@ -19687,8 +22728,8 @@ function addAppCommands2(program2) {
     try {
       const result = await getAppStatus2(name);
       console.log(result.message);
-    } catch (error) {
-      console.error(`Failed to get status:`, error.message);
+    } catch (error2) {
+      console.error(`Failed to get status:`, error2.message);
       process.exit(1);
     }
   });
@@ -19696,8 +22737,8 @@ function addAppCommands2(program2) {
     try {
       const result = await getAppLogs2(name, parseInt(options.lines, 10));
       console.log(result.logs);
-    } catch (error) {
-      console.error(`Failed to get logs:`, error.message);
+    } catch (error2) {
+      console.error(`Failed to get logs:`, error2.message);
       process.exit(1);
     }
   });
@@ -19705,8 +22746,8 @@ function addAppCommands2(program2) {
     try {
       const result = await exportAppLogs2(name);
       console.log(result.message);
-    } catch (error) {
-      console.error(`Failed to export logs:`, error.message);
+    } catch (error2) {
+      console.error(`Failed to export logs:`, error2.message);
       process.exit(1);
     }
   });
@@ -19715,8 +22756,8 @@ function addAppCommands2(program2) {
     const result = await startApp2(name);
     console.log(result.message);
   });
-  const env = app.command("env").description("Manage environment variables for an app");
-  env.command("set").description("Set environment variables for an app").argument("<appName>", "Name of the app").argument("<key=value...>", "Environment variables in KEY=VALUE format").action(async (appName, keyValues) => {
+  const env2 = app.command("env").description("Manage environment variables for an app");
+  env2.command("set").description("Set environment variables for an app").argument("<appName>", "Name of the app").argument("<key=value...>", "Environment variables in KEY=VALUE format").action(async (appName, keyValues) => {
     try {
       const { setEnvVar: setEnvVar2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
       for (const pair of keyValues) {
@@ -19729,22 +22770,22 @@ function addAppCommands2(program2) {
         await setEnvVar2(appName, key, value);
         console.log(`Set ${key}`);
       }
-    } catch (error) {
-      console.error(`Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`Error: ${error2.message}`);
       process.exit(1);
     }
   });
-  env.command("import").description("Import environment variables from a .env file").argument("<appName>", "Name of the app").option("-f, --file <path>", "Path to .env file", ".env").action(async (appName, options) => {
+  env2.command("import").description("Import environment variables from a .env file").argument("<appName>", "Name of the app").option("-f, --file <path>", "Path to .env file", ".env").action(async (appName, options) => {
     try {
       const { importEnvFile: importEnvFile2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
       await importEnvFile2(appName, options.file);
       console.log(`✅ Imported environment variables from ${options.file}`);
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
-  env.command("list").description("List environment variable keys for an app").argument("<appName>", "Name of the app").action(async (appName) => {
+  env2.command("list").description("List environment variable keys for an app").argument("<appName>", "Name of the app").action(async (appName) => {
     try {
       const { listEnvVars: listEnvVars2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
       const keys = await listEnvVars2(appName);
@@ -19754,28 +22795,28 @@ function addAppCommands2(program2) {
         console.log("Environment variables:");
         keys.forEach((key) => console.log(`  ${key}=••••••••`));
       }
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
-  env.command("export").description("Export environment variables to a file").argument("<appName>", "Name of the app").option("-f, --file <path>", "Output file path", "exported.env").action(async (appName, options) => {
+  env2.command("export").description("Export environment variables to a file").argument("<appName>", "Name of the app").option("-f, --file <path>", "Output file path", "exported.env").action(async (appName, options) => {
     try {
       const { exportEnvFile: exportEnvFile2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
       await exportEnvFile2(appName, options.file);
       console.log(`✅ Exported environment variables to ${options.file}`);
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
-  env.command("unset").description("Unset an environment variable").argument("<appName>", "Name of the app").argument("<key>", "Environment variable key to unset").action(async (appName, key) => {
+  env2.command("unset").description("Unset an environment variable").argument("<appName>", "Name of the app").argument("<key>", "Environment variable key to unset").action(async (appName, key) => {
     try {
       const { unsetEnvVar: unsetEnvVar2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
       await unsetEnvVar2(appName, key);
       console.log(`✅ Unset ${key}`);
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -19801,8 +22842,8 @@ function addAppCommands2(program2) {
         const result = await setAppWebhookAutoDeploy2(name, enabled);
         console.log(result.message);
       }
-    } catch (error) {
-      console.error(`❌ Failed:`, error.message);
+    } catch (error2) {
+      console.error(`❌ Failed:`, error2.message);
       process.exit(1);
     }
   });
@@ -19816,8 +22857,8 @@ var init_app = __esm(() => {
   init_config();
   __filename6 = fileURLToPath5(import.meta.url);
   __dirname6 = dirname6(__filename6);
-  PROJECT_ROOT5 = join17(__dirname6, "..", "..");
-  APPS_DIR7 = join17(OKASTR8_HOME, "apps");
+  PROJECT_ROOT5 = join16(__dirname6, "..", "..");
+  APPS_DIR7 = join16(OKASTR8_HOME, "apps");
 });
 
 // src/services/email.ts
@@ -19831,7 +22872,7 @@ __export(exports_email, {
   sendDeploymentAlertEmail: () => sendDeploymentAlertEmail,
   sendAdminEmail: () => sendAdminEmail
 });
-import { join as join18 } from "path";
+import { join as join17 } from "path";
 import { homedir as homedir4 } from "os";
 import { existsSync as existsSync12 } from "fs";
 import { readFile as readFile10 } from "fs/promises";
@@ -19854,8 +22895,8 @@ async function getBrevoConfig() {
       senderName: brevo.sender_name || "okastr8",
       adminEmail: brevo.admin_email || ""
     };
-  } catch (error) {
-    console.error("Email: Failed to load config:", error.message);
+  } catch (error2) {
+    console.error("Email: Failed to load config:", error2.message);
     return null;
   }
 }
@@ -19892,9 +22933,9 @@ async function sendEmail(options) {
     const result = await response.json();
     console.log("Email sent successfully:", result.messageId);
     return { success: true };
-  } catch (error) {
-    console.error("Email error:", error.message);
-    return { success: false, error: error.message };
+  } catch (error2) {
+    console.error("Email error:", error2.message);
+    return { success: false, error: error2.message };
   }
 }
 async function sendAdminEmail(subject, html) {
@@ -19990,7 +23031,7 @@ async function sendDeploymentAlertEmail(appName, status, details) {
 </html>`;
   return sendAdminEmail(`Deployment ${statusText}: ${appName}`, html);
 }
-async function sendServiceDownEmail(serviceName, error) {
+async function sendServiceDownEmail(serviceName, error2) {
   const html = `
 <!DOCTYPE html>
 <html>
@@ -20013,7 +23054,7 @@ async function sendServiceDownEmail(serviceName, error) {
         <div class="content">
             <p><strong>Service:</strong> <span class="service-name">${serviceName}</span></p>
             <p><strong>Error:</strong></p>
-            <div class="error">${error}</div>
+            <div class="error">${error2}</div>
             <p>To restart the service:</p>
             <div class="cli-cmd">okastr8 service restart ${serviceName}</div>
         </div>
@@ -20111,7 +23152,7 @@ async function sendWelcomeEmail(userEmail, token, permissions) {
 var import_yaml, SYSTEM_YAML_PATH;
 var init_email = __esm(() => {
   import_yaml = __toESM(require_dist(), 1);
-  SYSTEM_YAML_PATH = join18(homedir4(), ".okastr8", "system.yaml");
+  SYSTEM_YAML_PATH = join17(homedir4(), ".okastr8", "system.yaml");
 });
 
 // node_modules/commander/esm.mjs
@@ -20134,6 +23175,12 @@ var {
 init_command();
 import * as path from "path";
 var SCRIPT_BASE_PATH = path.join(process.cwd(), "scripts", "systemd");
+async function serviceExists(service_name) {
+  const serviceFile = `/etc/systemd/system/${service_name}.service`;
+  const { runCommand: runCommand2 } = await Promise.resolve().then(() => (init_command(), exports_command));
+  const result = await runCommand2("sudo", ["test", "-f", serviceFile]);
+  return result.exitCode === 0;
+}
 async function createService(service_name, description, exec_start, working_directory, user, wanted_by, auto_start) {
   return await runCommand("sudo", [
     path.join(SCRIPT_BASE_PATH, "create.sh"),
@@ -20147,34 +23194,53 @@ async function createService(service_name, description, exec_start, working_dire
   ]);
 }
 async function deleteService(service_name) {
-  return await runCommand("sudo", [path.join(SCRIPT_BASE_PATH, "delete.sh"), service_name]);
+  await stopService(service_name).catch(() => {});
+  await disableService(service_name).catch(() => {});
+  const result = await runCommand("sudo", ["rm", "-f", `/etc/systemd/system/${service_name}.service`]);
+  await reloadDaemon();
+  return result;
 }
 async function startService(service_name) {
-  return await runCommand("sudo", [path.join(SCRIPT_BASE_PATH, "start.sh"), service_name]);
+  return await runCommand("sudo", ["systemctl", "start", service_name]);
 }
 async function stopService(service_name) {
-  return await runCommand("sudo", [path.join(SCRIPT_BASE_PATH, "stop.sh"), service_name]);
+  return await runCommand("sudo", ["systemctl", "stop", service_name]);
 }
 async function restartService(service_name) {
-  return await runCommand("sudo", [path.join(SCRIPT_BASE_PATH, "restart.sh"), service_name]);
+  return await runCommand("sudo", ["systemctl", "restart", service_name]);
 }
 async function statusService(service_name) {
-  return await runCommand("sudo", [path.join(SCRIPT_BASE_PATH, "status.sh"), service_name]);
+  if (!await serviceExists(service_name)) {
+    return { exitCode: 4, stdout: "", stderr: `Error: Service file not found at /etc/systemd/system/${service_name}.service
+` };
+  }
+  const isActive = await runCommand("sudo", ["systemctl", "is-active", "--quiet", service_name]);
+  if (isActive.exitCode === 0) {
+    return { exitCode: 0, stdout: `✅ ${service_name} is running
+`, stderr: "" };
+  }
+  const isFailed = await runCommand("sudo", ["systemctl", "is-failed", "--quiet", service_name]);
+  if (isFailed.exitCode === 0) {
+    return { exitCode: 2, stdout: `❌ ${service_name} has failed
+`, stderr: "" };
+  }
+  return { exitCode: 3, stdout: `⏹️  ${service_name} is stopped
+`, stderr: "" };
 }
 async function logsService(service_name) {
-  return await runCommand("sudo", [path.join(SCRIPT_BASE_PATH, "logs.sh"), service_name]);
+  return await runCommand("sudo", ["journalctl", "-u", service_name, "-n", "50", "--no-pager"]);
 }
 async function enableService(service_name) {
-  return await runCommand("sudo", [path.join(SCRIPT_BASE_PATH, "enable.sh"), service_name]);
+  return await runCommand("sudo", ["systemctl", "enable", service_name]);
 }
 async function disableService(service_name) {
-  return await runCommand("sudo", [path.join(SCRIPT_BASE_PATH, "disable.sh"), service_name]);
+  return await runCommand("sudo", ["systemctl", "disable", service_name]);
 }
 async function reloadDaemon() {
-  return await runCommand("sudo", [path.join(SCRIPT_BASE_PATH, "reload.sh")]);
+  return await runCommand("sudo", ["systemctl", "daemon-reload"]);
 }
 async function listServices() {
-  return await runCommand("sudo", [path.join(SCRIPT_BASE_PATH, "list.sh")]);
+  return await runCommand("sudo", ["ls", "/etc/systemd/system/okastr8-*.service"]);
 }
 function addSystemdCommands(program2) {
   const systemd = program2.command("systemd").description("Manage systemd services");
@@ -20617,18 +23683,18 @@ init_deploy_core();
 init_version();
 init_docker();
 init_config();
-import { join as join15, dirname as dirname4 } from "path";
+import { join as join14, dirname as dirname4 } from "path";
 import { mkdir as mkdir5, writeFile as writeFile7, readFile as readFile7, rm as rm2, readdir as readdir2 } from "fs/promises";
 import { existsSync as existsSync9 } from "fs";
 import { fileURLToPath as fileURLToPath3 } from "url";
 var __filename4 = fileURLToPath3(import.meta.url);
 var __dirname4 = dirname4(__filename4);
-var PROJECT_ROOT3 = join15(__dirname4, "..", "..");
-var APPS_DIR5 = join15(OKASTR8_HOME, "apps");
+var PROJECT_ROOT3 = join14(__dirname4, "..", "..");
+var APPS_DIR5 = join14(OKASTR8_HOME, "apps");
 async function ensureAppDirs(appName) {
-  const appDir = join15(APPS_DIR5, appName);
-  const repoDir = join15(appDir, "repo");
-  const logsDir = join15(appDir, "logs");
+  const appDir = join14(APPS_DIR5, appName);
+  const repoDir = join14(appDir, "repo");
+  const logsDir = join14(appDir, "logs");
   await mkdir5(appDir, { recursive: true });
   await mkdir5(repoDir, { recursive: true });
   await mkdir5(logsDir, { recursive: true });
@@ -20637,7 +23703,7 @@ async function ensureAppDirs(appName) {
 async function createApp(config) {
   try {
     const { appDir, repoDir, logsDir } = await ensureAppDirs(config.name);
-    const metadataPath = join15(appDir, "app.json");
+    const metadataPath = join14(appDir, "app.json");
     const metadata = {
       ...config,
       createdAt: new Date().toISOString(),
@@ -20658,9 +23724,9 @@ async function createApp(config) {
       appDir,
       message: "App registered. Please use deploy command or git push to start it."
     };
-  } catch (error) {
-    console.error(`Error creating app ${config.name}:`, error);
-    throw error;
+  } catch (error2) {
+    console.error(`Error creating app ${config.name}:`, error2);
+    throw error2;
   }
 }
 async function deleteApp(appName) {
@@ -20669,25 +23735,25 @@ async function deleteApp(appName) {
     console.log(`\uD83E\uDDF9 Cleaning up Docker resources for ${appName}...`);
     await stopContainer(appName).catch(() => {});
     await removeContainer(appName).catch(() => {});
-    const currentComposePath = join15(APPS_DIR5, appName, "current", "docker-compose.yml");
+    const currentComposePath = join14(APPS_DIR5, appName, "current", "docker-compose.yml");
     if (existsSync9(currentComposePath)) {
       const { composeDown: composeDown2 } = await Promise.resolve().then(() => (init_docker(), exports_docker));
       await composeDown2(currentComposePath, appName).catch(() => {});
     }
-    const appDir = join15(APPS_DIR5, appName);
+    const appDir = join14(APPS_DIR5, appName);
     console.log(`Removing app directory: ${appDir}`);
     await rm2(appDir, { recursive: true, force: true });
     return {
       success: true,
       message: `App '${appName}' deleted successfully`
     };
-  } catch (error) {
-    console.error(`Error deleting app ${appName}:`, error);
-    const appDir = join15(APPS_DIR5, appName);
+  } catch (error2) {
+    console.error(`Error deleting app ${appName}:`, error2);
+    const appDir = join14(APPS_DIR5, appName);
     await rm2(appDir, { recursive: true, force: true }).catch(() => {});
     return {
       success: false,
-      message: `Failed to delete app cleanly: ${error instanceof Error ? error.message : String(error)}`
+      message: `Failed to delete app cleanly: ${error2 instanceof Error ? error2.message : String(error2)}`
     };
   }
 }
@@ -20700,7 +23766,7 @@ async function listApps() {
     const runningMap = new Map(runningContainers.map((c) => [c.name, c.state]));
     for (const entry of entries) {
       if (entry.isDirectory()) {
-        const metadataPath = join15(APPS_DIR5, entry.name, "app.json");
+        const metadataPath = join14(APPS_DIR5, entry.name, "app.json");
         try {
           const metadata = JSON.parse(await readFile7(metadataPath, "utf-8"));
           const state = runningMap.get(entry.name);
@@ -20715,9 +23781,9 @@ async function listApps() {
       }
     }
     return { success: true, apps };
-  } catch (error) {
-    console.error("Error listing apps:", error);
-    throw error;
+  } catch (error2) {
+    console.error("Error listing apps:", error2);
+    throw error2;
   }
 }
 async function getAppStatus(appName) {
@@ -20745,17 +23811,17 @@ async function getAppLogs(appName, lines = 50) {
 }
 async function exportAppLogs(appName) {
   try {
-    const appDir = join15(APPS_DIR5, appName);
-    const logsDir = join15(appDir, "logs");
+    const appDir = join14(APPS_DIR5, appName);
+    const logsDir = join14(appDir, "logs");
     await mkdir5(logsDir, { recursive: true });
     const timestamp2 = new Date().toISOString().replace(/[:.]/g, "-");
-    const logFile = join15(logsDir, `${appName}-${timestamp2}.log`);
+    const logFile = join14(logsDir, `${appName}-${timestamp2}.log`);
     const logs = await containerLogs(appName, 1e4);
     await writeFile7(logFile, logs);
     return { success: true, logFile, message: `Logs exported to ${logFile}` };
-  } catch (error) {
-    console.error(`Error exporting logs for ${appName}:`, error);
-    throw error;
+  } catch (error2) {
+    console.error(`Error exporting logs for ${appName}:`, error2);
+    throw error2;
   }
 }
 async function startApp(appName) {
@@ -20783,8 +23849,8 @@ async function restartApp(appName) {
   }
 }
 async function getAppMetadata(appName) {
-  const appDir = join15(APPS_DIR5, appName);
-  const metadataPath = join15(appDir, "app.json");
+  const appDir = join14(APPS_DIR5, appName);
+  const metadataPath = join14(appDir, "app.json");
   try {
     const content = await readFile7(metadataPath, "utf-8");
     return JSON.parse(content);
@@ -20793,8 +23859,8 @@ async function getAppMetadata(appName) {
   }
 }
 async function setAppWebhookAutoDeploy(appName, enabled) {
-  const appDir = join15(APPS_DIR5, appName);
-  const metadataPath = join15(appDir, "app.json");
+  const appDir = join14(APPS_DIR5, appName);
+  const metadataPath = join14(appDir, "app.json");
   try {
     const content = await readFile7(metadataPath, "utf-8");
     const metadata = JSON.parse(content);
@@ -20810,7 +23876,7 @@ function addAppCommands(program2) {
   app.command("create").description("Create a new application").argument("<name>", "Application name").argument("<exec_start>", "Command to run (e.g., 'bun run start')").option("-d, --description <desc>", "Service description", "Okastr8 managed app").option("-u, --user <user>", "User to run as", process.env.USER || "root").option("-w, --working-dir <dir>", "Working directory").option("-p, --port <port>", "Application port").option("--domain <domain>", "Domain for Caddy reverse proxy").option("--git-repo <url>", "Git repository URL").option("--git-branch <branch>", "Git branch to track", "main").option("--database <type:version>", "Database service (e.g., 'postgres:15')").option("--cache <type:version>", "Cache service (e.g., 'redis:7')").option("--env <vars...>", "Environment variables (KEY=VALUE)").option("--env-file <path>", "Path to .env file").action(async (name, execStart, options) => {
     console.log(`Creating app '${name}'...`);
     try {
-      let env2 = {};
+      let env3 = {};
       if (options.envFile) {
         if (existsSync9(options.envFile)) {
           const content = await readFile7(options.envFile, "utf-8");
@@ -20821,7 +23887,7 @@ function addAppCommands(program2) {
               return;
             const [k, ...v] = line.split("=");
             if (k && v.length > 0)
-              env2[k.trim()] = v.join("=").trim();
+              env3[k.trim()] = v.join("=").trim();
           });
         } else {
           console.error(`❌ Env file not found: ${options.envFile}`);
@@ -20832,12 +23898,12 @@ function addAppCommands(program2) {
         options.env.forEach((pair) => {
           const [k, ...v] = pair.split("=");
           if (k && v.length > 0)
-            env2[k.trim()] = v.join("=").trim();
+            env3[k.trim()] = v.join("=").trim();
         });
       }
-      if (Object.keys(env2).length > 0) {
+      if (Object.keys(env3).length > 0) {
         const { saveEnvVars: saveEnvVars2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
-        await saveEnvVars2(name, env2);
+        await saveEnvVars2(name, env3);
       }
       const result = await createApp({
         name,
@@ -20854,8 +23920,8 @@ function addAppCommands(program2) {
       });
       console.log(result.message);
       console.log(`App created at ${result.appDir}`);
-    } catch (error) {
-      console.error(`Failed to create app:`, error.message);
+    } catch (error2) {
+      console.error(`Failed to create app:`, error2.message);
       process.exit(1);
     }
   });
@@ -20865,8 +23931,8 @@ function addAppCommands(program2) {
       const result = await deleteApp(name);
       console.log(result.message);
       console.log(`App '${name}' deleted`);
-    } catch (error) {
-      console.error(`Failed to delete app:`, error.message);
+    } catch (error2) {
+      console.error(`Failed to delete app:`, error2.message);
       process.exit(1);
     }
   });
@@ -20881,8 +23947,8 @@ function addAppCommands(program2) {
           console.log(`  • ${app2.name}${app2.description ? ` - ${app2.description}` : ""}`);
         }
       }
-    } catch (error) {
-      console.error(`Failed to list apps:`, error.message);
+    } catch (error2) {
+      console.error(`Failed to list apps:`, error2.message);
       process.exit(1);
     }
   });
@@ -20890,8 +23956,8 @@ function addAppCommands(program2) {
     try {
       const result = await getAppStatus(name);
       console.log(result.message);
-    } catch (error) {
-      console.error(`Failed to get status:`, error.message);
+    } catch (error2) {
+      console.error(`Failed to get status:`, error2.message);
       process.exit(1);
     }
   });
@@ -20899,8 +23965,8 @@ function addAppCommands(program2) {
     try {
       const result = await getAppLogs(name, parseInt(options.lines, 10));
       console.log(result.logs);
-    } catch (error) {
-      console.error(`Failed to get logs:`, error.message);
+    } catch (error2) {
+      console.error(`Failed to get logs:`, error2.message);
       process.exit(1);
     }
   });
@@ -20908,8 +23974,8 @@ function addAppCommands(program2) {
     try {
       const result = await exportAppLogs(name);
       console.log(result.message);
-    } catch (error) {
-      console.error(`Failed to export logs:`, error.message);
+    } catch (error2) {
+      console.error(`Failed to export logs:`, error2.message);
       process.exit(1);
     }
   });
@@ -20918,8 +23984,8 @@ function addAppCommands(program2) {
     const result = await startApp(name);
     console.log(result.message);
   });
-  const env = app.command("env").description("Manage environment variables for an app");
-  env.command("set").description("Set environment variables for an app").argument("<appName>", "Name of the app").argument("<key=value...>", "Environment variables in KEY=VALUE format").action(async (appName, keyValues) => {
+  const env2 = app.command("env").description("Manage environment variables for an app");
+  env2.command("set").description("Set environment variables for an app").argument("<appName>", "Name of the app").argument("<key=value...>", "Environment variables in KEY=VALUE format").action(async (appName, keyValues) => {
     try {
       const { setEnvVar: setEnvVar2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
       for (const pair of keyValues) {
@@ -20932,22 +23998,22 @@ function addAppCommands(program2) {
         await setEnvVar2(appName, key, value);
         console.log(`Set ${key}`);
       }
-    } catch (error) {
-      console.error(`Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`Error: ${error2.message}`);
       process.exit(1);
     }
   });
-  env.command("import").description("Import environment variables from a .env file").argument("<appName>", "Name of the app").option("-f, --file <path>", "Path to .env file", ".env").action(async (appName, options) => {
+  env2.command("import").description("Import environment variables from a .env file").argument("<appName>", "Name of the app").option("-f, --file <path>", "Path to .env file", ".env").action(async (appName, options) => {
     try {
       const { importEnvFile: importEnvFile2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
       await importEnvFile2(appName, options.file);
       console.log(`✅ Imported environment variables from ${options.file}`);
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
-  env.command("list").description("List environment variable keys for an app").argument("<appName>", "Name of the app").action(async (appName) => {
+  env2.command("list").description("List environment variable keys for an app").argument("<appName>", "Name of the app").action(async (appName) => {
     try {
       const { listEnvVars: listEnvVars2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
       const keys = await listEnvVars2(appName);
@@ -20957,28 +24023,28 @@ function addAppCommands(program2) {
         console.log("Environment variables:");
         keys.forEach((key) => console.log(`  ${key}=••••••••`));
       }
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
-  env.command("export").description("Export environment variables to a file").argument("<appName>", "Name of the app").option("-f, --file <path>", "Output file path", "exported.env").action(async (appName, options) => {
+  env2.command("export").description("Export environment variables to a file").argument("<appName>", "Name of the app").option("-f, --file <path>", "Output file path", "exported.env").action(async (appName, options) => {
     try {
       const { exportEnvFile: exportEnvFile2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
       await exportEnvFile2(appName, options.file);
       console.log(`✅ Exported environment variables to ${options.file}`);
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
-  env.command("unset").description("Unset an environment variable").argument("<appName>", "Name of the app").argument("<key>", "Environment variable key to unset").action(async (appName, key) => {
+  env2.command("unset").description("Unset an environment variable").argument("<appName>", "Name of the app").argument("<key>", "Environment variable key to unset").action(async (appName, key) => {
     try {
       const { unsetEnvVar: unsetEnvVar2 } = await Promise.resolve().then(() => (init_env_manager(), exports_env_manager));
       await unsetEnvVar2(appName, key);
       console.log(`✅ Unset ${key}`);
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -21004,8 +24070,8 @@ function addAppCommands(program2) {
         const result = await setAppWebhookAutoDeploy(name, enabled);
         console.log(result.message);
       }
-    } catch (error) {
-      console.error(`❌ Failed:`, error.message);
+    } catch (error2) {
+      console.error(`❌ Failed:`, error2.message);
       process.exit(1);
     }
   });
@@ -21014,22 +24080,22 @@ function addAppCommands(program2) {
 // src/commands/deploy.ts
 init_command();
 init_config();
-import { join as join19, dirname as dirname7 } from "path";
+import { join as join18, dirname as dirname7 } from "path";
 import { fileURLToPath as fileURLToPath6 } from "url";
 import { readFile as readFile11, writeFile as writeFile10, mkdir as mkdir8 } from "fs/promises";
 import { existsSync as existsSync13 } from "fs";
 var __filename7 = fileURLToPath6(import.meta.url);
 var __dirname7 = dirname7(__filename7);
-var PROJECT_ROOT6 = join19(__dirname7, "..", "..");
-var APPS_DIR8 = join19(OKASTR8_HOME, "apps");
-var DEPLOYMENT_FILE = join19(OKASTR8_HOME, "deployment.json");
+var PROJECT_ROOT6 = join18(__dirname7, "..", "..");
+var APPS_DIR8 = join18(OKASTR8_HOME, "apps");
+var DEPLOYMENT_FILE = join18(OKASTR8_HOME, "deployment.json");
 var SCRIPTS2 = {
-  gitPull: join19(PROJECT_ROOT6, "scripts", "git", "pull.sh"),
-  gitRollback: join19(PROJECT_ROOT6, "scripts", "git", "rollback.sh"),
-  healthCheck: join19(PROJECT_ROOT6, "scripts", "deploy", "health-check.sh"),
-  restart: join19(PROJECT_ROOT6, "scripts", "systemd", "restart.sh"),
-  stop: join19(PROJECT_ROOT6, "scripts", "systemd", "stop.sh"),
-  start: join19(PROJECT_ROOT6, "scripts", "systemd", "start.sh")
+  gitPull: join18(PROJECT_ROOT6, "scripts", "git", "pull.sh"),
+  gitRollback: join18(PROJECT_ROOT6, "scripts", "git", "rollback.sh"),
+  healthCheck: join18(PROJECT_ROOT6, "scripts", "deploy", "health-check.sh"),
+  restart: join18(PROJECT_ROOT6, "scripts", "systemd", "restart.sh"),
+  stop: join18(PROJECT_ROOT6, "scripts", "systemd", "stop.sh"),
+  start: join18(PROJECT_ROOT6, "scripts", "systemd", "start.sh")
 };
 async function runHealthCheck(method, target, timeout = 30) {
   return await runCommand("bash", [
@@ -21040,7 +24106,7 @@ async function runHealthCheck(method, target, timeout = 30) {
   ]);
 }
 async function deployApp(options) {
-  const { appName, branch, skipHealthCheck, env } = options;
+  const { appName, branch, skipHealthCheck, env: env2 } = options;
   console.log(`Starting deployment for ${appName}...`);
   try {
     const { getAppMetadata: getAppMetadata3, updateApp: updateApp2 } = await Promise.resolve().then(() => (init_app(), exports_app));
@@ -21073,7 +24139,7 @@ async function deployApp(options) {
     }
     console.log(`
 Using immutable deployment strategy (V2)...`);
-    const result = await updateApp2(appName, env);
+    const result = await updateApp2(appName, env2);
     const { sendDeploymentAlertEmail: sendDeploymentAlertEmail2 } = await Promise.resolve().then(() => (init_email(), exports_email));
     if (result.success) {
       console.log(`
@@ -21093,18 +24159,18 @@ Release ID: ${releaseId}`);
       await sendDeploymentAlertEmail2(appName, "failed", result.message);
     }
     return result;
-  } catch (error) {
-    console.error(`❌ Deployment failed: ${error.message}`);
+  } catch (error2) {
+    console.error(`❌ Deployment failed: ${error2.message}`);
     try {
       const { sendDeploymentAlertEmail: sendDeploymentAlertEmail2 } = await Promise.resolve().then(() => (init_email(), exports_email));
-      await sendDeploymentAlertEmail2(appName, "failed", error.message);
+      await sendDeploymentAlertEmail2(appName, "failed", error2.message);
     } catch {}
-    return { success: false, message: error.message };
+    return { success: false, message: error2.message };
   }
 }
 async function rollbackApp(appName, commitHash) {
-  const appDir = join19(APPS_DIR8, appName);
-  const repoDir = join19(appDir, "repo");
+  const appDir = join18(APPS_DIR8, appName);
+  const repoDir = join18(appDir, "repo");
   console.log(`⏪ Rolling back ${appName}...`);
   try {
     if (!commitHash) {
@@ -21128,9 +24194,9 @@ async function rollbackApp(appName, commitHash) {
     }
     console.log(`✅ Rolled back ${appName} to ${commitHash}`);
     return { success: true, message: `Rolled back to ${commitHash}` };
-  } catch (error) {
-    console.error(`❌ Rollback failed: ${error.message}`);
-    return { success: false, message: error.message };
+  } catch (error2) {
+    console.error(`❌ Rollback failed: ${error2.message}`);
+    return { success: false, message: error2.message };
   }
 }
 async function getDeploymentHistory(appName) {
@@ -21152,7 +24218,7 @@ function addDeployCommands(program2) {
       target: options.healthTarget,
       timeout: parseInt(options.healthTimeout, 10)
     } : undefined;
-    let env = {};
+    let env2 = {};
     if (options.envFile) {
       if (existsSync13(options.envFile)) {
         const content = await readFile11(options.envFile, "utf-8");
@@ -21163,7 +24229,7 @@ function addDeployCommands(program2) {
             return;
           const [k, ...v] = line.split("=");
           if (k && v.length > 0)
-            env[k.trim()] = v.join("=").trim();
+            env2[k.trim()] = v.join("=").trim();
         });
       } else {
         console.error(`❌ Env file not found: ${options.envFile}`);
@@ -21174,7 +24240,7 @@ function addDeployCommands(program2) {
       options.env.forEach((pair) => {
         const [k, ...v] = pair.split("=");
         if (k && v.length > 0)
-          env[k.trim()] = v.join("=").trim();
+          env2[k.trim()] = v.join("=").trim();
       });
     }
     const result = await deployApp({
@@ -21183,7 +24249,7 @@ function addDeployCommands(program2) {
       buildSteps,
       healthCheck,
       skipHealthCheck: options.skipHealth,
-      env: Object.keys(env).length > 0 ? env : undefined
+      env: Object.keys(env2).length > 0 ? env2 : undefined
     });
     if (!result.success) {
       process.exit(1);
@@ -21219,11 +24285,11 @@ function addDeployCommands(program2) {
 // src/commands/github-cli.ts
 init_command();
 init_github();
-import { join as join20 } from "path";
+import { join as join19 } from "path";
 import { homedir as homedir5 } from "os";
 import { existsSync as existsSync14 } from "fs";
 import { readFile as readFile12 } from "fs/promises";
-var SSH_KEY_PATH = join20(homedir5(), ".ssh", "okastr8_deploy_key");
+var SSH_KEY_PATH = join19(homedir5(), ".ssh", "okastr8_deploy_key");
 function addGitHubCommands(program2) {
   const github = program2.command("github").description("GitHub integration commands");
   github.command("status").description("Check GitHub connection status").action(async () => {
@@ -21241,8 +24307,8 @@ function addGitHubCommands(program2) {
         console.log("❌ Not connected to GitHub");
         console.log("   Use the web UI to connect via OAuth, or configure manually.");
       }
-    } catch (error) {
-      console.error("Error checking status:", error.message);
+    } catch (error2) {
+      console.error("Error checking status:", error2.message);
       process.exit(1);
     }
   });
@@ -21296,8 +24362,8 @@ Open this URL in your browser:
       console.log(`
 ❌ Timed out waiting for authorization.`);
       process.exit(1);
-    } catch (error) {
-      console.error("Error:", error.message);
+    } catch (error2) {
+      console.error("Error:", error2.message);
       process.exit(1);
     }
   });
@@ -21429,7 +24495,7 @@ Full Details for ${repo.full_name}`);
           });
           appName = nameResponse.appName;
         }
-        let env = {};
+        let env2 = {};
         const envOption = await Enquirer2.prompt({
           type: "select",
           name: "choice",
@@ -21458,9 +24524,9 @@ Full Details for ${repo.full_name}`);
                 return;
               const [k, ...v] = line.split("=");
               if (k && v.length > 0)
-                env[k.trim()] = v.join("=").trim();
+                env2[k.trim()] = v.join("=").trim();
             });
-            console.log(`   ✅ Loaded ${Object.keys(env).length} variables from ${filePath}`);
+            console.log(`   ✅ Loaded ${Object.keys(env2).length} variables from ${filePath}`);
           } else {
             console.error(`   ❌ File not found: ${filePath}`);
           }
@@ -21477,7 +24543,7 @@ Full Details for ${repo.full_name}`);
               break;
             const [k, ...v] = val.split("=");
             if (k && v.length > 0) {
-              env[k.trim()] = v.join("=").trim();
+              env2[k.trim()] = v.join("=").trim();
             } else {
               console.log("   Invalid format. Use KEY=VALUE");
             }
@@ -21493,7 +24559,7 @@ ${deployed ? "Redeploying" : "Importing"} ${repo.full_name}...`);
           appName,
           branch,
           setupWebhook: true,
-          env: Object.keys(env).length > 0 ? env : undefined
+          env: Object.keys(env2).length > 0 ? env2 : undefined
         });
         if (result.success) {
           console.log(`
@@ -21503,13 +24569,13 @@ ${deployed ? "Redeploying" : "Importing"} ${repo.full_name}...`);
 ❌ ${result.message}`);
         }
       }
-    } catch (error) {
-      if (error.message === "" || error.name === "ExitPromptError") {
+    } catch (error2) {
+      if (error2.message === "" || error2.name === "ExitPromptError") {
         console.log(`
 Cancelled.`);
         return;
       }
-      console.error("Error:", error.message);
+      console.error("Error:", error2.message);
       process.exit(1);
     }
   });
@@ -21520,7 +24586,7 @@ Cancelled.`);
         console.error("❌ Not connected to GitHub. Use web UI to connect first.");
         process.exit(1);
       }
-      let env = {};
+      let env2 = {};
       if (options.envFile) {
         if (existsSync14(options.envFile)) {
           const { readFile: readFile13 } = await import("fs/promises");
@@ -21532,7 +24598,7 @@ Cancelled.`);
               return;
             const [k, ...v] = line.split("=");
             if (k && v.length > 0)
-              env[k.trim()] = v.join("=").trim();
+              env2[k.trim()] = v.join("=").trim();
           });
         } else {
           console.error(`❌ Env file not found: ${options.envFile}`);
@@ -21543,7 +24609,7 @@ Cancelled.`);
         options.env.forEach((pair) => {
           const [k, ...v] = pair.split("=");
           if (k && v.length > 0)
-            env[k.trim()] = v.join("=").trim();
+            env2[k.trim()] = v.join("=").trim();
         });
       }
       console.log(`
@@ -21553,7 +24619,7 @@ Importing ${repo}...
         repoFullName: repo,
         branch: options.branch,
         setupWebhook: options.webhook !== false,
-        env: Object.keys(env).length > 0 ? env : undefined
+        env: Object.keys(env2).length > 0 ? env2 : undefined
       });
       if (result.success) {
         console.log(`
@@ -21566,8 +24632,8 @@ Importing ${repo}...
 ❌ ${result.message}`);
         process.exit(1);
       }
-    } catch (error) {
-      console.error("Error importing repo:", error.message);
+    } catch (error2) {
+      console.error("Error importing repo:", error2.message);
       process.exit(1);
     }
   });
@@ -21588,8 +24654,8 @@ Importing ${repo}...
       }
       await disconnectGitHub();
       console.log("✅ Disconnected from GitHub");
-    } catch (error) {
-      console.error("Error disconnecting:", error.message);
+    } catch (error2) {
+      console.error("Error disconnecting:", error2.message);
       process.exit(1);
     }
   });
@@ -21609,7 +24675,7 @@ Importing ${repo}...
       const pubKeyPath = `${SSH_KEY_PATH}.pub`;
       if (!existsSync14(pubKeyPath)) {
         console.log("Generating new SSH deploy key...");
-        const sshDir = join20(homedir5(), ".ssh");
+        const sshDir = join19(homedir5(), ".ssh");
         await runCommand("mkdir", ["-p", sshDir]);
         await runCommand("chmod", ["700", sshDir]);
         const genResult = await runCommand("ssh-keygen", [
@@ -21642,8 +24708,8 @@ Importing ${repo}...
       console.log(`
 ✅ Deploy key configured successfully!`);
       console.log("   All GitHub clones will now use SSH automatically.");
-    } catch (error) {
-      console.error("Error setting up key:", error.message);
+    } catch (error2) {
+      console.error("Error setting up key:", error2.message);
       process.exit(1);
     }
   });
@@ -21669,9 +24735,28 @@ async function getSystemMetrics() {
   const freeMem = freemem();
   const usedMem = totalMem - freeMem;
   const uptimeSec = osUptime();
-  const load2 = loadavg();
+  const load3 = loadavg();
   const cores = cpus().length;
-  const cpuUsage = Math.min(100, load2[0] / cores * 100);
+  const cpuUsage = Math.min(100, load3[0] / cores * 100);
+  let diskUsed = 0;
+  let diskTotal = 0;
+  let diskFree = 0;
+  try {
+    const dfResult = await runCommand("df", ["-B1", "/"]);
+    if (dfResult.exitCode === 0) {
+      const lines = dfResult.stdout.trim().split(`
+`);
+      if (lines.length >= 2 && lines[1]) {
+        const parts = lines[1].split(/\s+/);
+        if (parts.length >= 4) {
+          diskTotal = parseInt(parts[1] || "0", 10) || 0;
+          diskUsed = parseInt(parts[2] || "0", 10) || 0;
+          diskFree = parseInt(parts[3] || "0", 10) || 0;
+        }
+      }
+    }
+  } catch {}
+  const diskPercent = diskTotal > 0 ? Math.round(diskUsed / diskTotal * 100) : 0;
   return {
     cpu: {
       usage: Math.round(cpuUsage * 10) / 10,
@@ -21683,16 +24768,22 @@ async function getSystemMetrics() {
       percent: Math.round(usedMem / totalMem * 100),
       free: Math.round(freeMem / 1024 / 1024)
     },
+    disk: {
+      used: diskUsed,
+      total: diskTotal,
+      percent: diskPercent,
+      free: diskFree
+    },
     uptime: formatUptime(uptimeSec),
     uptimeSeconds: Math.floor(uptimeSec),
     load: [
-      Math.round(load2[0] * 100) / 100,
-      Math.round(load2[1] * 100) / 100,
-      Math.round(load2[2] * 100) / 100
+      Math.round(load3[0] * 100) / 100,
+      Math.round(load3[1] * 100) / 100,
+      Math.round(load3[2] * 100) / 100
     ]
   };
 }
-async function getServiceMetrics(serviceName) {
+async function getServiceMetrics(serviceName, diskUsage = 0) {
   try {
     let status = "unknown";
     let cpu = 0;
@@ -21817,13 +24908,14 @@ async function getServiceMetrics(serviceName) {
       cpu: Math.round(cpu * 10) / 10,
       memory,
       memoryPercent: Math.round(memory / totalMem * 100 * 10) / 10,
+      diskUsage,
       uptime: formatUptime(uptimeSeconds),
       uptimeSeconds,
       status,
       pid
     };
-  } catch (error) {
-    console.error(`Error getting metrics for ${serviceName}:`, error);
+  } catch (error2) {
+    console.error(`Error getting metrics for ${serviceName}:`, error2);
     return null;
   }
 }
@@ -21843,13 +24935,75 @@ async function getOkastr8Services() {
   return services;
 }
 var previousRequestCounts = {};
+var diskUsageCache = { data: {}, timestamp: 0 };
+var DISK_CACHE_TTL = 60000;
+async function getContainerDiskUsage() {
+  const now = Date.now();
+  if (now - diskUsageCache.timestamp < DISK_CACHE_TTL) {
+    return diskUsageCache.data;
+  }
+  const result = {};
+  try {
+    const dfResult = await runCommand("sudo", ["docker", "system", "df", "-v"]);
+    if (dfResult.exitCode === 0 && dfResult.stdout) {
+      const lines = dfResult.stdout.split(`
+`);
+      let inContainersSection = false;
+      for (const line of lines) {
+        if (line.includes("Containers space usage:")) {
+          inContainersSection = true;
+          continue;
+        }
+        if (inContainersSection && (line.includes("Local Volumes space usage:") || line.includes("Build cache usage:"))) {
+          break;
+        }
+        if (inContainersSection && line.trim() && !line.startsWith("CONTAINER")) {
+          const parts = line.split(/\s{2,}/);
+          if (parts.length >= 6) {
+            const sizeStr = parts[4]?.trim();
+            const name = parts[parts.length - 1]?.trim();
+            if (name && sizeStr) {
+              const bytes = parseSizeToBytes(sizeStr);
+              result[name] = bytes;
+            }
+          }
+        }
+      }
+    }
+  } catch (error2) {
+    console.error("Error getting container disk usage:", error2);
+  }
+  diskUsageCache = { data: result, timestamp: now };
+  return result;
+}
+function parseSizeToBytes(sizeStr) {
+  const match = sizeStr.match(/^([\d.]+)\s*([A-Za-z]+)$/);
+  if (!match || !match[1] || !match[2])
+    return 0;
+  const value = parseFloat(match[1]);
+  const unit = match[2].toUpperCase();
+  if (unit.startsWith("G"))
+    return Math.round(value * 1024 * 1024 * 1024);
+  if (unit.startsWith("M"))
+    return Math.round(value * 1024 * 1024);
+  if (unit.startsWith("K"))
+    return Math.round(value * 1024);
+  if (unit.startsWith("B"))
+    return Math.round(value);
+  return 0;
+}
 async function getCaddyMetrics() {
   const result = {
     totalRequests: 0,
     byDomain: {}
   };
   try {
-    const response = await fetch("http://localhost:2019/metrics");
+    const controller = new AbortController;
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    const response = await fetch("http://localhost:2019/metrics", {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
     if (!response.ok) {
       return result;
     }
@@ -21872,7 +25026,7 @@ async function getCaddyMetrics() {
         }
       }
     }
-  } catch (error) {}
+  } catch (error2) {}
   return result;
 }
 async function getAppDomains() {
@@ -21891,11 +25045,12 @@ async function getAppDomains() {
   return domainToApp;
 }
 async function collectMetrics() {
-  const [system, serviceNames, traffic, domainToApp] = await Promise.all([
+  const [system, serviceNames, traffic, domainToApp, containerDiskUsage] = await Promise.all([
     getSystemMetrics(),
     getOkastr8Services(),
     getCaddyMetrics(),
-    getAppDomains()
+    getAppDomains(),
+    getContainerDiskUsage()
   ]);
   const appToDomain = {};
   for (const [domain, appName] of Object.entries(domainToApp)) {
@@ -21904,7 +25059,8 @@ async function collectMetrics() {
   const now = Date.now();
   const serviceMetrics = [];
   for (const name of serviceNames) {
-    const metrics = await getServiceMetrics(name);
+    const diskUsage = containerDiskUsage[name] || 0;
+    const metrics = await getServiceMetrics(name, diskUsage);
     if (metrics) {
       const domain = appToDomain[name];
       if (domain) {
@@ -22044,8 +25200,8 @@ ${GREEN}Exiting metrics view...${RESET}`);
 `;
       output += renderFooter();
       process.stdout.write(output);
-    } catch (error) {
-      console.error(`${RED}Error collecting metrics: ${error.message}${RESET}`);
+    } catch (error2) {
+      console.error(`${RED}Error collecting metrics: ${error2.message}${RESET}`);
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
@@ -22057,8 +25213,8 @@ async function runMetricsOnce() {
 `);
     console.log(renderSystemOverview(metrics.system));
     console.log(renderServicesTable(metrics.services));
-  } catch (error) {
-    console.error(`${RED}Error collecting metrics: ${error.message}${RESET}`);
+  } catch (error2) {
+    console.error(`${RED}Error collecting metrics: ${error2.message}${RESET}`);
     process.exit(1);
   }
 }
@@ -22098,8 +25254,8 @@ Expires: ${new Date(expiresAt).toLocaleString()}`);
 Use this token to log in to the okastr8 UI`);
       console.log(`   Paste it in the login page to get access.
 `);
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22128,8 +25284,8 @@ Active Tokens
         console.log(`${id.padEnd(16)}${user.padEnd(25)}${expires.padEnd(25)}${perms}`);
       }
       console.log("");
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22146,14 +25302,14 @@ Active Tokens
         console.error(`❌ Token not found: ${tokenId}`);
         process.exit(1);
       }
-      const success = await revokeToken(match.id);
-      if (success) {
+      const success2 = await revokeToken(match.id);
+      if (success2) {
         console.log(`✅ Token revoked: ${match.id.slice(0, 12)}...`);
       } else {
         console.error("❌ Failed to revoke token");
       }
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22174,8 +25330,8 @@ Active Tokens
         console.error(`❌ Failed to send: ${result.error}`);
         console.error("   Make sure your system.yaml has the notifications.brevo section configured.");
       }
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22209,8 +25365,8 @@ Active Tokens
 To approve: okastr8 auth approve <id>`);
       console.log(`To reject:  okastr8 auth reject <id>
 `);
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22230,8 +25386,8 @@ To approve: okastr8 auth approve <id>`);
         console.error(`❌ ${result.error}`);
         process.exit(1);
       }
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22250,8 +25406,8 @@ To approve: okastr8 auth approve <id>`);
         console.error(`❌ ${result.error}`);
         process.exit(1);
       }
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22470,8 +25626,8 @@ Access Token (${options.expiry || "1d"})`);
 Note: User must this token to login.`);
       if (!emailResult.success)
         console.log("      (Since email failed, you must share this securely manually)");
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22499,8 +25655,8 @@ Token Generated for ${email}
 Expires: ${new Date(expiresAt).toLocaleString()}`);
       console.log(`Permissions: ${userData.permissions.join(", ")}
 `);
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22533,8 +25689,8 @@ New Token (${options.expiry})`);
       console.log(`Token: ${token}`);
       console.log("━".repeat(50));
       console.log(`Expires: ${new Date(expiresAt).toLocaleString()}`);
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22561,8 +25717,8 @@ Users
         console.log(`${u.email.padEnd(30)}${perms.padEnd(40)}${created}`);
       }
       console.log("");
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22573,16 +25729,16 @@ Users
         console.error("❌ Only admin can remove users");
         process.exit(1);
       }
-      const success = await removeUser(email);
-      if (success) {
+      const success2 = await removeUser(email);
+      if (success2) {
         console.log(`✅ User removed: ${email}`);
         console.log("   All their tokens have been revoked.");
       } else {
         console.error(`❌ User not found: ${email}`);
         process.exit(1);
       }
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22615,8 +25771,8 @@ Users
         console.log(`
 ⚠️  User needs a new token for changes to take effect.`);
       }
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22654,8 +25810,8 @@ Active token:`);
 No active token`);
       }
       console.log("");
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22685,8 +25841,8 @@ Active Tokens
         console.log(`${t.userId.padEnd(30)}${t.id.slice(0, 12)}...     ${timeStr} (${expires.toLocaleTimeString()})`);
       }
       console.log("");
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22706,8 +25862,8 @@ Active Tokens
       const { revokeToken: revokeToken3 } = await Promise.resolve().then(() => (init_auth(), exports_auth));
       await revokeToken3(userToken.id);
       console.log(`✅ Revoked active token for ${email}`);
-    } catch (error) {
-      console.error(`❌ Error: ${error.message}`);
+    } catch (error2) {
+      console.error(`❌ Error: ${error2.message}`);
       process.exit(1);
     }
   });
@@ -22735,13 +25891,13 @@ function collect(value, previous) {
 // src/commands/tunnel.ts
 init_command();
 init_config();
-import { join as join21, dirname as dirname8 } from "path";
+import { join as join20, dirname as dirname8 } from "path";
 import { fileURLToPath as fileURLToPath7 } from "url";
 var __filename8 = fileURLToPath7(import.meta.url);
 var __dirname8 = dirname8(__filename8);
-var PROJECT_ROOT7 = join21(__dirname8, "..", "..");
+var PROJECT_ROOT7 = join20(__dirname8, "..", "..");
 var SCRIPTS3 = {
-  install: join21(PROJECT_ROOT7, "scripts", "tunnel", "install.sh")
+  install: join20(PROJECT_ROOT7, "scripts", "tunnel", "install.sh")
 };
 async function isCloudflaredInstalled() {
   const result = await runCommand("which", ["cloudflared"]);
@@ -22801,8 +25957,8 @@ function addTunnelCommands(program2) {
       const result = await installTunnel(token);
       console.log(result.message);
       console.log("   Your dashboard should now be accessible at your configured domain.");
-    } catch (error) {
-      console.error("Setup failed:", error.message);
+    } catch (error2) {
+      console.error("Setup failed:", error2.message);
       process.exit(1);
     }
   });
@@ -22810,8 +25966,8 @@ function addTunnelCommands(program2) {
     try {
       const result = await uninstallTunnel();
       console.log(result.message);
-    } catch (error) {
-      console.error("Uninstall failed:", error.message);
+    } catch (error2) {
+      console.error("Uninstall failed:", error2.message);
       process.exit(1);
     }
   });
@@ -22829,7 +25985,25 @@ function addTunnelCommands(program2) {
 
 // src/commands/system.ts
 init_app();
-init_systemd();
+
+// src/commands/systemd.ts
+init_command();
+import * as path3 from "path";
+var SCRIPT_BASE_PATH3 = path3.join(process.cwd(), "scripts", "systemd");
+async function startService2(service_name) {
+  return await runCommand("sudo", ["systemctl", "start", service_name]);
+}
+async function stopService2(service_name) {
+  return await runCommand("sudo", ["systemctl", "stop", service_name]);
+}
+async function restartService2(service_name) {
+  return await runCommand("sudo", ["systemctl", "restart", service_name]);
+}
+async function disableService2(service_name) {
+  return await runCommand("sudo", ["systemctl", "disable", service_name]);
+}
+
+// src/commands/system.ts
 init_config();
 import * as fs from "fs/promises";
 import { existsSync as existsSync15 } from "fs";

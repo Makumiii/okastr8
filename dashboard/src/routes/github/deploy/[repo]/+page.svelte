@@ -4,13 +4,14 @@
     import { get, post } from "$lib/api";
     import { onMount } from "svelte";
     import { toasts } from "$lib/stores/toasts";
+    import { Check, TriangleAlert, Rocket, X } from "lucide-svelte";
 
     interface Branch {
         name: string;
         protected: boolean;
     }
-
-    const repoFullName = decodeURIComponent($page.params.repo);
+    // ... existing code ...
+    const repoFullName = decodeURIComponent($page.params.repo ?? "");
     const [owner, repoName] = repoFullName.split("/");
 
     let branches = $state<Branch[]>([]);
@@ -25,10 +26,10 @@
     let deployComplete = $state(false);
     let deploySuccess = $state(false);
 
-    let logsContainer: HTMLDivElement;
+    let logsContainer = $state<HTMLDivElement>();
 
-    onMount(async () => {
-        await loadBranches();
+    onMount(() => {
+        loadBranches();
     });
 
     async function loadBranches() {
@@ -183,9 +184,12 @@
                         <Badge variant="outline">Checking okastr8.yaml...</Badge
                         >
                     {:else if hasConfig}
-                        <Badge variant="success">✓ okastr8.yaml found</Badge>
+                        <Badge variant="success" class="flex gap-1 items-center"
+                            ><Check size={14} /> okastr8.yaml found</Badge
+                        >
                     {:else}
-                        <Badge variant="warning">⚠ No okastr8.yaml found</Badge
+                        <Badge variant="warning" class="flex gap-1 items-center"
+                            ><TriangleAlert size={14} /> No okastr8.yaml found</Badge
                         >
                     {/if}
                 </div>
@@ -233,7 +237,7 @@
                         ></div>
                         Deploying...
                     {:else}
-                        🚀 Start Deploy
+                        <Rocket size={16} class="mr-2" /> Start Deploy
                     {/if}
                 </Button>
             </Card>
@@ -247,8 +251,15 @@
                         Deployment Logs
                     </h2>
                     {#if deployComplete}
-                        <Badge variant={deploySuccess ? "success" : "error"}>
-                            {deploySuccess ? "✓ Success" : "✕ Failed"}
+                        <Badge
+                            variant={deploySuccess ? "success" : "error"}
+                            class="flex gap-1 items-center"
+                        >
+                            {#if deploySuccess}
+                                <Check size={14} /> Success
+                            {:else}
+                                <X size={14} /> Failed
+                            {/if}
                         </Badge>
                     {:else if isDeploying}
                         <Badge variant="warning">

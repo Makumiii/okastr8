@@ -2,6 +2,7 @@
     import { Card, Badge } from "$lib/components/ui";
     import { get } from "$lib/api";
     import { onMount } from "svelte";
+    import { Box, Play, Square, Clock, Globe, ArrowRight } from "lucide-svelte";
 
     interface App {
         name: string;
@@ -12,12 +13,12 @@
         gitBranch?: string;
         port?: number;
     }
-
+    // ... existing code ...
     let apps = $state<App[]>([]);
     let isLoading = $state(true);
 
-    onMount(async () => {
-        await loadApps();
+    onMount(() => {
+        loadApps();
         const interval = setInterval(loadApps, 15000);
         return () => clearInterval(interval);
     });
@@ -72,7 +73,9 @@
         </div>
     {:else if apps.length === 0}
         <Card class="flex flex-col items-center p-12">
-            <div class="text-6xl">📦</div>
+            <div class="text-[var(--text-muted)]">
+                <Box size={48} />
+            </div>
             <h2 class="mt-4 text-xl font-semibold text-[var(--text-primary)]">
                 No Apps Deployed
             </h2>
@@ -96,11 +99,15 @@
                         <div class="flex items-start justify-between">
                             <div class="flex items-center gap-3">
                                 <div
-                                    class="flex h-10 w-10 items-center justify-center rounded-lg text-lg {app.running
-                                        ? 'bg-[var(--success-light)]'
-                                        : 'bg-[var(--error-light)]'}"
+                                    class="flex h-10 w-10 items-center justify-center rounded-lg {app.running
+                                        ? 'bg-[var(--success-light)] text-[var(--success)]'
+                                        : 'bg-[var(--error-light)] text-[var(--error)]'}"
                                 >
-                                    {app.running ? "🟢" : "🔴"}
+                                    {#if app.running}
+                                        <Play size={20} fill="currentColor" />
+                                    {:else}
+                                        <Square size={20} fill="currentColor" />
+                                    {/if}
                                 </div>
                                 <div>
                                     <h3
@@ -126,7 +133,7 @@
                             <div
                                 class="mt-4 flex items-center gap-2 text-sm text-[var(--text-secondary)]"
                             >
-                                <span>🕐</span>
+                                <Clock size={16} />
                                 <span>Up {app.uptime}</span>
                             </div>
                         {/if}
@@ -135,15 +142,15 @@
                             <div
                                 class="mt-2 flex items-center gap-2 text-sm text-[var(--text-muted)]"
                             >
-                                <span>📡</span>
+                                <Globe size={16} />
                                 <span>Port {app.port}</span>
                             </div>
                         {/if}
 
                         <div
-                            class="mt-4 text-right text-sm font-medium text-[var(--primary)]"
+                            class="mt-4 flex items-center justify-end gap-1 text-sm font-medium text-[var(--primary)]"
                         >
-                            Manage →
+                            Manage <ArrowRight size={16} />
                         </div>
                     </Card>
                 </a>

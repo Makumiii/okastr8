@@ -13,6 +13,7 @@ export interface ServiceMetrics {
     cpu: number;           // Percentage (0-100+)
     memory: number;        // MB used
     memoryPercent: number; // Percentage of system RAM
+    diskUsage: number;     // Bytes of container storage
     uptime: string;        // e.g., "2d 5h 30m"
     uptimeSeconds: number;
     status: 'running' | 'stopped' | 'failed' | 'unknown';
@@ -32,6 +33,12 @@ export interface SystemMetrics {
         total: number;     // MB
         percent: number;   // Percentage used
         free: number;      // MB
+    };
+    disk: {
+        used: number;      // Bytes
+        total: number;     // Bytes
+        percent: number;   // Percentage used
+        free: number;      // Bytes
     };
     uptime: string;
     uptimeSeconds: number;
@@ -82,6 +89,28 @@ async function getSystemMetrics(): Promise<SystemMetrics> {
     // Load average / cores * 100 gives percentage
     const cpuUsage = Math.min(100, (load[0] / cores) * 100);
 
+    // Get disk usage via df command
+    let diskUsed = 0;
+    let diskTotal = 0;
+    let diskFree = 0;
+    try {
+        const dfResult = await runCommand('df', ['-B1', '/']);
+        if (dfResult.exitCode === 0) {
+            const lines = dfResult.stdout.trim().split('\n');
+            if (lines.length >= 2 && lines[1]) {
+                // Format: Filesystem     1B-blocks         Used    Available Use% Mounted on
+                const parts = lines[1].split(/\s+/);
+                if (parts.length >= 4) {
+                    diskTotal = parseInt(parts[1] || '0', 10) || 0;
+                    diskUsed = parseInt(parts[2] || '0', 10) || 0;
+                    diskFree = parseInt(parts[3] || '0', 10) || 0;
+                }
+            }
+        }
+    } catch { }
+
+    const diskPercent = diskTotal > 0 ? Math.round((diskUsed / diskTotal) * 100) : 0;
+
     return {
         cpu: {
             usage: Math.round(cpuUsage * 10) / 10,
@@ -92,6 +121,12 @@ async function getSystemMetrics(): Promise<SystemMetrics> {
             total: Math.round(totalMem / 1024 / 1024),
             percent: Math.round((usedMem / totalMem) * 100),
             free: Math.round(freeMem / 1024 / 1024)
+        },
+        disk: {
+            used: diskUsed,
+            total: diskTotal,
+            percent: diskPercent,
+            free: diskFree
         },
         uptime: formatUptime(uptimeSec),
         uptimeSeconds: Math.floor(uptimeSec),
@@ -107,7 +142,7 @@ async function getSystemMetrics(): Promise<SystemMetrics> {
  * Get metrics for a single application or service
  * Uses Docker for apps, systemctl for okastr8-manager
  */
-async function getServiceMetrics(serviceName: string): Promise<ServiceMetrics | null> {
+async function getServiceMetrics(serviceName: string, diskUsage: number = 0): Promise<ServiceMetrics | null> {
     try {
         let status: ServiceMetrics['status'] = 'unknown';
         let cpu = 0;
@@ -249,6 +284,7 @@ async function getServiceMetrics(serviceName: string): Promise<ServiceMetrics | 
             cpu: Math.round(cpu * 10) / 10,
             memory,
             memoryPercent: Math.round((memory / totalMem) * 100 * 10) / 10,
+            diskUsage,
             uptime: formatUptime(uptimeSeconds),
             uptimeSeconds,
             status,
@@ -284,6 +320,91 @@ async function getOkastr8Services(): Promise<string[]> {
 
 // Store previous request counts for rate calculation
 let previousRequestCounts: Record<string, { count: number; timestamp: number }> = {};
+
+// Cache for container disk usage (refreshed every 60 seconds)
+let diskUsageCache: { data: Record<string, number>; timestamp: number } = { data: {}, timestamp: 0 };
+const DISK_CACHE_TTL = 60000; // 60 seconds
+
+/**
+ * Get disk usage for all containers via docker system df -v
+ * Returns a map of container name -> disk usage in bytes
+ */
+async function getContainerDiskUsage(): Promise<Record<string, number>> {
+    const now = Date.now();
+
+    // Return cached data if still fresh
+    if (now - diskUsageCache.timestamp < DISK_CACHE_TTL) {
+        return diskUsageCache.data;
+    }
+
+    const result: Record<string, number> = {};
+
+    try {
+        // docker system df -v outputs container disk usage in the "Containers space usage" section
+        const dfResult = await runCommand('sudo', ['docker', 'system', 'df', '-v']);
+
+        if (dfResult.exitCode === 0 && dfResult.stdout) {
+            const lines = dfResult.stdout.split('\n');
+            let inContainersSection = false;
+
+            for (const line of lines) {
+                // Detect the containers section
+                if (line.includes('Containers space usage:')) {
+                    inContainersSection = true;
+                    continue;
+                }
+
+                // End of containers section (next section starts)
+                if (inContainersSection && (line.includes('Local Volumes space usage:') || line.includes('Build cache usage:'))) {
+                    break;
+                }
+
+                // Skip header line and empty lines
+                if (inContainersSection && line.trim() && !line.startsWith('CONTAINER')) {
+                    // Format: CONTAINER ID   IMAGE   COMMAND   LOCAL VOLUMES   SIZE   CREATED   STATUS   NAMES
+                    // The SIZE column is what we want, and NAMES is the container name
+                    const parts = line.split(/\s{2,}/); // Split by 2+ spaces
+
+                    if (parts.length >= 6) {
+                        // SIZE is typically at index 4, NAMES is the last column
+                        const sizeStr = parts[4]?.trim();
+                        const name = parts[parts.length - 1]?.trim();
+
+                        if (name && sizeStr) {
+                            const bytes = parseSizeToBytes(sizeStr);
+                            result[name] = bytes;
+                        }
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error getting container disk usage:', error);
+    }
+
+    // Update cache
+    diskUsageCache = { data: result, timestamp: now };
+
+    return result;
+}
+
+/**
+ * Parse a size string like "2.82MB", "1.5GB", "500kB" to bytes
+ */
+function parseSizeToBytes(sizeStr: string): number {
+    const match = sizeStr.match(/^([\d.]+)\s*([A-Za-z]+)$/);
+    if (!match || !match[1] || !match[2]) return 0;
+
+    const value = parseFloat(match[1]);
+    const unit = match[2].toUpperCase();
+
+    if (unit.startsWith('G')) return Math.round(value * 1024 * 1024 * 1024);
+    if (unit.startsWith('M')) return Math.round(value * 1024 * 1024);
+    if (unit.startsWith('K')) return Math.round(value * 1024);
+    if (unit.startsWith('B')) return Math.round(value);
+
+    return 0;
+}
 
 /**
  * Scrape Caddy metrics from admin API
@@ -371,11 +492,12 @@ async function getAppDomains(): Promise<Record<string, string>> {
  * Collect all metrics
  */
 export async function collectMetrics(): Promise<MetricsResult> {
-    const [system, serviceNames, traffic, domainToApp] = await Promise.all([
+    const [system, serviceNames, traffic, domainToApp, containerDiskUsage] = await Promise.all([
         getSystemMetrics(),
         getOkastr8Services(),
         getCaddyMetrics(),
-        getAppDomains()
+        getAppDomains(),
+        getContainerDiskUsage()
     ]);
 
     // Build reverse mapping: app name -> domain
@@ -388,7 +510,8 @@ export async function collectMetrics(): Promise<MetricsResult> {
     const serviceMetrics: ServiceMetrics[] = [];
 
     for (const name of serviceNames) {
-        const metrics = await getServiceMetrics(name);
+        const diskUsage = containerDiskUsage[name] || 0;
+        const metrics = await getServiceMetrics(name, diskUsage);
         if (metrics) {
             // Add domain and traffic info
             const domain = appToDomain[name];

@@ -1,18 +1,25 @@
 <script lang="ts">
     import { page } from "$app/stores";
     import { cn } from "$lib/utils";
+    import {
+        LayoutDashboard,
+        Github,
+        Box,
+        ChartLine,
+        LogOut,
+    } from "lucide-svelte";
 
     interface NavItem {
         href: string;
         label: string;
-        icon: string;
+        icon: typeof LayoutDashboard;
     }
 
     const navItems: NavItem[] = [
-        { href: "/", label: "Dashboard", icon: "📊" },
-        { href: "/github", label: "GitHub", icon: "🐙" },
-        { href: "/apps", label: "Apps", icon: "📦" },
-        { href: "/metrics", label: "Metrics", icon: "📈" },
+        { href: "/", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/github", label: "GitHub", icon: Github },
+        { href: "/apps", label: "Apps", icon: Box },
+        { href: "/metrics", label: "Metrics", icon: ChartLine },
     ];
 
     function isActive(href: string, pathname: string): boolean {
@@ -22,21 +29,14 @@
 </script>
 
 <aside
-    class="fixed left-0 top-0 z-40 h-screen w-64 bg-[var(--bg-sidebar)] border-r border-[var(--border)]"
+    class="fixed left-0 top-0 z-40 h-screen w-64 border-r border-[var(--border)] bg-[var(--bg-sidebar)]"
 >
     <div class="flex h-full flex-col">
         <!-- Logo -->
         <div
             class="flex h-16 items-center gap-2 border-b border-[var(--border)] px-6"
         >
-            <div
-                class="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--primary)] text-white font-bold"
-            >
-                O
-            </div>
-            <span class="text-lg font-semibold text-[var(--text-primary)]"
-                >okastr8</span
-            >
+            <img src="/logo.jpg" alt="Okastr8" class="h-10 w-auto rounded-lg" />
         </div>
 
         <!-- Navigation -->
@@ -51,7 +51,7 @@
                             : "text-[var(--text-secondary)] hover:bg-[var(--bg-card)] hover:text-[var(--text-primary)]",
                     )}
                 >
-                    <span class="text-lg">{item.icon}</span>
+                    <item.icon size={20} />
                     {item.label}
                 </a>
             {/each}
@@ -67,7 +67,7 @@
                     });
                 }}
             >
-                <span class="text-lg">🚪</span>
+                <LogOut size={20} />
                 Logout
             </button>
         </div>

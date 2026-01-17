@@ -79,14 +79,11 @@
         <div class="flex flex-col items-center gap-6">
             <!-- Logo -->
             <div class="flex items-center gap-3">
-                <div
-                    class="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--primary)] text-2xl font-bold text-white"
-                >
-                    O
-                </div>
-                <span class="text-2xl font-semibold text-[var(--text-primary)]"
-                    >okastr8</span
-                >
+                <img
+                    src="/logo.jpg"
+                    alt="Okastr8"
+                    class="h-16 w-auto rounded-xl"
+                />
             </div>
 
             {#if pendingApproval}

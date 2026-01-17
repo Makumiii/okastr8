@@ -4,6 +4,20 @@
     import { get, post } from "$lib/api";
     import { onMount } from "svelte";
     import { toasts } from "$lib/stores/toasts";
+    import {
+        GitBranch,
+        Globe,
+        Cpu,
+        FileText,
+        RefreshCw,
+        Square,
+        Play,
+        Trash2,
+        Check,
+        Rocket,
+        X,
+        TriangleAlert,
+    } from "lucide-svelte";
 
     interface Version {
         id: number;
@@ -12,7 +26,7 @@
         branch?: string;
         isCurrent: boolean;
     }
-
+    // ... existing interfaces ...
     interface AppMeta {
         name: string;
         gitRepo?: string;
@@ -37,31 +51,61 @@
         versionId?: number;
     } | null>(null);
 
+    // ... existing onMount and loadData ...
     onMount(async () => {
         await loadData();
     });
 
     async function loadData() {
         isLoading = true;
-        try {
-            // Load versions
-            const versionsResult = await post<Version[]>("/app/versions", {
-                name: appName,
-            });
-            if (versionsResult.success && versionsResult.data) {
-                versions = versionsResult.data;
-            }
 
-            // Load app status (to get metadata like running state)
+        // Load versions - API returns { versions, current, maxVersions }
+        try {
+            const versionsResult = await post<{
+                versions: Array<{
+                    id: number;
+                    timestamp: string;
+                    commit?: string;
+                    branch?: string;
+                    status?: string;
+                }>;
+                current: number | null;
+                maxVersions: number;
+            }>("/app/versions", { name: appName });
+
+            console.log("Versions API result:", versionsResult);
+
+            if (versionsResult.success && versionsResult.data?.versions) {
+                const currentId = versionsResult.data.current;
+                versions = versionsResult.data.versions
+                    .map((v) => ({
+                        id: v.id,
+                        deployedAt: v.timestamp,
+                        commitHash: v.commit,
+                        branch: v.branch,
+                        isCurrent: v.id === currentId,
+                    }))
+                    .sort((a, b) => b.id - a.id);
+            }
+        } catch (e) {
+            console.error("Failed to load versions:", e);
+        }
+
+        // Load app status (to get metadata like running state)
+        try {
             const statusResult = await get<{ apps: AppMeta[] }>("/app/list");
+            console.log("App list API result:", statusResult);
+
             if (statusResult.success && statusResult.data?.apps) {
                 meta =
                     statusResult.data.apps.find((a) => a.name === appName) ||
                     null;
             }
         } catch (e) {
+            console.error("Failed to load app list:", e);
             toasts.error("Failed to load app data");
         }
+
         isLoading = false;
     }
 
@@ -152,19 +196,25 @@
                 </h1>
                 <div class="mt-2 flex flex-wrap items-center gap-2">
                     {#if meta?.gitBranch}
-                        <Badge variant="outline">🌿 {meta.gitBranch}</Badge>
+                        <Badge variant="outline" class="flex gap-1 items-center"
+                            ><GitBranch size={14} /> {meta.gitBranch}</Badge
+                        >
                     {/if}
                     {#if meta?.port}
-                        <Badge variant="outline">📡 Port {meta.port}</Badge>
+                        <Badge variant="outline" class="flex gap-1 items-center"
+                            ><Globe size={14} /> Port {meta.port}</Badge
+                        >
                     {/if}
                     {#if meta?.runtime}
-                        <Badge variant="outline">⚙️ {meta.runtime}</Badge>
+                        <Badge variant="outline" class="flex gap-1 items-center"
+                            ><Cpu size={14} /> {meta.runtime}</Badge
+                        >
                     {/if}
                 </div>
             </div>
             <div class="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onclick={viewLogs}
-                    >📋 Logs</Button
+                    ><FileText size={16} class="mr-2" /> Logs</Button
                 >
                 <Button
                     variant="outline"
@@ -172,7 +222,7 @@
                     onclick={() => controlApp("restart")}
                     disabled={isControlling}
                 >
-                    🔄 Restart
+                    <RefreshCw size={16} class="mr-2" /> Restart
                 </Button>
                 <Button
                     variant="outline"
@@ -180,7 +230,7 @@
                     onclick={() => controlApp("stop")}
                     disabled={isControlling}
                 >
-                    ⏹️ Stop
+                    <Square size={16} class="mr-2" /> Stop
                 </Button>
                 <Button
                     variant="outline"
@@ -188,7 +238,7 @@
                     onclick={() => controlApp("start")}
                     disabled={isControlling}
                 >
-                    ▶️ Start
+                    <Play size={16} class="mr-2" /> Start
                 </Button>
                 <Button
                     variant="destructive"
@@ -198,7 +248,7 @@
                         deleteTarget = { type: "app" };
                     }}
                 >
-                    🗑️ Delete
+                    <Trash2 size={16} class="mr-2" /> Delete
                 </Button>
             </div>
         </Card>
@@ -209,7 +259,7 @@
                 Deployments
             </h2>
             <div class="space-y-3">
-                {#each versions.sort((a, b) => b.id - a.id) as version}
+                {#each versions as version}
                     <Card
                         class="flex items-center justify-between !p-4 {version.isCurrent
                             ? 'border-2 border-[var(--primary)]'
@@ -220,7 +270,7 @@
                                 <span
                                     class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--success-light)] text-[var(--success)]"
                                 >
-                                    ✓
+                                    <Check size={18} />
                                 </span>
                             {:else}
                                 <span
@@ -263,7 +313,7 @@
                                     onclick={() => promoteVersion(version.id)}
                                     disabled={isControlling}
                                 >
-                                    🚀 Promote
+                                    <Rocket size={16} class="mr-2" /> Promote
                                 </Button>
                             {/if}
                         </div>
@@ -289,6 +339,7 @@
         onclick={() => (showLogs = false)}
         onkeydown={(e) => e.key === "Escape" && (showLogs = false)}
     >
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <div
             class="max-h-[80vh] w-full max-w-4xl overflow-hidden rounded-[var(--radius-lg)] bg-white shadow-xl"
             role="document"
@@ -304,9 +355,9 @@
                 </h3>
                 <button
                     onclick={() => (showLogs = false)}
-                    class="text-2xl text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                    class="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                 >
-                    ×
+                    <X size={24} />
                 </button>
             </div>
             <div class="max-h-[60vh] overflow-auto bg-[var(--bg-terminal)] p-4">
@@ -327,8 +378,10 @@
         onkeydown={(e) => e.key === "Escape" && (showConfirmDelete = false)}
     >
         <Card class="w-full max-w-md" onclick={(e) => e.stopPropagation()}>
-            <h3 class="text-lg font-semibold text-[var(--error)]">
-                ⚠️ Confirm Deletion
+            <h3
+                class="flex items-center gap-2 text-lg font-semibold text-[var(--error)]"
+            >
+                <TriangleAlert size={20} /> Confirm Deletion
             </h3>
             <p class="mt-2 text-[var(--text-secondary)]">
                 Are you sure you want to delete <strong>{appName}</strong>? This

@@ -2,6 +2,15 @@
     import { Card, Badge } from "$lib/components/ui";
     import { get } from "$lib/api";
     import { onMount } from "svelte";
+    import {
+        Server,
+        Zap,
+        Clock,
+        Package,
+        Activity,
+        TriangleAlert,
+        ArrowRight,
+    } from "lucide-svelte";
 
     interface SystemStatus {
         user: string;
@@ -25,8 +34,8 @@
     let isLoading = $state(true);
     let error = $state("");
 
-    onMount(async () => {
-        await loadData();
+    onMount(() => {
+        loadData();
         // Auto-refresh every 30 seconds
         const interval = setInterval(loadData, 30000);
         return () => clearInterval(interval);
@@ -74,8 +83,9 @@
             {/each}
         </div>
     {:else if error}
-        <Card class="bg-[var(--error-light)]">
-            <p class="text-[var(--error)]">❌ {error}</p>
+        <Card class="bg-[var(--error-light)] flex items-center gap-2">
+            <TriangleAlert class="text-[var(--error)]" />
+            <p class="text-[var(--error)]">{error}</p>
         </Card>
     {:else if data}
         <!-- Welcome Card -->
@@ -99,9 +109,12 @@
                         ></span>
                         {data.health.status.toUpperCase()}
                     </Badge>
-                    <span class="rounded-lg bg-white/10 px-3 py-1.5 text-sm"
-                        >🖥️ {data.hostname}</span
+                    <span
+                        class="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-sm"
                     >
+                        <Server size={14} />
+                        {data.hostname}
+                    </span>
                 </div>
             </div>
         </Card>
@@ -114,7 +127,7 @@
                     <span class="text-sm text-[var(--text-secondary)]"
                         >Services Active</span
                     >
-                    <span class="text-xl">⚡</span>
+                    <Zap size={20} />
                 </div>
                 <div class="mt-3 text-3xl font-bold text-[var(--text-primary)]">
                     {data.services.filter((s) => s.running).length}
@@ -139,7 +152,7 @@
             <Card class="bg-[var(--text-primary)] text-white">
                 <div class="flex items-start justify-between">
                     <span class="text-sm opacity-70">System Uptime</span>
-                    <span class="text-xl">🕐</span>
+                    <Clock size={20} />
                 </div>
                 <div class="mt-3 text-2xl font-bold">{data.uptime}</div>
                 <div
@@ -158,7 +171,7 @@
                     <span class="text-sm text-[var(--text-secondary)]"
                         >Environments</span
                     >
-                    <span class="text-xl">📦</span>
+                    <Package size={20} />
                 </div>
                 <div class="mt-3 text-3xl font-bold text-[var(--text-primary)]">
                     {Object.values(data.environments).filter((e) => e.installed)
@@ -180,7 +193,7 @@
                     <span class="text-sm text-[var(--warning)] opacity-80"
                         >System Load</span
                     >
-                    <span class="text-xl">🔥</span>
+                    <Activity size={20} class="text-[var(--warning)]" />
                 </div>
                 <div class="mt-3 text-3xl font-bold text-[var(--text-primary)]">
                     {data.health.counts.info + data.health.counts.warning}
@@ -203,9 +216,9 @@
             </div>
             <a
                 href="/github"
-                class="rounded-full bg-[var(--text-primary)] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--primary)]"
+                class="flex items-center gap-2 rounded-full bg-[var(--text-primary)] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--primary)]"
             >
-                Go to GitHub →
+                Go to GitHub <ArrowRight size={16} />
             </a>
         </Card>
 
