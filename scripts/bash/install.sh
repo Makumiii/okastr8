@@ -30,7 +30,7 @@ trap 'cleanup_on_error $LINENO' ERR
 
 # --- Configuration ---
 REPO_URL="https://github.com/Makumiii/okastr8.git"
-REPO_BRANCH="docker-support"
+REPO_BRANCH="main"
 INSTALL_DIR="$HOME/okastr8"
 SYMLINK_DIR="$HOME/.local/bin"
 SYMLINK_NAME="okastr8"
