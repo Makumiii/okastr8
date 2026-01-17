@@ -1,6 +1,6 @@
 /**
- * Auth & Permissions System
- * Token-based authentication with fine-grained permissions
+ * Auth System
+ * Token-based authentication (RBAC removed - all tokens have full access)
  */
 
 import { homedir } from 'os';
@@ -13,7 +13,6 @@ import { randomBytes, createHmac } from 'crypto';
 
 export interface User {
     email: string;
-    permissions: string[];
     createdAt: string;
     createdBy: string;
 }
@@ -21,7 +20,6 @@ export interface User {
 export interface Token {
     id: string;
     userId: string;       // email or 'admin' for admin
-    permissions: string[];
     expiresAt: string;
     createdAt: string;
     renewalAlertSent?: boolean;
@@ -108,7 +106,6 @@ function parseExpiry(expiry: string): number {
  */
 export async function generateToken(
     userId: string,
-    permissions: string[],
     expiry: string = '1d'
 ): Promise<{ token: string; expiresAt: string }> {
     const data = await loadAuthData();
@@ -122,11 +119,10 @@ export async function generateToken(
     const tokenId = randomBytes(16).toString('hex');
     const expiresAt = new Date(Date.now() + durationMs).toISOString();
 
-    // Create token payload
+    // Create token payload (no permissions - all tokens have full access)
     const payload = {
         id: tokenId,
         sub: userId,
-        perm: permissions,
         exp: expiresAt
     };
 
@@ -151,7 +147,6 @@ export async function generateToken(
     data.tokens.push({
         id: tokenId,
         userId,
-        permissions,
         expiresAt,
         createdAt: now.toISOString()
     });
@@ -167,7 +162,6 @@ export async function generateToken(
 export async function validateToken(token: string): Promise<{
     valid: boolean;
     userId?: string;
-    permissions?: string[];
     error?: string;
 }> {
     try {
@@ -207,8 +201,7 @@ export async function validateToken(token: string): Promise<{
 
         return {
             valid: true,
-            userId: payload.sub,
-            permissions: payload.perm
+            userId: payload.sub
         };
     } catch (error: any) {
         return { valid: false, error: error.message };
@@ -279,11 +272,10 @@ export async function listTokens(): Promise<Token[]> {
 // ============ User Management ============
 
 /**
- * Add a new user with permissions
+ * Add a new user
  */
 export async function addUser(
     email: string,
-    permissions: string[],
     createdBy: string = 'admin'
 ): Promise<User> {
     const data = await loadAuthData();
@@ -295,7 +287,6 @@ export async function addUser(
 
     const user: User = {
         email,
-        permissions,
         createdAt: new Date().toISOString(),
         createdBy
     };
@@ -325,24 +316,6 @@ export async function removeUser(email: string): Promise<boolean> {
 }
 
 /**
- * Update user permissions
- */
-export async function updateUserPermissions(
-    email: string,
-    permissions: string[]
-): Promise<User | null> {
-    const data = await loadAuthData();
-    const user = data.users.find(u => u.email === email);
-
-    if (!user) return null;
-
-    user.permissions = permissions;
-    await saveAuthData(data);
-
-    return user;
-}
-
-/**
  * List all users
  */
 export async function listUsers(): Promise<User[]> {
@@ -358,31 +331,7 @@ export async function getUser(email: string): Promise<User | null> {
     return data.users.find(u => u.email === email) || null;
 }
 
-// ============ Permission Checks ============
-
-/**
- * Check if permissions array grants access to required permission
- */
-export function hasPermission(userPerms: string[], required: string): boolean {
-    // Wildcard grants everything
-    if (userPerms.includes('*')) return true;
-
-    // Exact match
-    if (userPerms.includes(required)) return true;
-
-    // Category wildcard: view:* matches view:logs
-    const [category] = required.split(':');
-    if (userPerms.includes(`${category}:*`)) return true;
-
-    // Specific app permission: deploy:my-app
-    // Required: deploy:my-app, has: deploy:*
-    if (required.includes(':')) {
-        const [reqCat] = required.split(':');
-        if (userPerms.includes(`${reqCat}:*`)) return true;
-    }
-
-    return false;
-}
+// ============ Admin Functions ============
 
 /**
  * Get admin username
@@ -411,7 +360,7 @@ export async function generateAdminToken(expiry: string = '1d'): Promise<{ token
     }
 
     const data = await loadAuthData();
-    return generateToken(data.admin, ['*'], expiry);
+    return generateToken(data.admin, expiry);
 }
 
 // ============ Login Approval System ============

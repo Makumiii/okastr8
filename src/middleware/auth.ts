@@ -1,16 +1,15 @@
 /**
  * Auth Middleware for Hono
- * Validates tokens and checks permissions on API routes
+ * Validates tokens (RBAC removed - all tokens have full access)
  */
 
 import type { Context, Next, MiddlewareHandler } from 'hono';
-import { validateToken, hasPermission } from '../commands/auth';
+import { validateToken } from '../commands/auth';
 
 // Extend Hono context types
 declare module 'hono' {
     interface ContextVariableMap {
         userId: string;
-        permissions: string[];
     }
 }
 
@@ -63,33 +62,6 @@ export function requireAuth(): MiddlewareHandler {
 
         // Attach user info to context
         c.set('userId', result.userId!);
-        c.set('permissions', result.permissions!);
-
-        await next();
-    };
-}
-
-/**
- * Permission middleware - checks if user has required permission
- * Must be used after requireAuth()
- */
-export function requirePermission(permission: string): MiddlewareHandler {
-    return async (c: Context, next: Next) => {
-        const permissions = c.get('permissions');
-
-        if (!permissions) {
-            return c.json({
-                success: false,
-                message: 'Authentication required'
-            }, 401);
-        }
-
-        if (!hasPermission(permissions, permission)) {
-            return c.json({
-                success: false,
-                message: `Permission denied: requires '${permission}'`
-            }, 403);
-        }
 
         await next();
     };
@@ -106,19 +78,9 @@ export function optionalAuth(): MiddlewareHandler {
             const result = await validateToken(token);
             if (result.valid) {
                 c.set('userId', result.userId!);
-                c.set('permissions', result.permissions!);
             }
         }
 
         await next();
     };
-}
-
-/**
- * Check if request has permission (for use in route handlers)
- */
-export function checkPermission(c: Context, permission: string): boolean {
-    const permissions = c.get('permissions');
-    if (!permissions) return false;
-    return hasPermission(permissions, permission);
 }

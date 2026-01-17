@@ -305,8 +305,7 @@ export async function testEmailConfig(): Promise<{ success: boolean; error?: str
  */
 export async function sendWelcomeEmail(
     userEmail: string,
-    token: string,
-    permissions: string[]
+    token: string
 ): Promise<{ success: boolean; error?: string }> {
     const config = await getBrevoConfig();
     if (!config) {
@@ -323,7 +322,6 @@ export async function sendWelcomeEmail(
         .header { background: linear-gradient(135deg, #8B5CF6, #6366F1); color: white; padding: 20px; border-radius: 8px 8px 0 0; }
         .content { background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; }
         .token-box { background: #1f2937; color: #10B981; padding: 16px; border-radius: 6px; font-family: monospace; word-break: break-all; margin: 20px 0; font-size: 14px; }
-        .permissions { display: inline-block; background: #E0E7FF; color: #4338CA; padding: 4px 8px; border-radius: 4px; font-size: 13px; margin-right: 4px; margin-bottom: 4px; }
         .footer { margin-top: 20px; font-size: 12px; color: #6b7280; text-align: center; }
     </style>
 </head>
@@ -335,13 +333,8 @@ export async function sendWelcomeEmail(
         <div class="content">
             <p>You have been granted access to the okastr8 dashboard.</p>
             
-            <p><strong>Your Gateway Token:</strong></p>
+            <p><strong>Your Access Token:</strong></p>
             <div class="token-box">${token}</div>
-            
-            <p><strong>Your Permissions:</strong></p>
-            <div>
-                ${permissions.map(p => `<span class="permissions">${p}</span>`).join('')}
-            </div>
             
             <p style="margin-top: 20px;">
                 <strong>How to login:</strong><br>

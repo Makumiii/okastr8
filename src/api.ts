@@ -30,8 +30,7 @@ import {
     configureFirewall,
     configureFail2ban,
 } from './commands/setup';
-import { validateToken, hasPermission } from './commands/auth';
-import { getRoutePermission } from './permissions';
+import { validateToken } from './commands/auth';
 
 const api = new Hono();
 
@@ -93,15 +92,8 @@ api.use('*', async (c, next) => {
         return c.json(apiResponse(false, result.error || 'Invalid token'), 401);
     }
 
-    // Store user info in context
+    // Store user info in context (no permission checks - all authenticated users have full access)
     c.set('userId', result.userId!);
-    c.set('permissions', result.permissions!);
-
-    // Check route-specific permission
-    const requiredPerm = getRoutePermission(method, path);
-    if (requiredPerm && !hasPermission(result.permissions!, requiredPerm)) {
-        return c.json(apiResponse(false, `Permission denied: requires '${requiredPerm}'`), 403);
-    }
 
     return next();
 });
@@ -1270,8 +1262,7 @@ api.post('/auth/verify', async (c) => {
         c.header('Set-Cookie', `okastr8_session=${token}; ${cookieOpts}`);
 
         return c.json(apiResponse(true, 'Authenticated', {
-            userId: result.userId,
-            permissions: result.permissions
+            userId: result.userId
         }));
     } catch (error: any) {
         console.error('API /auth/verify error:', error);
@@ -1330,8 +1321,7 @@ api.get('/auth/me', async (c) => {
         }
 
         return c.json(apiResponse(true, 'Session valid', {
-            userId: result.userId,
-            permissions: result.permissions
+            userId: result.userId
         }));
     } catch (error: any) {
         console.error('API /auth/me error:', error);
@@ -1416,7 +1406,6 @@ api.get('/access/list', async (c) => {
         // Hide tokens if present in basic list, return safe view
         const safeUsers = users.map(u => ({
             email: u.email,
-            permissions: u.permissions,
             createdAt: u.createdAt,
             createdBy: u.createdBy
         }));

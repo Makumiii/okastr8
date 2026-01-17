@@ -1,130 +1,18 @@
 /**
  * User Management CLI Commands
- * Add, remove, and manage user permissions
+ * Add, remove, and manage access users (RBAC removed - all users have full access)
  */
 
 import { Command } from 'commander';
 import {
     addUser,
     removeUser,
-    updateUserPermissions,
     listUsers as listUsersData,
     getUser,
     generateToken,
     isCurrentUserAdmin,
-    revokeToken,
     listTokens
 } from './auth';
-import { isValidPermission, getAllPermissions, getPermissionDescription, PERMISSIONS } from '../permissions';
-
-// Generate help text from registry
-function getPermissionHelp(): string {
-    const lines = ['\nAvailable permissions:'];
-    for (const [key, desc] of Object.entries(PERMISSIONS)) {
-        lines.push(`  ${key.padEnd(18)} ${desc}`);
-    }
-    lines.push('\n  deploy:<app>      Deploy specific app (e.g., deploy:my-app)');
-    return lines.join('\n');
-}
-
-function validatePermissions(perms: string[]): { valid: boolean; invalid: string[] } {
-    const invalid: string[] = [];
-    for (const p of perms) {
-        if (!isValidPermission(p)) {
-            invalid.push(p);
-        }
-    }
-    return { valid: invalid.length === 0, invalid };
-}
-
-// ============ Role Presets ============
-const ROLE_PRESETS: Record<string, { name: string; permissions: string[]; description: string }> = {
-    viewer: {
-        name: 'Viewer',
-        permissions: ['view:*'],
-        description: 'Read-only access to dashboard, metrics, logs'
-    },
-    deployer: {
-        name: 'Deployer',
-        permissions: ['view:*', 'deploy:*', 'app:restart', 'app:rollback'],
-        description: 'Can deploy, restart, and rollback apps'
-    },
-    developer: {
-        name: 'Developer',
-        permissions: ['view:*', 'deploy:*', 'app:*', 'github:manage'],
-        description: 'Full app management including create/delete'
-    },
-    admin: {
-        name: 'Admin',
-        permissions: ['*'],
-        description: 'Full access to everything'
-    }
-};
-
-// Interactive permission picker using enquirer multiselect
-async function interactivePermissionPicker(): Promise<string[]> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const enquirer = await import('enquirer') as any;
-    const Select = enquirer.Select || enquirer.default?.Select;
-    const MultiSelect = enquirer.MultiSelect || enquirer.default?.MultiSelect;
-
-    // First, ask if they want a preset or custom
-    const modePrompt = new Select({
-        name: 'mode',
-        message: 'How would you like to assign permissions?',
-        choices: [
-            { name: 'viewer', message: 'Viewer - Read-only access' },
-            { name: 'deployer', message: 'Deployer - Deploy, restart, rollback' },
-            { name: 'developer', message: 'Developer - Full app management' },
-            { name: 'admin', message: 'Admin - Full access to everything' },
-            { name: 'custom', message: 'Custom - Pick individual permissions' }
-        ]
-    });
-
-    const mode = await modePrompt.run();
-
-    // If preset, return those permissions
-    if (mode !== 'custom' && mode in ROLE_PRESETS) {
-        const role = ROLE_PRESETS[mode as keyof typeof ROLE_PRESETS]!;
-        console.log(`\n✅ Using ${role.name} preset: ${role.permissions.join(', ')}\n`);
-        return role.permissions;
-    }
-
-    // Custom mode - multiselect permissions
-    const permChoices = [
-        { name: 'view:*', message: 'view:* - All view permissions', value: 'view:*' },
-        { name: 'apps:view', message: 'apps:view - List and view apps', value: 'apps:view' },
-        { name: 'apps:logs', message: 'apps:logs - View app logs', value: 'apps:logs' },
-        { name: 'apps:stats', message: 'apps:stats - View app stats', value: 'apps:stats' },
-        { name: 'deploy:*', message: 'deploy:* - Deploy all apps', value: 'deploy:*' },
-        { name: 'app:*', message: 'app:* - All app permissions', value: 'app:*' },
-        { name: 'apps:manage', message: 'apps:manage - Start, stop, restart apps', value: 'apps:manage' },
-        { name: 'apps:delete', message: 'apps:delete - Remove apps', value: 'apps:delete' },
-        { name: 'github:*', message: 'github:* - All GitHub permissions', value: 'github:*' },
-        { name: 'github:import', message: 'github:import - Import from GitHub', value: 'github:import' },
-        { name: 'github:webhooks', message: 'github:webhooks - Manage webhooks', value: 'github:webhooks' },
-        { name: 'users:manage', message: 'users:manage - Manage Linux users', value: 'users:manage' },
-        { name: 'users:access', message: 'users:access - Manage access users', value: 'users:access' },
-    ];
-
-    const permPrompt = new MultiSelect({
-        name: 'permissions',
-        message: 'Select permissions (space to toggle, enter to confirm)',
-        choices: permChoices,
-        initial: ['view:*'], // Default to viewer
-        hint: '(Use arrow keys, space to select, enter to confirm)'
-    });
-
-    const selected = await permPrompt.run() as string[];
-
-    if (selected.length === 0) {
-        console.log('\n⚠️  No permissions selected, defaulting to view:*\n');
-        return ['view:*'];
-    }
-
-    console.log(`\n✅ Selected: ${selected.join(', ')}\n`);
-    return selected;
-}
 
 export function addAccessUserCommands(program: Command): void {
     const user = program
@@ -134,19 +22,8 @@ export function addAccessUserCommands(program: Command): void {
     // Add a new user
     user
         .command('add <email>')
-        .description('Add a new user with permissions')
-        .option('-p, --perm <permission>', 'Add permission (can be used multiple times)', collect, [])
-        .option('-r, --role <role>', 'Use preset role (viewer, deployer, developer, admin)')
-        .option('-i, --interactive', 'Interactive permission picker')
+        .description('Add a new user and send them an access token')
         .option('-e, --expiry <duration>', 'Token expiry (max 24h)', '1d')
-        .addHelpText('after', `
-Role presets:
-  --role viewer     Read-only access to dashboard, metrics, logs
-  --role deployer   Can deploy, restart, and rollback apps
-  --role developer  Full app management including create/delete
-  --role admin      Full access to everything
-
-${getPermissionHelp()}`)
         .action(async (email, options) => {
             try {
                 const isAdmin = await isCurrentUserAdmin();
@@ -155,46 +32,17 @@ ${getPermissionHelp()}`)
                     process.exit(1);
                 }
 
-                let permissions: string[];
-
-                // Priority: interactive > role preset > manual perms > default viewer
-                if (options.interactive) {
-                    permissions = await interactivePermissionPicker();
-                } else if (options.role) {
-                    const rolePreset = ROLE_PRESETS[options.role as keyof typeof ROLE_PRESETS];
-                    if (!rolePreset) {
-                        console.error(`❌ Unknown role: ${options.role}`);
-                        console.error('   Available: viewer, deployer, developer, admin');
-                        process.exit(1);
-                    }
-                    permissions = rolePreset.permissions;
-                    console.log(`Using ${options.role} preset: ${permissions.join(', ')}`);
-                } else if (options.perm.length > 0) {
-                    permissions = options.perm;
-                } else {
-                    permissions = ['view:*'];
-                }
-
-                // Validate permissions
-                const validation = validatePermissions(permissions);
-                if (!validation.valid) {
-                    console.error(`❌ Invalid permissions: ${validation.invalid.join(', ')}`);
-                    console.error('   Run with --help to see available permissions.');
-                    process.exit(1);
-                }
-
-                const newUser = await addUser(email, permissions);
+                const newUser = await addUser(email);
                 console.log(`\n✅ User added: ${newUser.email}`);
-                console.log(`   Permissions: ${newUser.permissions.join(', ')}`);
 
-                // Automatically generate token (enforce max 24h)
+                // Automatically generate token
                 const expiry = options.expiry || '1d';
-                const { token, expiresAt } = await generateToken(email, permissions, expiry);
+                const { token, expiresAt } = await generateToken(email, expiry);
 
                 // Send email
                 console.log('Sending welcome email with token...');
                 const { sendWelcomeEmail } = await import('../services/email');
-                const emailResult = await sendWelcomeEmail(email, token, permissions);
+                const emailResult = await sendWelcomeEmail(email, token);
 
                 if (emailResult.success) {
                     console.log('✅ Welcome email sent successfully!');
@@ -208,7 +56,7 @@ ${getPermissionHelp()}`)
                 console.log(`Token: ${token}`);
                 console.log('━'.repeat(50));
                 console.log(`Expires: ${new Date(expiresAt).toLocaleString()}`);
-                console.log('\nNote: User must this token to login.');
+                console.log('\nNote: User must use this token to login.');
                 if (!emailResult.success) console.log('      (Since email failed, you must share this securely manually)');
 
             } catch (error: any) {
@@ -233,18 +81,17 @@ ${getPermissionHelp()}`)
                 const userData = await getUser(email);
                 if (!userData) {
                     console.error(`❌ User not found: ${email}`);
-                    console.error('   Create the user first with: okastr8 user add <email>');
+                    console.error('   Create the user first with: okastr8 access add <email>');
                     process.exit(1);
                 }
 
-                const { token, expiresAt } = await generateToken(email, userData.permissions, options.expiry);
+                const { token, expiresAt } = await generateToken(email, options.expiry);
 
                 console.log(`\nToken Generated for ${email}\n`);
                 console.log('━'.repeat(50));
                 console.log(`Token: ${token}`);
                 console.log('━'.repeat(50));
-                console.log(`\nExpires: ${new Date(expiresAt).toLocaleString()}`);
-                console.log(`Permissions: ${userData.permissions.join(', ')}\n`);
+                console.log(`\nExpires: ${new Date(expiresAt).toLocaleString()}\n`);
             } catch (error: any) {
                 console.error(`❌ Error: ${error.message}`);
                 process.exit(1);
@@ -271,12 +118,12 @@ ${getPermissionHelp()}`)
                 }
 
                 console.log(`Renewing access for ${email}...`);
-                const { token, expiresAt } = await generateToken(email, userData.permissions, options.expiry);
+                const { token, expiresAt } = await generateToken(email, options.expiry);
 
                 // Send email
                 console.log('Sending new token via email...');
                 const { sendWelcomeEmail } = await import('../services/email');
-                const emailResult = await sendWelcomeEmail(email, token, userData.permissions);
+                const emailResult = await sendWelcomeEmail(email, token);
 
                 if (emailResult.success) {
                     console.log('✅ New token emailed successfully!');
@@ -312,18 +159,17 @@ ${getPermissionHelp()}`)
                 const users = await listUsersData();
 
                 if (users.length === 0) {
-                    console.log('No users configured. Add one with: okastr8 user add <email>');
+                    console.log('No users configured. Add one with: okastr8 access add <email>');
                     return;
                 }
 
                 console.log('\nUsers\n');
-                console.log('Email'.padEnd(30) + 'Permissions'.padEnd(40) + 'Created');
-                console.log('─'.repeat(85));
+                console.log('Email'.padEnd(40) + 'Created');
+                console.log('─'.repeat(60));
 
                 for (const u of users) {
-                    const perms = u.permissions.slice(0, 3).join(', ') + (u.permissions.length > 3 ? '...' : '');
                     const created = new Date(u.createdAt).toLocaleDateString();
-                    console.log(`${u.email.padEnd(30)}${perms.padEnd(40)}${created}`);
+                    console.log(`${u.email.padEnd(40)}${created}`);
                 }
                 console.log('');
             } catch (error: any) {
@@ -358,61 +204,10 @@ ${getPermissionHelp()}`)
             }
         });
 
-    // Update user permissions
-    user
-        .command('update <email>')
-        .description('Update user permissions')
-        .option('-p, --perm <permission>', 'Set permissions (can be used multiple times)', collect, [])
-        .option('--add <permission>', 'Add a permission')
-        .option('--remove <permission>', 'Remove a permission')
-        .addHelpText('after', getPermissionHelp())
-        .action(async (email, options) => {
-            try {
-                const isAdmin = await isCurrentUserAdmin();
-                if (!isAdmin) {
-                    console.error('❌ Only admin can update users');
-                    process.exit(1);
-                }
-
-                const userData = await getUser(email);
-                if (!userData) {
-                    console.error(`❌ User not found: ${email}`);
-                    process.exit(1);
-                }
-
-                let newPerms = [...userData.permissions];
-
-                // Replace all permissions
-                if (options.perm.length > 0) {
-                    newPerms = options.perm;
-                }
-
-                // Add permission
-                if (options.add && !newPerms.includes(options.add)) {
-                    newPerms.push(options.add);
-                }
-
-                // Remove permission
-                if (options.remove) {
-                    newPerms = newPerms.filter(p => p !== options.remove);
-                }
-
-                const updated = await updateUserPermissions(email, newPerms);
-                if (updated) {
-                    console.log(`✅ Updated ${email}`);
-                    console.log(`   Permissions: ${updated.permissions.join(', ')}`);
-                    console.log('\n⚠️  User needs a new token for changes to take effect.');
-                }
-            } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
-                process.exit(1);
-            }
-        });
-
     // Show user details
     user
         .command('info <email>')
-        .description('Show user details and permissions')
+        .description('Show user details')
         .action(async (email) => {
             try {
                 const isAdmin = await isCurrentUserAdmin();
@@ -434,10 +229,6 @@ ${getPermissionHelp()}`)
                 console.log(`\nUser: ${userData.email}\n`);
                 console.log(`Created: ${new Date(userData.createdAt).toLocaleString()}`);
                 console.log(`Created by: ${userData.createdBy}`);
-                console.log(`\nPermissions:`);
-                for (const p of userData.permissions) {
-                    console.log(`  • ${p}`);
-                }
 
                 if (userTokens.length > 0) {
                     console.log(`\nActive token:`);
@@ -546,9 +337,4 @@ ${getPermissionHelp()}`)
             const count = await revokeAllTokens();
             console.log(`\n✅ Revoked ${count} tokens. All sessions invalidated.`);
         });
-}
-
-// Helper to collect multiple --perm flags
-function collect(value: string, previous: string[]): string[] {
-    return previous.concat([value]);
 }
