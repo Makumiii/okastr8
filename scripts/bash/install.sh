@@ -305,7 +305,52 @@ if ! bun install --frozen-lockfile; then
 fi
 info "Dependencies installed."
 
+# --- 5. Create Config Directory and Template system.yaml ---
+info "Creating config directory..."
+mkdir -p "$CONFIG_DIR"
 
+# Create template system.yaml if it doesn't exist
+if [ ! -f "$CONFIG_DIR/system.yaml" ]; then
+  info "Creating template system.yaml..."
+  cat > "$CONFIG_DIR/system.yaml" <<'YAML'
+# Okastr8 System Configuration
+# Location: ~/.okastr8/system.yaml
+# 
+# Most settings are auto-populated by Okastr8 commands.
+# Only the fields below require manual configuration.
+
+# ============================================================
+# REQUIRED: GitHub Integration
+# ============================================================
+# To enable GitHub deployments, create a GitHub OAuth App:
+# 1. Go to: GitHub → Settings → Developer Settings → OAuth Apps → New
+# 2. Set Homepage URL: http://your-server:41788
+# 3. Set Callback URL: http://your-server:41788/api/github/callback
+# 4. Copy your Client ID and Client Secret below
+# 5. Run: okastr8 github connect
+
+manager:
+  github:
+    client_id: ""      # Your GitHub OAuth App Client ID
+    client_secret: ""  # Your GitHub OAuth App Client Secret
+
+# ============================================================
+# OPTIONAL: Email Notifications (via Brevo)
+# ============================================================
+# Uncomment and configure if you want email alerts for deployments,
+# login approvals, and service monitoring.
+
+# notifications:
+#   brevo:
+#     api_key: ""
+#     sender_email: "robot@yourdomain.com"
+#     sender_name: "okastr8"
+#     admin_email: "you@example.com"
+YAML
+  info "Created template system.yaml at $CONFIG_DIR/system.yaml"
+else
+  info "system.yaml already exists, skipping template creation."
+fi
 
 # --- 6. Create Executable ---
 info "Creating executable in $SYMLINK_DIR..."
