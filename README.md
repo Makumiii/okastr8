@@ -17,10 +17,9 @@ Okastr8 (pronounced "orchestrate") is a self-hosted Platform-as-a-Service that b
 - **🖥️ Beautiful Dashboard**: Modern, responsive UI to manage apps and users.
 - **⚡ Powerful CLI**: Automate everything from deployments to server hardening.
 - **🔄 Git-based Deploys**: Connect GitHub repositories, setup webhooks, and auto-deploy on push.
-- **🐳 Docker Support**: Native support for Dockerfile-based deployments.
+- **🐳 Containerized Deployments**: All applications are deployed as isolated Docker containers for consistency and security.
 - **🔒 Zero-Trust Security**: Token-based authentication, role-based access, and SSH hardening.
 - **📊 Real-time Metrics**: Monitor CPU, RAM, and Disk usage per app and system-wide.
-- **🤖 Systemd Integration**: Manages applications as robust systemd services.
 
 ---
 
