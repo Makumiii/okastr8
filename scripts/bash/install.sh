@@ -305,6 +305,26 @@ if ! bun install --frozen-lockfile; then
 fi
 info "Dependencies installed."
 
+# --- 4.5. Build Dashboard ---
+info "Building dashboard..."
+cd "$INSTALL_DIR/dashboard" || error "Dashboard directory not found"
+
+# Install dashboard dependencies
+info "Installing dashboard dependencies..."
+if ! bun install; then
+    error "Failed to install dashboard dependencies."
+fi
+
+# Build static assets
+info "Building SvelteKit application..."
+if ! bun run build; then
+    error "Failed to build dashboard."
+fi
+
+# Go back to root
+cd "$INSTALL_DIR"
+info "Dashboard built successfully. Assets generated in 'public/'."
+
 # --- 5. Create Config Directory and Template system.yaml ---
 info "Creating config directory..."
 mkdir -p "$CONFIG_DIR"

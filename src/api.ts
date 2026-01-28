@@ -787,42 +787,43 @@ api.get('/github/callback', async (c) => {
 
         if (error) {
             // Redirect to UI with error
-            return c.redirect(`/github.html?error=${encodeURIComponent(error)}`);
+            return c.redirect(`/github?error=${encodeURIComponent(error)}`);
         }
 
         if (!code) {
-            return c.redirect('/github.html?error=no_code');
+            return c.redirect('/github?error=no_code');
         }
 
         const { getGitHubConfig, exchangeCodeForToken, getGitHubUser, saveGitHubConfig } = await import('./commands/github');
         const config = await getGitHubConfig();
 
         if (!config.clientId || !config.clientSecret) {
-            return c.redirect('/github.html?error=not_configured');
+            return c.redirect('/github?error=config_missing');
         }
 
         // Exchange code for token
-        const tokenResult = await exchangeCodeForToken(config.clientId, config.clientSecret, code);
+        const tokenData = await exchangeCodeForToken(config.clientId, config.clientSecret, code);
 
-        if (tokenResult.error || !tokenResult.accessToken) {
-            return c.redirect(`/github.html?error=${encodeURIComponent(tokenResult.error || 'token_exchange_failed')}`);
+        if (tokenData.error || !tokenData.accessToken) {
+            return c.redirect(`/github?error=${encodeURIComponent(tokenData.error || 'token_exchange_failed')}`);
         }
 
-        // Get user info
-        const user = await getGitHubUser(tokenResult.accessToken);
+        // Get user profile
+        const userProfile = await getGitHubUser(tokenData.accessToken);
 
-        // Save to config
+        // Save config with new token
         await saveGitHubConfig({
-            accessToken: tokenResult.accessToken,
-            username: user.login,
-            connectedAt: new Date().toISOString(),
+            ...config,
+            accessToken: tokenData.accessToken,
+            username: userProfile.login,
+            connectedAt: new Date().toISOString()
         });
 
-        // Redirect to UI with success
-        return c.redirect(`/github.html?connected=true&user=${encodeURIComponent(user.login)}`);
+        console.log(`GitHub connected for user: ${userProfile.login}`);
+        return c.redirect(`/github?connected=true&user=${userProfile.login}`);
     } catch (error: any) {
         console.error('API: /github/callback error:', error);
-        return c.redirect(`/github.html?error=${encodeURIComponent(error.message)}`);
+        return c.redirect(`/github?error=${encodeURIComponent(error.message)}`);
     }
 });
 
