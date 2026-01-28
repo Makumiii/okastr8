@@ -155,6 +155,20 @@ okastr8 deploy trigger my-awesome-app
 3.  Select your repository and configure the port/domain.
 4.  Click **Deploy**.
 
+### 4. Configuring Your App (okastr8.yaml)
+
+To tell Okastr8 how to build and run your app (if not using Docker), add an `okastr8.yaml` file to your repository root:
+
+```yaml
+start: "npm start"
+port: 3000
+build:
+  - "npm install"
+  - "npm run build"
+```
+
+👉 **[See the Full Configuration Guide](./OKASTR8_YAML.md)** for all available options.
+
 ---
 
 ## 👨‍💻 Developer & Contribution Guide

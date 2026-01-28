@@ -6,15 +6,10 @@
     import { toasts } from "$lib/stores/toasts";
     import { Check, TriangleAlert, Rocket, X } from "lucide-svelte";
 
-    interface Branch {
-        name: string;
-        protected: boolean;
-    }
-    // ... existing code ...
     const repoFullName = decodeURIComponent($page.params.repo ?? "");
     const [owner, repoName] = repoFullName.split("/");
 
-    let branches = $state<Branch[]>([]);
+    let branches = $state<string[]>([]);
     let selectedBranch = $state("");
     let hasConfig = $state<boolean | null>(null);
     let webhookEnabled = $state(true);
@@ -33,13 +28,13 @@
     });
 
     async function loadBranches() {
-        const result = await post<{ branches: Branch[] }>("/github/branches", {
+        const result = await post<{ branches: string[] }>("/github/branches", {
             repoFullName,
         });
         if (result.success && result.data?.branches) {
             branches = result.data.branches;
             if (branches.length > 0) {
-                selectedBranch = branches[0].name;
+                selectedBranch = branches[0]; // branches is string[], not object[]
                 await checkConfig();
             }
         }
@@ -170,10 +165,15 @@
                         id="branch-select"
                         bind:value={selectedBranch}
                         onchange={checkConfig}
-                        class="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--primary)] focus:outline-none"
+                        class="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm focus:border-[var(--primary)] focus:outline-none"
+                        style="color: #1a1a1a; background-color: #ffffff;"
                     >
                         {#each branches as branch}
-                            <option value={branch.name}>{branch.name}</option>
+                            <option
+                                value={branch}
+                                style="color: #1a1a1a; background-color: #ffffff;"
+                                >{branch}</option
+                            >
                         {/each}
                     </select>
                 </div>
@@ -221,7 +221,8 @@
                         bind:value={envVars}
                         placeholder="KEY=value&#10;ANOTHER_KEY=another_value"
                         rows="4"
-                        class="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-2.5 font-mono text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none"
+                        class="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2.5 font-mono text-sm placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none"
+                        style="color: #000000 !important; background-color: #ffffff !important;"
                     ></textarea>
                 </div>
 

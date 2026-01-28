@@ -125,6 +125,18 @@ button {
     font-family: inherit;
 }
 
+/* Native select dropdowns can inherit dark OS themes; force light theme colors. */
+select {
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+    color-scheme: light;
+}
+
+select option {
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+}
+
 /* Link reset */
 a {
     color: inherit;

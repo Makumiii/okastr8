@@ -24,7 +24,7 @@ build:
 | `start` | string | **Yes** | The command to start your server (e.g., `node dist/server.js`, `python app.py`). |
 | `port` | number | **Yes** | The internal port your app listens on. Defaults to `3000` if omitted. |
 | `build` | string[] | No | List of shell commands to run during the build phase (e.g., install dependencies, compile assets). |
-| `runtime` | string | No | Explicitly set the runtime (e.g., `node`, `python`, `docker`). If omitted, Okastr8 auto-detects it. |
+| `runtime` | string | No | Explicitly set the runtime (e.g., `node`, `node:22`, `python:3.12`). Defaults to latest LTS/stable if version omitted. |
 | `domain` | string | No | Custom domain to bind to this app (e.g., `api.myapp.com`). |
 | `database` | string | No | Request a managed database (e.g., `postgres:15`, `mysql:8`, `mongodb:7`). |
 | `cache` | string | No | Request a managed cache instance (e.g., `redis:7`). |

@@ -320,20 +320,12 @@ export async function checkRepoConfig(accessToken: string, fullName: string, ref
     const files = ["okastr8.yaml", "okastr8.yml", "okastr8.json"];
 
     for (const file of files) {
-        // Use contents API to check existence. Metadata request (HEAD) is not standard for API
-        const response = await fetch(`${GITHUB_API}/repos/${fullName}/contents/${file}?ref=${encodeURIComponent(ref)}`, {
-            method: "HEAD", // HEAD works for contents if we just want existence? No, API usually returns 404
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                Accept: "application/vnd.github.v3+json",
-                // "X-GitHub-Api-Version": "2022-11-28" // Optional but good practice
-            },
-        });
-
-        if (response.ok) return true;
+        const exists = await checkFileExists(accessToken, fullName, file, ref);
+        if (exists) return true;
     }
     return false;
 }
+
 
 // Auto-detection for build configs
 export interface DetectedConfig {
