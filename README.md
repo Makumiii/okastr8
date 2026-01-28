@@ -59,61 +59,64 @@ Access your dashboard at: `http://<your-server-ip>:41788`
 
 ---
 
-## 🔗 GitHub Integration Setup
+## 🌍 Remote Access & Tunnel Setup (Required for Webhooks)
 
-To enable GitHub-based deployments, you need to create a GitHub OAuth App and configure Okastr8.
+To access your dashboard remotely and enable GitHub auto-deployments (webhooks), your server needs a public URL. Okastr8 makes this easy with **Cloudflare Tunnel**.
 
-### Step 1: Create a GitHub OAuth App
+👉 **[Read the Full Tunnel Setup Guide](./TUNNEL_SETUP.md)**
 
-1. Go to **GitHub → Settings → Developer Settings → OAuth Apps → New OAuth App**
-2. Fill in the form:
-   - **Application name**: `Okastr8` (or any name you prefer)
-   - **Homepage URL**: `http://your-server-ip:41788`
-   - **Authorization callback URL**: `http://your-server-ip:41788/api/github/callback`
-3. Click **Register application**
-4. Copy the **Client ID**
-5. Click **Generate a new client secret** and copy it
+**Quick Summary:**
+1.  **Get a Token**: Create a text tunnel in the Cloudflare Dashboard and copy the token.
+2.  **Setup Tunnel**: Run `okastr8 tunnel setup <your-token-here>`.
+3.  **Note your URL**: e.g., `https://okastr8.yourdomain.com`.
 
-> **Using a tunnel?** If you're using Cloudflare Tunnel (e.g., `https://okastr8.yourdomain.com`), use that URL instead of the IP address.
+---
 
-### Step 2: Add Credentials to Okastr8
+## ⚙️ Manual Configuration
 
-Create or edit `~/.okastr8/system.yaml`:
+Before connecting GitHub or expecting webhooks to work, you must manually configure a few secrets in `~/.okastr8/system.yaml`.
 
+Run:
 ```bash
-mkdir -p ~/.okastr8
 nano ~/.okastr8/system.yaml
 ```
 
-Add your credentials:
+Ensure it looks like this (fill in your real values):
 
 ```yaml
 manager:
   github:
-    client_id: "Ov23liXXXXXXXXXXXXXX"
-    client_secret: "your_client_secret_here"
+    # Get these from GitHub -> Settings -> Developer Settings -> OAuth Apps
+    client_id: "YOUR_GITHUB_CLIENT_ID"
+    client_secret: "YOUR_GITHUB_CLIENT_SECRET"
+
+tunnel:
+  # The URL you configured in Cloudflare (must start with https://)
+  url: "https://okastr8.yourdomain.com"
 ```
 
-### Step 3: Connect Your Account
+> **Why is this manual?** For security and simplicity, we don't ask for these sensitive values during the auto-install. You have full control.
+
+---
+
+## 🔗 GitHub Integration Setup
+
+Once your Tunnel is up and `system.yaml` is configured:
+
+### Step 1: Create GitHub OAuth App
+1.  **Homepage URL**: Use your tunnel URL (e.g., `https://okastr8.yourdomain.com`).
+2.  **Callback URL**: Append `/api/github/callback` (e.g., `https://okastr8.yourdomain.com/api/github/callback`).
+
+### Step 2: Connect
+Run the connection command on your server:
 
 ```bash
 okastr8 github connect
 ```
+This will generate a link to authenticate. Since you are on a headless server, open the link in your local browser. Once approved, the server automatically receives the token.
 
-This will open a browser for GitHub authorization. Once complete, your access token is automatically saved.
-
-### Step 4: Enable Auto-Deploy Webhooks (Tunnel Setup)
-
-### Step 4: Enable Auto-Deploy Webhooks (Tunnel Setup)
-
-For GitHub to send webhooks to your server (to trigger auto-deploy on push), it needs a public URL.
-We recommend using **Cloudflare Tunnel** (built-in).
-
-👉 **[See the Tunnel Setup Guide](./TUNNEL_SETUP.md)** for detailed instructions.
-
-Quick summary:
-1.  **Setup Tunnel**: `okastr8 tunnel setup <token>`
-2.  **Update Config**: Add your `url` to `~/.okastr8/system.yaml`.
+### Step 3: Webhooks
+With the tunnel URL configured in `system.yaml`, Okastr8 automatically registers the correct webhook URL (`https://.../api/github/webhook`) when you import repositories.
 
 ---
 
