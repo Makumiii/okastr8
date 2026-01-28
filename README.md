@@ -104,21 +104,16 @@ This will open a browser for GitHub authorization. Once complete, your access to
 
 ### Step 4: Enable Auto-Deploy Webhooks (Tunnel Setup)
 
+### Step 4: Enable Auto-Deploy Webhooks (Tunnel Setup)
+
 For GitHub to send webhooks to your server (to trigger auto-deploy on push), it needs a public URL.
+We recommend using **Cloudflare Tunnel** (built-in).
 
-1.  **Set up a Tunnel**: Use Cloudflare Tunnel or similar.
-    ```bash
-    okastr8 tunnel setup <your-tunnel-token>
-    ```
+👉 **[See the Tunnel Setup Guide](./TUNNEL_SETUP.md)** for detailed instructions.
 
-2.  **Add Tunnel URL to Config**:
-    Manually add your public tunnel URL to `~/.okastr8/system.yaml` so Okastr8 knows where to tell GitHub to send events:
-
-    ```yaml
-    tunnel:
-      enabled: true
-      url: "https://okastr8.yourdomain.com"  # <--- REQUIRED for webhooks
-    ```
+Quick summary:
+1.  **Setup Tunnel**: `okastr8 tunnel setup <token>`
+2.  **Update Config**: Add your `url` to `~/.okastr8/system.yaml`.
 
 ---
 

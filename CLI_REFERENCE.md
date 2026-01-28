@@ -272,6 +272,32 @@ okastr8 setup sudoers
 
 ---
 
+## Tunnel Management (`okastr8 tunnel`)
+
+Securely expose your instance to the internet for remote dashboard access and GitHub webhooks using Cloudflare Tunnel.
+
+See [TUNNEL_SETUP.md](./TUNNEL_SETUP.md) for a complete setup guide.
+
+### Setup Tunnel
+```bash
+okastr8 tunnel setup <token>
+
+# Example:
+okastr8 tunnel setup eyJhIjoi...
+```
+
+### Check Status
+```bash
+okastr8 tunnel status
+```
+
+### Uninstall Tunnel
+```bash
+okastr8 tunnel uninstall
+```
+
+---
+
 ## Metrics (`okastr8 metrics`)
 
 ```bash

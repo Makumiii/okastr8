@@ -18,24 +18,28 @@ manager:
   api_key: "your-generated-secret-key"
   
   github:
-    client_id: "Ov23..."
-    client_secret: "a623..."
-    # Access token is auto-filled after login
+    # <--- MANUAL CONFIG REQUIRED: Create OAuth App in GitHub Developer Settings
+    client_id: "ENTER_YOUR_CLIENT_ID_HERE"         # e.g., Ov23...
+    client_secret: "ENTER_YOUR_CLIENT_SECRET_HERE" # e.g., a623...
+    # Access token is auto-filled after login (Do not edit)
     access_token: ""
     username: ""
 
 tunnel:
-  # External access via ngrok/cloudflare
-  enabled: true
+  # Internal settings (Managed by 'okastr8 tunnel setup')
+  enabled: false
   service: manager
   port: 8788
-  url: "https://your-app.ngrok-free.app"
-  auth_token: "your-ngrok-token"
+  auth_token: ""  # Filled by 'okastr8 tunnel setup'
+
+  # <--- MANUAL CONFIG REQUIRED: The public URL of your tunnel
+  url: "https://ENTER_YOUR_PUBLIC_TUNNEL_URL_HERE" # e.g. https://okastr8.yourdomain.com
 
 # Email notifications via Brevo
 notifications:
   brevo:
-    api_key: "xkeysib-your-api-key"
+    # <--- MANUAL CONFIG REQUIRED (Optional)
+    api_key: "ENTER_YOUR_BREVO_API_KEY_HERE"
     sender_email: "robot@yourdomain.com"
     sender_name: "okastr8"
     admin_email: "you@example.com"

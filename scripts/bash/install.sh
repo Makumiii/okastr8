@@ -315,7 +315,7 @@ if [ ! -f "$CONFIG_DIR/system.yaml" ]; then
   cat > "$CONFIG_DIR/system.yaml" <<'YAML'
 # Okastr8 System Configuration
 # Location: ~/.okastr8/system.yaml
-# 
+#
 # Most settings are auto-populated by Okastr8 commands.
 # Only the fields below require manual configuration.
 
@@ -324,25 +324,31 @@ if [ ! -f "$CONFIG_DIR/system.yaml" ]; then
 # ============================================================
 # To enable GitHub deployments, create a GitHub OAuth App:
 # 1. Go to: GitHub → Settings → Developer Settings → OAuth Apps → New
-# 2. Set Homepage URL: http://your-server:41788
-# 3. Set Callback URL: http://your-server:41788/api/github/callback
+# 2. Set Homepage URL: http://your-server:41788 (or your tunnel URL)
+# 3. Set Callback URL: http://your-server:41788/api/github/callback (or your tunnel URL)
 # 4. Copy your Client ID and Client Secret below
 # 5. Run: okastr8 github connect
 
 manager:
   github:
-    client_id: ""      # Your GitHub OAuth App Client ID
-    client_secret: ""  # Your GitHub OAuth App Client Secret
+    # <--- MANUAL CONFIG REQUIRED
+    client_id: "ENTER_YOUR_CLIENT_ID_HERE"      # Your GitHub OAuth App Client ID
+    client_secret: "ENTER_YOUR_CLIENT_SECRET_HERE"  # Your GitHub OAuth App Client Secret
+
+tunnel:
+  # <--- MANUAL CONFIG REQUIRED IF USING TUNNEL
+  # The 'okastr8 tunnel setup' command fills the auth_token, but NOT the URL.
+  # You must manually add your public URL here:
+  url: "https://ENTER_YOUR_PUBLIC_TUNNEL_URL_HERE" # e.g. https://okastr8.yourdomain.com
 
 # ============================================================
 # OPTIONAL: Email Notifications (via Brevo)
 # ============================================================
-# Uncomment and configure if you want email alerts for deployments,
-# login approvals, and service monitoring.
+# Uncomment and configure if you want email alerts.
 
 # notifications:
 #   brevo:
-#     api_key: ""
+#     api_key: "ENTER_YOUR_BREVO_KEY_HERE"
 #     sender_email: "robot@yourdomain.com"
 #     sender_name: "okastr8"
 #     admin_email: "you@example.com"
