@@ -110,11 +110,17 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
         };
     }
 
-    if (!config.startCommand) {
+    // Check if user provides their own Docker files
+    // If so, startCommand is not required (it's defined in their Dockerfile/compose)
+    const hasUserDockerfile = existsSync(join(releasePath, "Dockerfile"));
+    const hasUserCompose = existsSync(join(releasePath, "docker-compose.yml"));
+    const hasUserDocker = hasUserDockerfile || hasUserCompose;
+
+    if (!config.startCommand && !hasUserDocker) {
         fail("No start command specified in okastr8.yaml");
         return {
             success: false,
-            message: "No start command specified in okastr8.yaml",
+            message: "No start command specified in okastr8.yaml (required when no Dockerfile or docker-compose.yml is present)",
             config,
         };
     }
@@ -255,7 +261,7 @@ async function checkPortAvailability(port: number, myAppName: string, log: (msg:
         // A. Is it me in Docker?
         try {
             // Use a targeted check for this specific app's container
-            const { containerStatus } = await import("./docker.ts");
+            const { containerStatus, getProjectContainers } = await import("./docker.ts");
             const status = await containerStatus(myAppName);
 
             if (status.running) {
@@ -267,6 +273,17 @@ async function checkPortAvailability(port: number, myAppName: string, log: (msg:
                 if (myContainer && myContainer.ports.includes(`:${port}`)) {
                     log(`Port ${port} is currently held by a running instance of this app. It will be released during deployment.`);
                     return; // It's us, this is fine
+                }
+            }
+
+            // B. Check for compose project containers (user-compose / auto-compose strategy)
+            const projectContainers = await getProjectContainers(myAppName);
+            if (projectContainers.length > 0) {
+                // This app has compose containers running - it's the one using the port
+                const anyRunning = projectContainers.some(c => c.status === 'running');
+                if (anyRunning) {
+                    log(`Port ${port} is currently held by compose services for this app. They will be replaced during deployment.`);
+                    return; // It's us (compose), this is fine
                 }
             }
         } catch (e) {

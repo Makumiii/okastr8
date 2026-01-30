@@ -1,30 +1,46 @@
-# SCOPE: Repository Level. Place in git root.
-# Defines build/run configuration for the app.
+# ==============================================
+# OKASTR8.YAML - Application Deployment Config
+# ==============================================
+# Place this file in your repository root.
+# Okastr8 uses it to build and deploy your app.
 
-name: my-node-app
-description: "A sample Node.js application deployed with okastr8"
-
-# Required runtime (node, python, go, bun, deno)
-# If not installed, deploy will fail with install instructions
+# Runtime (optional - auto-detected if omitted)
+# Supported: node, python, go, bun, deno
+# Can include version: "node:22", "python:3.12"
 runtime: node
 
+# Port your application listens on (required)
+port: 3000
+
+# Command to start your application (required)
+start: npm start
+
+# Custom domain for reverse proxy (optional)
+domain: myapp.example.com
+
+# Build commands (optional)
+# Run in order before starting the application
 build:
   - npm install
   - npm run build
 
-start: npm start
-port: 3000
-domain: myapp.example.com
+# Managed database (optional)
+# Triggers Docker Compose deployment
+# Supported: postgres, mysql, mariadb, mongo
+database: "postgres:15"
 
-env:
-  NODE_ENV: production
-  API_KEY: your-secret-api-key
+# Managed cache (optional)
+# Triggers Docker Compose deployment
+# Supported: redis
+cache: "redis:7"
 
-# Optional: Provision managed resources
-database:
-  type: postgres # or mysql, redis, mongo
-  version: "15"
-
-cache:
-  type: redis
-  version: "7"
+# ==============================================
+# NOTE: Environment Variables
+# ==============================================
+# Do NOT put secrets in this file!
+# This file is committed to your repository.
+#
+# Instead, add env vars via:
+#   - Dashboard UI when deploying
+#   - CLI: okastr8 app env set myapp KEY=VALUE
+#   - CLI: okastr8 deploy trigger myapp --env-file .env.local

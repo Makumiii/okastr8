@@ -7,6 +7,7 @@ export interface DeploymentStream {
     id: string;
     callbacks: Set<(message: string) => void>;
     createdAt: number;
+    cancelled: boolean;
 }
 
 // Store active deployment streams
@@ -23,6 +24,7 @@ export function startDeploymentStream(deploymentId: string): void {
         id: deploymentId,
         callbacks: new Set(),
         createdAt: Date.now(),
+        cancelled: false,
     });
     console.log(`[DeploymentLogger] Started stream: ${deploymentId}`);
 }
@@ -111,4 +113,26 @@ setInterval(cleanupOldStreams, 10 * 60 * 1000);
  */
 export function getActiveStreamCount(): number {
     return deploymentStreams.size;
+}
+
+/**
+ * Cancel a deployment
+ */
+export function cancelDeployment(deploymentId: string): boolean {
+    const stream = deploymentStreams.get(deploymentId);
+    if (stream) {
+        stream.cancelled = true;
+        streamLog(deploymentId, '❌ Deployment cancelled by user');
+        console.log(`[DeploymentLogger] Deployment cancelled: ${deploymentId}`);
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Check if a deployment has been cancelled
+ */
+export function isDeploymentCancelled(deploymentId: string): boolean {
+    const stream = deploymentStreams.get(deploymentId);
+    return stream?.cancelled ?? false;
 }

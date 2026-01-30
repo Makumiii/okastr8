@@ -18,7 +18,10 @@ export function generateCompose(
 ): string {
     const services: any = {
         app: {
-            build: ".",
+            build: {
+                context: ".",
+                dockerfile: "Dockerfile.generated"
+            },
             container_name: appName,
             ports: [`${config.port}:${config.port}`],
             restart: "unless-stopped",
@@ -280,8 +283,9 @@ function toYAML(obj: any, indent = 0): string {
             yaml += `${spaces}${key}:\n`;
             yaml += toYAML(value, indent + 1);
         } else if (typeof value === "string") {
-            // Quote strings if they contain special characters
-            const needsQuotes = value.includes(":") || value.includes("#") || value.startsWith("$");
+            // Quote strings if they contain special characters or look like numbers
+            const looksLikeNumber = /^[\d.]+$/.test(value);
+            const needsQuotes = value.includes(":") || value.includes("#") || value.startsWith("$") || looksLikeNumber;
             yaml += `${spaces}${key}: ${needsQuotes ? `"${value}"` : value}\n`;
         } else {
             yaml += `${spaces}${key}: ${value}\n`;

@@ -37,3 +37,6 @@ environment.json
 public/
 build/
 configs/
+
+# Test apps (separate repos for testing deployments)
+test-apps/

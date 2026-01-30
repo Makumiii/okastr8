@@ -128,15 +128,33 @@ export async function deployWithDocker(
     // and also ensures legacy systemd services are cleared.
     log("Ensuring clean slate for deployment...");
 
-    // A. Clean up Docker Resources
+    // A. Clean up Docker Resources - direct container
     await stopContainer(appName).catch(() => { });
     await removeContainer(appName).catch(() => { });
 
-    // For compose, we try to down if we can find a compose file
-    const currentComposePath = join(APPS_DIR, appName, "current", "docker-compose.yml");
-    if (existsSync(currentComposePath)) {
-        log("Stopping existing Compose services...");
-        await composeDown(currentComposePath, appName).catch(() => { });
+    // B. Clean up Compose services - check multiple possible locations/names
+    const currentDir = join(APPS_DIR, appName, "current");
+    const composeFiles = [
+        join(currentDir, "docker-compose.yml"),
+        join(currentDir, "docker-compose.generated.yml"),
+    ];
+
+    for (const composePath of composeFiles) {
+        if (existsSync(composePath)) {
+            log("Stopping existing Compose services...");
+            await composeDown(composePath, appName).catch(() => { });
+            break; // Only need to stop once
+        }
+    }
+
+    // C. Also try to stop by project name label (catches any compose containers we might have missed)
+    const projectContainers = await getProjectContainers(appName);
+    if (projectContainers.length > 0) {
+        log(`Stopping ${projectContainers.length} compose project container(s)...`);
+        for (const container of projectContainers) {
+            await stopContainer(container.name).catch(() => { });
+            await removeContainer(container.name).catch(() => { });
+        }
     }
 
     // B. Legacy Systemd Cleanup (Removed)

@@ -363,6 +363,19 @@ export async function importRepo(
         }
     };
 
+    // Helper to check if deployment was cancelled
+    const checkCancelled = async (cleanup?: () => Promise<void>) => {
+        if (deploymentId) {
+            const { isDeploymentCancelled } = require('../utils/deploymentLogger');
+            if (isDeploymentCancelled(deploymentId)) {
+                if (cleanup) {
+                    await cleanup();
+                }
+                throw new Error('DEPLOYMENT_CANCELLED');
+            }
+        }
+    };
+
     if (!githubConfig.accessToken) {
         return { success: false, message: "GitHub not connected" };
     }
@@ -486,6 +499,9 @@ export async function importRepo(
         } catch { }
 
 
+        // Check for cancellation after clone
+        await checkCancelled(() => cleanupFailedDeployment('Deployment cancelled'));
+
         // Load configuration from okastr8.yaml
         log("Loading okastr8.yaml configuration...");
         const configPath = join(releasePath, "okastr8.yaml");
@@ -531,13 +547,18 @@ export async function importRepo(
             detectedConfig.startCommand = options.startCommand;
         }
 
-        if (!detectedConfig.startCommand) {
+        // Check if user provides their own Docker files
+        const hasUserDockerfile = existsSync(join(releasePath, "Dockerfile"));
+        const hasUserCompose = existsSync(join(releasePath, "docker-compose.yml"));
+        const hasUserDocker = hasUserDockerfile || hasUserCompose;
+
+        if (!detectedConfig.startCommand && !hasUserDocker) {
             await updateVersionStatus(appName, versionId, "failed", "No start command");
             // Cleanup on missing start command
             await cleanupFailedDeployment("Missing start command");
             return {
                 success: false,
-                message: "No start command specified in okastr8.yaml or deployment options.",
+                message: "No start command specified in okastr8.yaml (required when no Dockerfile or docker-compose.yml is present)",
                 config: detectedConfig,
             };
         }
@@ -564,11 +585,15 @@ export async function importRepo(
         log(`Build steps: ${detectedConfig.buildSteps.join(", ") || "none"}`);
         log(`▶️  Start command: ${detectedConfig.startCommand}`);
 
+        // Check for cancellation before build
+        await checkCancelled(() => cleanupFailedDeployment('Deployment cancelled'));
+
         // Run build steps
         if (detectedConfig.buildSteps.length > 0) {
             log("Running build steps...");
 
             for (const step of detectedConfig.buildSteps) {
+                await checkCancelled(() => cleanupFailedDeployment('Deployment cancelled')); // Check between each build step
                 log(`  → ${step}`);
                 // Use bash -c to handle composite commands, running in releasePath
                 const buildResult = await runCommand("bash", ["-c", step], releasePath);
@@ -584,6 +609,9 @@ export async function importRepo(
         // Update symlink to new version BEFORE deployment
         log("Switching to new version...");
         await setCurrentVersion(appName, versionId);
+
+        // Check for cancellation before Docker deploy
+        await checkCancelled(() => cleanupFailedDeployment('Deployment cancelled'));
 
         // Deploy with Docker using deployFromPath
         log("Deploying with Docker...");
@@ -636,6 +664,10 @@ export async function importRepo(
             config: detectedConfig,
         };
     } catch (error: any) {
+        // Handle cancellation specifically
+        if (error.message === 'DEPLOYMENT_CANCELLED') {
+            return { success: false, message: 'Deployment was cancelled by user' };
+        }
         return { success: false, message: error.message };
     }
 }

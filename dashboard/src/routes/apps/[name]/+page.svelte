@@ -17,6 +17,7 @@
         Rocket,
         X,
         TriangleAlert,
+        Loader2,
     } from "lucide-svelte";
 
     interface Version {
@@ -44,6 +45,7 @@
     let logs = $state<string>("");
     let isLoading = $state(true);
     let isControlling = $state(false);
+    let promotingVersionId = $state<number | null>(null);
     let showLogs = $state(false);
     let showConfirmDelete = $state(false);
     let deleteTarget = $state<{
@@ -123,6 +125,7 @@
 
     async function promoteVersion(versionId: number) {
         isControlling = true;
+        promotingVersionId = versionId;
         const result = await post("/app/rollback", {
             name: appName,
             versionId,
@@ -133,6 +136,7 @@
         } else {
             toasts.error(result.message || "Failed to promote version");
         }
+        promotingVersionId = null;
         isControlling = false;
     }
 
@@ -313,7 +317,14 @@
                                     onclick={() => promoteVersion(version.id)}
                                     disabled={isControlling}
                                 >
-                                    <Rocket size={16} class="mr-2" /> Promote
+                                    {#if promotingVersionId === version.id}
+                                        <Loader2
+                                            size={16}
+                                            class="mr-2 animate-spin"
+                                        /> Promoting...
+                                    {:else}
+                                        <Rocket size={16} class="mr-2" /> Promote
+                                    {/if}
                                 </Button>
                             {/if}
                         </div>

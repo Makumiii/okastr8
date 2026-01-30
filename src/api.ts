@@ -141,10 +141,25 @@ api.get('/system/status', async (c) => {
         } catch { }
 
         // Check Docker container statuses for apps
-        const { containerStatus } = await import('./commands/docker');
+        const { containerStatus, getProjectContainers } = await import('./commands/docker');
         for (const app of apps) {
             if (app && app.name) {
-                const status = await containerStatus(app.name);
+                // First try direct container name (for auto-dockerfile strategy)
+                let status = await containerStatus(app.name);
+
+                // If not found, try compose project containers (for user-compose / auto-compose)
+                if (!status.running && status.status === 'not found') {
+                    const projectContainers = await getProjectContainers(app.name);
+                    if (projectContainers.length > 0) {
+                        // Check if any container in the project is running
+                        const anyRunning = projectContainers.some(c => c.status === 'running');
+                        status = {
+                            running: anyRunning,
+                            status: anyRunning ? 'running' : projectContainers[0]?.status || 'unknown',
+                        };
+                    }
+                }
+
                 services.push({
                     name: app.name,
                     status: status.status,
@@ -1046,8 +1061,9 @@ api.get('/github/deploy-stream/:deploymentId', async (c) => {
                     try {
                         controller.enqueue(data);
                     } catch (error) {
-                        console.error('[SSE] Error enqueuing data:', error);
+                        // Client disconnected - this is expected, silently stop
                         isClosed = true;
+                        if (heartbeatInterval) clearInterval(heartbeatInterval);
                     }
                 }
             };
@@ -1064,10 +1080,23 @@ api.get('/github/deploy-stream/:deploymentId', async (c) => {
 
                 // Check if stream should end
                 if (message === '[DEPLOYMENT_STREAM_END]') {
-                    safeEnqueue(encoder.encode(`data: ${JSON.stringify({ type: 'end' })}\n\n`));
+                    // Clear heartbeat FIRST to prevent race condition
                     if (heartbeatInterval) clearInterval(heartbeatInterval);
-                    controller.close();
                     isClosed = true;
+
+                    // Now safe to send final message and close
+                    try {
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'end' })}\n\n`));
+                    } catch (e) {
+                        // Ignore - controller may already be closing
+                    }
+
+                    try {
+                        controller.close();
+                    } catch (e) {
+                        // Ignore - controller may already be closed
+                    }
+
                     unsubscribe();
                     return;
                 }
@@ -1099,6 +1128,29 @@ api.get('/github/deploy-stream/:deploymentId', async (c) => {
             'X-Accel-Buffering': 'no',
         },
     });
+});
+
+// Cancel a running deployment
+api.post('/github/cancel-deployment/:deploymentId', async (c) => {
+    const deploymentId = c.req.param('deploymentId');
+    console.log(`API: /github/cancel-deployment hit for: ${deploymentId}`);
+
+    try {
+        const { cancelDeployment, endDeploymentStream } = await import('./utils/deploymentLogger');
+
+        const cancelled = cancelDeployment(deploymentId);
+
+        if (cancelled) {
+            // End the stream after a short delay to allow the cancel message to be sent
+            setTimeout(() => endDeploymentStream(deploymentId), 500);
+            return c.json(apiResponse(true, 'Deployment cancelled'));
+        } else {
+            return c.json(apiResponse(false, 'Deployment not found or already completed'));
+        }
+    } catch (error: any) {
+        console.error('API: /github/cancel-deployment error:', error);
+        return c.json(apiResponse(false, error.message || 'Internal Server Error'));
+    }
 });
 
 api.post('/github/disconnect', async (c) => {

@@ -4,7 +4,14 @@
     import { get, post } from "$lib/api";
     import { onMount } from "svelte";
     import { toasts } from "$lib/stores/toasts";
-    import { Check, TriangleAlert, Rocket, X } from "lucide-svelte";
+    import {
+        Check,
+        TriangleAlert,
+        Rocket,
+        X,
+        Clipboard,
+        XCircle,
+    } from "lucide-svelte";
 
     const repoFullName = decodeURIComponent($page.params.repo ?? "");
     const [owner, repoName] = repoFullName.split("/");
@@ -20,6 +27,8 @@
     let logs = $state<string[]>([]);
     let deployComplete = $state(false);
     let deploySuccess = $state(false);
+    let isCancelling = $state(false);
+    let eventSourceRef = $state<EventSource | null>(null);
 
     let logsContainer = $state<HTMLDivElement>();
 
@@ -99,6 +108,7 @@
                 scrollToBottom();
             } else if (data.type === "end") {
                 eventSource.close();
+                eventSourceRef = null;
                 isDeploying = false;
                 deployComplete = true;
                 deploySuccess = logs.some(
@@ -109,9 +119,39 @@
 
         eventSource.onerror = () => {
             eventSource.close();
+            eventSourceRef = null;
             isDeploying = false;
             deployComplete = true;
         };
+
+        eventSourceRef = eventSource;
+    }
+
+    async function cancelDeploy() {
+        if (!deploymentId || isCancelling) return;
+
+        isCancelling = true;
+        const result = await post(
+            `/github/cancel-deployment/${deploymentId}`,
+            {},
+        );
+
+        if (result.success) {
+            toasts.success("Deployment cancellation requested");
+        } else {
+            toasts.error("Failed to cancel deployment");
+        }
+        isCancelling = false;
+    }
+
+    async function copyLogs() {
+        const logsText = logs.join("\n");
+        try {
+            await navigator.clipboard.writeText(logsText);
+            toasts.success("Logs copied to clipboard!");
+        } catch (error) {
+            toasts.error("Failed to copy logs");
+        }
     }
 
     function scrollToBottom() {
@@ -241,35 +281,69 @@
                         <Rocket size={16} class="mr-2" /> Start Deploy
                     {/if}
                 </Button>
+
+                <!-- Cancel Button (shown during deployment) -->
+                {#if isDeploying}
+                    <button
+                        onclick={cancelDeploy}
+                        disabled={isCancelling}
+                        class="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-red-500 rounded-xl border border-red-500 hover:bg-red-500 hover:text-white transition-colors disabled:opacity-50"
+                    >
+                        {#if isCancelling}
+                            <div
+                                class="h-4 w-4 animate-spin rounded-full border-2 border-red-500 border-t-transparent"
+                            ></div>
+                        {:else}
+                            <XCircle size={16} />
+                        {/if}
+                        Cancel Deployment
+                    </button>
+                {/if}
             </Card>
 
             <!-- Logs -->
             <Card class="flex flex-col">
                 <div class="flex items-center justify-between">
-                    <h2
-                        class="text-lg font-semibold text-[var(--text-primary)]"
-                    >
-                        Deployment Logs
-                    </h2>
-                    {#if deployComplete}
-                        <Badge
-                            variant={deploySuccess ? "success" : "error"}
-                            class="flex gap-1 items-center"
+                    <div class="flex items-center gap-2">
+                        <h2
+                            class="text-lg font-semibold text-[var(--text-primary)]"
                         >
-                            {#if deploySuccess}
-                                <Check size={14} /> Success
-                            {:else}
-                                <X size={14} /> Failed
-                            {/if}
-                        </Badge>
-                    {:else if isDeploying}
-                        <Badge variant="warning">
-                            <div
-                                class="h-2 w-2 animate-pulse rounded-full bg-yellow-500"
-                            ></div>
-                            Deploying
-                        </Badge>
-                    {/if}
+                            Deployment Logs
+                        </h2>
+                        {#if logs.length > 0}
+                            <button
+                                onclick={copyLogs}
+                                class="p-1.5 rounded hover:bg-[var(--border)] transition-colors"
+                                title="Copy logs to clipboard"
+                            >
+                                <Clipboard
+                                    size={16}
+                                    class="text-[var(--text-secondary)]"
+                                />
+                            </button>
+                        {/if}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        {#if isDeploying}
+                            <Badge variant="warning">
+                                <div
+                                    class="h-2 w-2 animate-pulse rounded-full bg-yellow-500"
+                                ></div>
+                                Deploying
+                            </Badge>
+                        {:else if deployComplete}
+                            <Badge
+                                variant={deploySuccess ? "success" : "error"}
+                                class="flex gap-1 items-center"
+                            >
+                                {#if deploySuccess}
+                                    <Check size={14} /> Success
+                                {:else}
+                                    <X size={14} /> Failed
+                                {/if}
+                            </Badge>
+                        {/if}
+                    </div>
                 </div>
 
                 <div

@@ -13,7 +13,8 @@ import {
     stopContainer as stopDockerContainer,
     restartContainer as restartDockerContainer,
     removeContainer,
-    listContainers
+    listContainers,
+    getProjectContainers
 } from "./docker";
 
 // Helper to get __dirname in ESM
@@ -157,8 +158,21 @@ export async function listApps() {
                 const metadataPath = join(APPS_DIR, entry.name, "app.json");
                 try {
                     const metadata = JSON.parse(await readFile(metadataPath, "utf-8"));
-                    // Check if running
-                    const state = runningMap.get(entry.name);
+
+                    // Check for direct container name match (auto-dockerfile strategy)
+                    let state = runningMap.get(entry.name);
+
+                    // If not found, check for compose project containers
+                    // Docker Compose names containers like: projectname-servicename-1
+                    if (!state) {
+                        const projectContainers = await getProjectContainers(entry.name);
+                        if (projectContainers.length > 0) {
+                            // If any container in the project is running, consider the app running
+                            const anyRunning = projectContainers.some(c => c.status === 'running');
+                            state = anyRunning ? 'running' : projectContainers[0]?.status || 'stopped';
+                        }
+                    }
+
                     apps.push({
                         ...metadata,
                         running: state === 'running',
