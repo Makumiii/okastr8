@@ -9,6 +9,7 @@ import { existsSync } from "fs";
 import { OKASTR8_HOME } from "../config.ts";
 import { runCommand } from "../utils/command.ts";
 import { TaskProgress, cli } from "../utils/cli-logger.ts";
+import { startDeploymentStream, streamLog } from "../utils/deploymentLogger.ts";
 
 // Helper to get script path
 // Since we are in src/commands, project root is ../..
@@ -27,7 +28,11 @@ import type { DeployConfig, DeployFromPathOptions, DeployResult } from "../types
  * 5. Update metadata
  */
 export async function deployFromPath(options: DeployFromPathOptions): Promise<DeployResult> {
-    const { appName, releasePath, versionId, gitRepo, gitBranch, onProgress } = options;
+    const { appName, releasePath, versionId, gitRepo, gitBranch, onProgress, deploymentId } = options;
+
+    if (deploymentId) {
+        await startDeploymentStream(deploymentId);
+    }
 
     const task = new TaskProgress([
         "config",
@@ -42,6 +47,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     const useTaskProgress = !onProgress;
 
     const step = (key: string, message: string) => {
+        if (deploymentId) streamLog(deploymentId, `👉 ${message}`);
         if (useTaskProgress) {
             task.step(key, message);
         }
@@ -49,6 +55,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     };
 
     const log = (msg: string) => {
+        if (deploymentId) streamLog(deploymentId, msg);
         if (useTaskProgress) {
             task.log(msg);
         }
@@ -56,6 +63,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     };
 
     const fail = (message: string) => {
+        if (deploymentId) streamLog(deploymentId, `❌ ${message}`);
         if (useTaskProgress) {
             task.fail(message);
         } else if (onProgress) {
@@ -64,6 +72,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     };
 
     const success = (message: string) => {
+        if (deploymentId) streamLog(deploymentId, `✅ ${message}`);
         if (useTaskProgress) {
             task.success(message);
         } else if (onProgress) {

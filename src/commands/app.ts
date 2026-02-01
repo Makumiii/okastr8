@@ -24,6 +24,10 @@ const __dirname = dirname(__filename);
 // Project root is two levels up from src/commands/
 const PROJECT_ROOT = join(__dirname, "..", "..");
 
+// Activity Logging
+import { randomUUID } from "crypto";
+import { logActivity } from "../utils/activity";
+
 // App directory structure
 import { OKASTR8_HOME } from "../config";
 const APPS_DIR = join(OKASTR8_HOME, "apps");
@@ -279,6 +283,9 @@ export async function getAppMetadata(appName: string): Promise<AppConfig & { rep
 export async function updateApp(appName: string, env?: Record<string, string>) {
     let versionId: number = 0;
     let releasePath: string = "";
+    const deploymentId = randomUUID();
+    const startTime = Date.now();
+
     try {
         const metadata = await getAppMetadata(appName);
 
@@ -288,8 +295,17 @@ export async function updateApp(appName: string, env?: Record<string, string>) {
 
         console.log(`Updating ${appName} from git...`);
 
-        // 1. Create new version entry (V2 Logic)
         const branch = metadata.gitBranch || "main";
+
+        // Log Deployment Start
+        await logActivity('deploy', {
+            id: deploymentId,
+            status: 'started',
+            appName,
+            branch
+        });
+
+        // 1. Create new version entry (V2 Logic)
         // We use "HEAD" initially, and deployFromPath doesn't strictly require git hash for logic, 
         // but ideally we'd get the hash traverse. 
         const versionResult = await createVersion(appName, "HEAD", branch);
@@ -330,16 +346,40 @@ export async function updateApp(appName: string, env?: Record<string, string>) {
             versionId,
             gitRepo: metadata.gitRepo,
             gitBranch: branch,
-            env: env
+            env: env,
+            deploymentId: deploymentId
         });
 
+        const duration = (Date.now() - startTime) / 1000;
+
         if (!deployResult.success) {
+            // Log Failure
+            await logActivity('deploy', {
+                id: deploymentId,
+                status: 'failed',
+                appName,
+                branch,
+                versionId,
+                error: deployResult.message,
+                duration
+            });
+
             // Cleanup on failure
             console.log("Deployment failed. Cleaning up...");
             await rm(releasePath, { recursive: true, force: true });
             await removeVersion(appName, versionId);
             throw new Error(deployResult.message);
         }
+
+        // Log Success
+        await logActivity('deploy', {
+            id: deploymentId,
+            status: 'success',
+            appName,
+            branch,
+            versionId,
+            duration
+        });
 
         return { success: true, message: `App updated to v${versionId}` };
 
@@ -352,6 +392,16 @@ export async function updateApp(appName: string, env?: Record<string, string>) {
                 await removeVersion(appName, versionId);
             } catch { }
         }
+
+        // Log unexpected error
+        await logActivity('deploy', {
+            id: deploymentId,
+            status: 'failed',
+            appName,
+            error: error.message,
+            duration: (Date.now() - startTime) / 1000
+        });
+
         throw error;
     }
 }

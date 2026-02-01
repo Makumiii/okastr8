@@ -7,6 +7,7 @@
         Box,
         ChartLine,
         LogOut,
+        Inbox,
     } from "lucide-svelte";
 
     interface NavItem {
@@ -20,6 +21,7 @@
         { href: "/github", label: "GitHub", icon: Github },
         { href: "/apps", label: "Apps", icon: Box },
         { href: "/metrics", label: "Metrics", icon: ChartLine },
+        { href: "/activity", label: "Activity", icon: Inbox },
     ];
 
     function isActive(href: string, pathname: string): boolean {

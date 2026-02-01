@@ -170,6 +170,8 @@ api.get('/system/status', async (c) => {
         }
 
         // Get log health
+        const { getActivityStats } = await import('./utils/activity');
+        const activityStats = await getActivityStats();
         const logCounts = getLogCounts();
         const health = getHealthStatus();
 
@@ -186,7 +188,8 @@ api.get('/system/status', async (c) => {
             health: {
                 status: health,
                 counts: logCounts
-            }
+            },
+            activityStats
         }));
     } catch (error: any) {
         console.error('API /system/status error:', error);
@@ -212,6 +215,49 @@ api.get('/system/metrics', async (c) => {
         return c.json(apiResponse(true, 'System metrics', metrics));
     } catch (error: any) {
         console.error('API /system/metrics error:', error);
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
+// Activity Routes
+api.get('/activity/list', async (c) => {
+    try {
+        const { getRecentActivity } = await import('./utils/activity');
+        const type = c.req.query('type') as any;
+        const limit = parseInt(c.req.query('limit') || '50');
+        const activities = await getRecentActivity(limit, type);
+        return c.json(apiResponse(true, 'Activity log', activities));
+    } catch (error: any) {
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
+api.get('/activity/stats', async (c) => {
+    try {
+        const { getActivityStats } = await import('./utils/activity');
+        const stats = await getActivityStats();
+        return c.json(apiResponse(true, 'Activity stats', stats));
+    } catch (error: any) {
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
+api.get('/activity/log/:id', async (c) => {
+    try {
+        const id = c.req.param('id');
+        const { join } = await import('path');
+        const { homedir } = await import('os');
+        const { readFile } = await import('fs/promises');
+        const { existsSync } = await import('fs');
+
+        const logPath = join(homedir(), '.okastr8', 'logs', `deploy-${id}.log`);
+        if (!existsSync(logPath)) {
+            return c.json(apiResponse(false, 'Log not found'), 404);
+        }
+
+        const content = await readFile(logPath, 'utf-8');
+        return c.json(apiResponse(true, 'Deployment log', { log: content }));
+    } catch (error: any) {
         return c.json(apiResponse(false, error.message));
     }
 });

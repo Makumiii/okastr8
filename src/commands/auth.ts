@@ -153,6 +153,14 @@ export async function generateToken(
 
     await saveAuthData(data);
 
+    // Log activity
+    try {
+        const { logActivity } = await import('../utils/activity');
+        await logActivity('login', { action: 'token_generated', expiry }, userId);
+    } catch (e) {
+        console.error('Failed to log login activity:', e);
+    }
+
     return { token, expiresAt };
 }
 
@@ -360,7 +368,18 @@ export async function generateAdminToken(expiry: string = '1d'): Promise<{ token
     }
 
     const data = await loadAuthData();
-    return generateToken(data.admin, expiry);
+
+    // Try to get admin email from config for better identification
+    let adminId = data.admin;
+    try {
+        const { getSystemConfig } = await import('../config');
+        const config = await getSystemConfig();
+        if (config.notifications?.brevo?.admin_email) {
+            adminId = config.notifications.brevo.admin_email;
+        }
+    } catch { }
+
+    return generateToken(adminId, expiry);
 }
 
 // ============ Login Approval System ============

@@ -10,6 +10,7 @@
         Activity,
         TriangleAlert,
         ArrowRight,
+        Inbox,
     } from "lucide-svelte";
 
     interface SystemStatus {
@@ -27,6 +28,11 @@
         health: {
             status: string;
             counts: { info: number; warning: number; error: number };
+        };
+        activityStats?: {
+            failedDeploysToday: number;
+            resourceWarningsToday: number;
+            loginsToday: number;
         };
     }
 
@@ -65,11 +71,36 @@
 
 <div class="space-y-6">
     <!-- Header -->
-    <div>
-        <h1 class="text-2xl font-bold text-[var(--text-primary)]">Dashboard</h1>
-        <p class="mt-1 text-[var(--text-secondary)]">
-            Monitor your server and deployments
-        </p>
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-[var(--text-primary)]">
+                Dashboard
+            </h1>
+            <p class="mt-1 text-[var(--text-secondary)]">
+                Monitor your server and deployments
+            </p>
+        </div>
+
+        {#if data && data.activityStats}
+            {@const totalCount =
+                data.activityStats.failedDeploysToday +
+                data.activityStats.resourceWarningsToday +
+                data.activityStats.loginsToday}
+            <a
+                href="/activity"
+                class="relative flex items-center gap-2 rounded-lg bg-[var(--surface)] px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-dark)] hover:text-[var(--text-primary)]"
+            >
+                <Inbox size={20} />
+                <span>Inbox</span>
+                {#if totalCount > 0}
+                    <span
+                        class="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--primary)] text-[10px] font-bold text-white shadow-sm"
+                    >
+                        {totalCount > 99 ? "99+" : totalCount}
+                    </span>
+                {/if}
+            </a>
+        {/if}
     </div>
 
     {#if isLoading}
@@ -97,10 +128,6 @@
                     <h2 class="text-xl font-semibold">
                         Welcome back, {data.user}
                     </h2>
-                    <p class="mt-1 opacity-80">
-                        All systems operational. {data.health.counts.info} notifications
-                        today.
-                    </p>
                 </div>
                 <div class="flex items-center gap-3">
                     <Badge variant="success" class="!bg-white/20 !text-white">

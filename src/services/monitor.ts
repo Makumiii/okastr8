@@ -3,6 +3,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { sendAdminEmail } from './email';
 import { getSystemConfig } from '../config';
+import { logActivity } from '../utils/activity';
 
 const execAsync = promisify(exec);
 
@@ -182,5 +183,6 @@ async function sendResourceAlert(resource: string, current: number, threshold: n
 </html>`;
 
     console.log(`Sending ${resource} alert: ${current}% > ${threshold}%`);
+    await logActivity('resource', { resource, current, threshold });
     await sendAdminEmail(`Alert: High ${resource} Usage (${current}%)`, html);
 }

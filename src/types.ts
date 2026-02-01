@@ -91,6 +91,7 @@ export interface DeployFromPathOptions {
   gitBranch?: string;
   env?: Record<string, string>;
   onProgress?: (msg: string) => void;
+  deploymentId?: string;
 }
 
 export interface DeployResult {
