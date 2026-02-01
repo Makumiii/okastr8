@@ -224,8 +224,9 @@ api.get('/activity/list', async (c) => {
     try {
         const { getRecentActivity } = await import('./utils/activity');
         const type = c.req.query('type') as any;
+        const date = c.req.query('date');
         const limit = parseInt(c.req.query('limit') || '50');
-        const activities = await getRecentActivity(limit, type);
+        const activities = await getRecentActivity(limit, type, date);
         return c.json(apiResponse(true, 'Activity log', activities));
     } catch (error: any) {
         return c.json(apiResponse(false, error.message));

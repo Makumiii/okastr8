@@ -72,7 +72,11 @@ export async function logActivity(
 /**
  * Get recent activity
  */
-export async function getRecentActivity(limit: number = 50, type?: ActivityType): Promise<ActivityEntry[]> {
+export async function getRecentActivity(
+    limit: number = 50,
+    type?: ActivityType,
+    date?: string // YYYY-MM-DD
+): Promise<ActivityEntry[]> {
     try {
         if (!existsSync(ACTIVITY_FILE)) return [];
 
@@ -91,6 +95,11 @@ export async function getRecentActivity(limit: number = 50, type?: ActivityType)
 
         if (type) {
             entries = entries.filter(e => e.type === type);
+        }
+
+        if (date) {
+            const targetDate = new Date(date).toDateString(); // "Fri Feb 01 2026"
+            entries = entries.filter(e => new Date(e.timestamp).toDateString() === targetDate);
         }
 
         return entries.slice(0, limit);

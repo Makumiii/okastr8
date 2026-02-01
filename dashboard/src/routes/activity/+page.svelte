@@ -12,6 +12,7 @@
         User,
         XCircle,
         Terminal,
+        Calendar,
     } from "lucide-svelte";
 
     // Types
@@ -32,6 +33,7 @@
     let activities: ActivityEntry[] = [];
     let isLoading = true;
     let filter: ActivityType | "all" = "all";
+    let selectedDate: string = new Date().toISOString().split("T")[0]; // Default today (YYYY-MM-DD)
     let expandedLogId: string | null = null;
     let logContent: string | null = null;
     let isLoadingLog = false;
@@ -47,10 +49,10 @@
     });
 
     async function loadActivity() {
-        const url =
+        let url =
             filter === "all"
-                ? "/activity/list?limit=100"
-                : `/activity/list?limit=100&type=${filter}`;
+                ? `/activity/list?limit=100&date=${selectedDate}`
+                : `/activity/list?limit=100&type=${filter}&date=${selectedDate}`;
 
         const res = await get<ActivityEntry[]>(url);
         if (res.success && res.data) {
@@ -63,6 +65,34 @@
         filter = f;
         isLoading = true;
         loadActivity();
+    }
+
+    function setDate(date: string) {
+        selectedDate = date;
+        isLoading = true;
+        loadActivity();
+    }
+
+    // Generate past 7 days
+    function getPast7Days() {
+        const dates = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            dates.push(d.toISOString().split("T")[0]);
+        }
+        return dates;
+    }
+
+    function formatDateLabel(dateStr: string) {
+        const d = new Date(dateStr);
+        const today = new Date().toISOString().split("T")[0];
+        if (dateStr === today) return "Today";
+        return d.toLocaleDateString(undefined, {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+        });
     }
 
     async function toggleLog(id: string) {
@@ -118,43 +148,83 @@
         </div>
 
         <!-- Filters -->
-        <div class="flex gap-2 rounded-lg bg-[var(--surface-dark)] p-1">
-            <button
-                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors {filter ===
-                'all'
-                    ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-sm'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
-                on:click={() => setFilter("all")}
-            >
-                All
-            </button>
-            <button
-                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors {filter ===
-                'deploy'
-                    ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-sm'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
-                on:click={() => setFilter("deploy")}
-            >
-                Deploys
-            </button>
-            <button
-                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors {filter ===
-                'login'
-                    ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-sm'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
-                on:click={() => setFilter("login")}
-            >
-                Logins
-            </button>
-            <button
-                class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors {filter ===
-                'resource'
-                    ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-sm'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
-                on:click={() => setFilter("resource")}
-            >
-                System
-            </button>
+        <div class="flex flex-col gap-4 items-end">
+            <!-- Date Filter -->
+            <div class="relative">
+                <div
+                    class="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-[var(--text-secondary)]"
+                >
+                    <Calendar size={16} />
+                </div>
+                <select
+                    class="h-9 w-40 appearance-none rounded-lg border border-[var(--border)] bg-[var(--surface-dark)] pl-9 pr-8 text-sm font-medium text-[var(--text-primary)] focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                    value={selectedDate}
+                    on:change={(e) => setDate(e.currentTarget.value)}
+                >
+                    {#each getPast7Days() as date}
+                        <option value={date}>{formatDateLabel(date)}</option>
+                    {/each}
+                </select>
+                <!-- Custom arrow -->
+                <div
+                    class="absolute inset-y-0 right-0 flex items-center pr-2.5 pointer-events-none text-[var(--text-secondary)]"
+                >
+                    <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                    >
+                        <path
+                            d="M3 4.5L6 7.5L9 4.5"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        />
+                    </svg>
+                </div>
+            </div>
+
+            <div class="flex gap-2 rounded-lg bg-[var(--surface-dark)] p-1">
+                <button
+                    class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors {filter ===
+                    'all'
+                        ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
+                    on:click={() => setFilter("all")}
+                >
+                    All
+                </button>
+                <button
+                    class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors {filter ===
+                    'deploy'
+                        ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
+                    on:click={() => setFilter("deploy")}
+                >
+                    Deploys
+                </button>
+                <button
+                    class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors {filter ===
+                    'login'
+                        ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
+                    on:click={() => setFilter("login")}
+                >
+                    Logins
+                </button>
+                <button
+                    class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors {filter ===
+                    'resource'
+                        ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
+                    on:click={() => setFilter("resource")}
+                >
+                    System
+                </button>
+            </div>
         </div>
     </div>
 
