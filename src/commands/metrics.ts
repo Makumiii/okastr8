@@ -18,6 +18,8 @@ export interface MetricsResult {
 interface RateState {
     count: number;
     timestamp: number;
+    errors4xx?: number;
+    errors5xx?: number;
 }
 let requestRates: Record<string, RateState> = {};
 let diskUsageCache: { data: Record<string, number>; timestamp: number } = { data: {}, timestamp: 0 };
@@ -29,6 +31,7 @@ interface TrafficMetrics {
     byDomain: Record<string, number>;
     errors4xxByDomain: Record<string, number>;
     errors5xxByDomain: Record<string, number>;
+    latencyByDomain?: Record<string, number>;
 }
 
 /**
@@ -67,28 +70,41 @@ export async function collectMetrics(): Promise<MetricsResult> {
 
             metrics.traffic.totalRequests = currentTotal;
 
-            // Calculate RPS
+            // Calculate Rates
             const prev = requestRates[domain];
             if (prev && now > prev.timestamp) {
                 const timeDelta = (now - prev.timestamp) / 1000;
-                const countDelta = currentTotal - prev.count;
-                metrics.traffic.requestsPerSec = Math.max(0, parseFloat((countDelta / timeDelta).toFixed(2)));
+                if (timeDelta > 0) {
+                    metrics.traffic.requestsPerSec = Math.max(0, parseFloat(((currentTotal - prev.count) / timeDelta).toFixed(2)));
+
+                    // Error Rates % = (delta_errors / delta_total) * 100
+                    const totalDelta = currentTotal - prev.count;
+                    if (totalDelta > 0) {
+                        metrics.traffic.errorRate4xx = Math.min(100, parseFloat(((errors4xx - (prev.errors4xx || 0)) / totalDelta * 100).toFixed(1)));
+                        metrics.traffic.errorRate5xx = Math.min(100, parseFloat(((errors5xx - (prev.errors5xx || 0)) / totalDelta * 100).toFixed(1)));
+                    } else {
+                        metrics.traffic.errorRate4xx = 0;
+                        metrics.traffic.errorRate5xx = 0;
+                    }
+                }
             } else {
                 metrics.traffic.requestsPerSec = 0;
+                metrics.traffic.errorRate4xx = 0;
+                metrics.traffic.errorRate5xx = 0;
             }
 
             // Update State
-            requestRates[domain] = { count: currentTotal, timestamp: now };
+            requestRates[domain] = {
+                count: currentTotal,
+                timestamp: now,
+                errors4xx,
+                errors5xx
+            };
 
-            // Calculate Error Rates % (Snapshot based? No, these are counters.
-            // Caddy metrics are cumulative totals. To get % rate we'd need delta/delta.
-            // For now, let's just expose raw count or 0 if no traffic.
-            // To do proper rates we need more state. Let's simplify: 
-            // Return raw counters or 0 for now, UI can show "Total 5xx".
-            // Implementation Plan asked for "Error Rates". 
-            // Let's defer complex rate logic to avoid overengineering in Step 1.
-            metrics.traffic.errorRate4xx = errors4xx;
-            metrics.traffic.errorRate5xx = errors5xx;
+            // Latency (Approximated from Caddy metrics if available)
+            if (caddyStats.latencyByDomain && caddyStats.latencyByDomain[domain]) {
+                metrics.traffic.p95Latency = caddyStats.latencyByDomain[domain];
+            }
         }
 
         // Add to result

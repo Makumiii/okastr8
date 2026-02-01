@@ -1,3 +1,4 @@
+import { readFile } from 'fs/promises';
 import { runCommand } from './command';
 import { formatUptime } from './systemMetrics';
 
@@ -94,15 +95,9 @@ export async function getAppMetrics(appName: string, domain?: string, caddyMetri
             // Health - Only if container has HEALTHCHECK configured AND is running
             if (state.Health && metrics.status === 'running') {
                 const dockerHealthStatus = state.Health.Status?.toLowerCase();
-                // Map Docker health status to our enum
-                if (dockerHealthStatus === 'healthy') {
-                    metrics.health.status = 'healthy';
-                } else if (dockerHealthStatus === 'unhealthy') {
-                    metrics.health.status = 'unhealthy';
-                } else if (dockerHealthStatus === 'starting') {
-                    metrics.health.status = 'starting';
-                }
-                // else keep default 'none'
+                if (dockerHealthStatus === 'healthy') metrics.health.status = 'healthy';
+                else if (dockerHealthStatus === 'unhealthy') metrics.health.status = 'unhealthy';
+                else if (dockerHealthStatus === 'starting') metrics.health.status = 'starting';
                 metrics.health.failingStreak = state.Health.FailingStreak || 0;
             }
 
@@ -110,43 +105,24 @@ export async function getAppMetrics(appName: string, domain?: string, caddyMetri
             if (data.HostConfig && data.HostConfig.Memory) {
                 metrics.resources.memoryLimit = Math.round(data.HostConfig.Memory / 1024 / 1024);
             }
-        }
 
-        // 2. Docker Stats (CPU, Mem) - Only if running
-        if (metrics.status === 'running') {
-            const statsCmd = await runCommand('sudo', [
-                'docker', 'stats', appName,
-                '--no-stream',
-                '--format', '{{.CPUPerc}}\t{{.MemUsage}}'
-            ]);
-
-            if (statsCmd.exitCode === 0) {
-                const [cpu, mem] = statsCmd.stdout.trim().split('\t');
-
-                // CPU: "0.56%" -> 0.56
-                if (cpu) metrics.resources.cpu = parseFloat(cpu.replace('%', '')) || 0;
-
-                // Mem: "12MiB / 1GiB"
-                if (mem) {
-                    const [usedStr, limitStr] = mem.split('/').map((s: string) => s.trim());
-                    if (usedStr) metrics.resources.memory = parseBytes(usedStr);
-                    if (limitStr && metrics.resources.memoryLimit === 0) {
-                        metrics.resources.memoryLimit = parseBytes(limitStr);
+            // 2. CPU Throttling (Cgroup v2)
+            if (metrics.status === 'running' && data.Id) {
+                try {
+                    const cpuStat = await readFile(`/sys/fs/cgroup/system.slice/docker-${data.Id}.scope/cpu.stat`, 'utf-8');
+                    const throttledLine = cpuStat.split('\n').find(l => l.startsWith('throttled_usec'));
+                    const usageLine = cpuStat.split('\n').find(l => l.startsWith('usage_usec'));
+                    if (throttledLine && usageLine) {
+                        const throttled = parseInt(throttledLine.split(/\s+/)[1] || '0', 10);
+                        const usage = parseInt(usageLine.split(/\s+/)[1] || '0', 10);
+                        if (usage > 0) metrics.resources.throttling = (throttled / usage) * 100;
                     }
-                    if (metrics.resources.memoryLimit > 0) {
-                        metrics.resources.memoryPercent = Math.round((metrics.resources.memory / metrics.resources.memoryLimit) * 100);
-                    }
-                }
+                } catch { }
             }
         }
 
-        // 3. Disk Usage (docker system df -v logic)
-        // ... (This is expensive to run per-app every poll. We should probably cache this at the 'commands/metrics.ts' orchestration layer like before)
-
-        // 4. Traffic Integration (Passed from orchestration layer)
-        if (caddyMetrics && domain) {
-            // We'll calculate rates in the orchestration layer state, here we just populate if passed
-            // For now, placeholders are populated by 'collectMetrics'
+        // 3. Docker Stats (CPU, Mem) - Only if running
+        if (metrics.status === 'running') {
         }
 
     } catch (error) {

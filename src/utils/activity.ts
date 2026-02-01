@@ -9,7 +9,7 @@ import { appendFile, readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { randomUUID } from 'crypto';
 
-export type ActivityType = 'login' | 'deploy' | 'resource';
+export type ActivityType = 'login' | 'deploy' | 'resource' | 'system';
 
 export interface ActivityEntry {
     id: string;

@@ -23,20 +23,37 @@ const ALERT_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour between repeated alerts
 const DEFAULT_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 // Default Thresholds (used if not configured in system.yaml)
-const SYSTEM_DEFAULTS: Record<string, { threshold: number; duration: string }> = {
-    cpu_usage: { threshold: 90, duration: '5m' },
-    ram_usage: { threshold: 90, duration: '5m' },
-    swap_usage: { threshold: 20, duration: '5m' },
-    disk_usage: { threshold: 90, duration: '5m' },
-    load_per_core: { threshold: 1.5, duration: '5m' },
+const SYSTEM_DEFAULTS: Record<string, { threshold: number; duration: string; unit?: string }> = {
+    cpu_usage: { threshold: 90, duration: '5m', unit: '%' },
+    cpu_steal: { threshold: 10, duration: '5m', unit: '%' },
+    ram_usage: { threshold: 90, duration: '5m', unit: '%' },
+    ram_available: { threshold: 500, duration: '5m', unit: 'MB' }, // Trigger if < 500
+    swap_usage: { threshold: 20, duration: '5m', unit: '%' },
+    swap_rate: { threshold: 50, duration: '5m', unit: 'MB/min' },
+    oom_kills: { threshold: 1, duration: '10m', unit: 'kills' },
+    disk_usage: { threshold: 90, duration: '5m', unit: '%' },
+    inode_usage: { threshold: 90, duration: '5m', unit: '%' },
+    disk_latency: { threshold: 50, duration: '5m', unit: 'ms' },
+    disk_saturation: { threshold: 80, duration: '5m', unit: '%' },
+    packet_drop_rate: { threshold: 1, duration: '5m', unit: '%' },
+    packet_error_rate: { threshold: 1, duration: '5m', unit: '%' },
+    fd_usage: { threshold: 80, duration: '5m', unit: '%' },
+    load_per_core: { threshold: 1.5, duration: '5m', unit: '' },
 };
 
-const APP_DEFAULTS: Record<string, { threshold: number; duration: string }> = {
-    cpu_usage: { threshold: 80, duration: '5m' },
-    memory_percent: { threshold: 80, duration: '5m' },
-    restart_count: { threshold: 3, duration: '10m' },
-    state_not_running: { threshold: 1, duration: '1m' },
-    healthcheck_failures: { threshold: 2, duration: '0m' }, // Immediate
+const APP_DEFAULTS: Record<string, { threshold: number; duration: string; unit?: string }> = {
+    cpu_usage: { threshold: 80, duration: '5m', unit: '%' },
+    cpu_throttling: { threshold: 10, duration: '5m', unit: '%' },
+    memory_percent: { threshold: 80, duration: '5m', unit: '%' },
+    restart_count: { threshold: 3, duration: '10m', unit: '' },
+    restarts_24h: { threshold: 10, duration: '24h', unit: '' },
+    state_not_running: { threshold: 1, duration: '1m', unit: '' },
+    healthcheck_failures: { threshold: 2, duration: '0m', unit: '' },
+    error_rate_5xx: { threshold: 5, duration: '5m', unit: '%' },
+    error_rate_4xx: { threshold: 30, duration: '5m', unit: '%' },
+    upstream_timeout_rate: { threshold: 1, duration: '5m', unit: '%' },
+    upstream_latency: { threshold: 2000, duration: '5m', unit: 'ms' },
+    volume_usage: { threshold: 80, duration: '5m', unit: '%' },
 };
 
 /**
@@ -145,87 +162,145 @@ async function checkSystemAlerts(
 ) {
     const getRule = (name: string) => rules[name] || SYSTEM_DEFAULTS[name] || { threshold: 90, duration: '5m' };
 
-    // CPU Usage
+    // CPU Usage & Steal
     const cpuRule = getRule('cpu_usage');
     const cpuThreshold = legacy?.cpu_threshold ?? cpuRule.threshold;
     if (shouldAlert('system:cpu', metrics.system.cpu.usage > cpuThreshold, parseDuration(cpuRule.duration || '5m'))) {
-        await sendSystemAlert('CPU', metrics.system.cpu.usage, cpuThreshold);
+        await sendSystemAlert('CPU Usage', metrics.system.cpu.usage, cpuThreshold, '%');
+    }
+    const stealRule = getRule('cpu_steal');
+    if (shouldAlert('system:steal', metrics.system.cpu.steal > stealRule.threshold, parseDuration(stealRule.duration || '5m'))) {
+        await sendSystemAlert('CPU Steal', metrics.system.cpu.steal, stealRule.threshold, '%');
     }
 
-    // RAM Usage
+    // RAM Usage & Available
     const ramRule = getRule('ram_usage');
     const ramThreshold = legacy?.ram_threshold ?? ramRule.threshold;
     if (shouldAlert('system:ram', metrics.system.memory.percent > ramThreshold, parseDuration(ramRule.duration || '5m'))) {
-        await sendSystemAlert('RAM', metrics.system.memory.percent, ramThreshold);
+        await sendSystemAlert('RAM Usage', metrics.system.memory.percent, ramThreshold, '%');
+    }
+    const availRule = getRule('ram_available');
+    if (shouldAlert('system:ram_avail', metrics.system.memory.available < availRule.threshold, parseDuration(availRule.duration || '5m'))) {
+        await sendSystemAlert('RAM Available', metrics.system.memory.available, availRule.threshold, 'MB', true);
     }
 
-    // Swap Usage
+    // Swap Usage & Rate
     const swapRule = getRule('swap_usage');
     if (shouldAlert('system:swap', metrics.system.swap.percent > swapRule.threshold, parseDuration(swapRule.duration || '5m'))) {
-        await sendSystemAlert('Swap', metrics.system.swap.percent, swapRule.threshold);
+        await sendSystemAlert('Swap Usage', metrics.system.swap.percent, swapRule.threshold, '%');
+    }
+    const swapRateRule = getRule('swap_rate');
+    const maxSwapRate = Math.max(metrics.system.swap.inRate, metrics.system.swap.outRate);
+    if (shouldAlert('system:swap_rate', maxSwapRate > swapRateRule.threshold, parseDuration(swapRateRule.duration || '5m'))) {
+        await sendSystemAlert('Swap Rate', maxSwapRate, swapRateRule.threshold, 'MB/min');
     }
 
-    // Disk Usage (per mount)
+    // Health: OOM Kills
+    const oomRule = getRule('oom_kills');
+    if (shouldAlert('system:oom', metrics.system.health.oomKills >= oomRule.threshold, parseDuration(oomRule.duration || '10m'))) {
+        await sendSystemAlert('OOM Kills', metrics.system.health.oomKills, oomRule.threshold, 'kills');
+    }
+
+    // Disk Usage & Inodes & I/O
     const diskRule = getRule('disk_usage');
     const diskThreshold = legacy?.disk_threshold ?? diskRule.threshold;
+    const inodeRule = getRule('inode_usage');
+    const ioRule = getRule('disk_saturation');
+
     for (const mount of metrics.system.disk.mounts) {
-        const key = `system:disk:${mount.mount}`;
-        if (shouldAlert(key, mount.percent > diskThreshold, parseDuration(diskRule.duration || '5m'))) {
-            await sendSystemAlert(`Disk (${mount.mount})`, mount.percent, diskThreshold);
+        // Space
+        if (shouldAlert(`system:disk:${mount.mount}:space`, mount.percent > diskThreshold, parseDuration(diskRule.duration || '5m'))) {
+            await sendSystemAlert(`Disk Space (${mount.mount})`, mount.percent, diskThreshold, '%');
         }
+        // Inodes
+        if (shouldAlert(`system:disk:${mount.mount}:inodes`, mount.inodesPercent > inodeRule.threshold, parseDuration(inodeRule.duration || '5m'))) {
+            await sendSystemAlert(`Disk Inodes (${mount.mount})`, mount.inodesPercent, inodeRule.threshold, '%');
+        }
+    }
+    // Saturation
+    if (shouldAlert('system:disk_busy', metrics.system.disk.io.busyPercent > ioRule.threshold, parseDuration(ioRule.duration || '5m'))) {
+        await sendSystemAlert('Disk Saturation', metrics.system.disk.io.busyPercent, ioRule.threshold, '%');
+    }
+
+    // Network & Connections
+    const dropRule = getRule('packet_drop_rate');
+    const errRule = getRule('packet_error_rate');
+    const fdRule = getRule('fd_usage');
+
+    // Limits
+    if (shouldAlert('system:fd', metrics.system.limits.fileDescriptors.percent > fdRule.threshold, parseDuration(fdRule.duration || '5m'))) {
+        await sendSystemAlert('File Descriptors', metrics.system.limits.fileDescriptors.percent, fdRule.threshold, '%');
     }
 
     // Load per Core
     const loadRule = getRule('load_per_core');
     const loadPerCore = metrics.system.load.avg1 / metrics.system.cpu.cores;
     if (shouldAlert('system:load', loadPerCore > loadRule.threshold, parseDuration(loadRule.duration || '5m'))) {
-        await sendSystemAlert('Load/Core', parseFloat(loadPerCore.toFixed(2)), loadRule.threshold);
+        await sendSystemAlert('Load/Core', parseFloat(loadPerCore.toFixed(2)), loadRule.threshold, '');
     }
 }
 
-/**
- * Check Per-App Alerts
- */
+// Persisted state for reboot detection
+let lastBootTime: number | null = null;
+
 async function checkAppAlerts(
     metrics: MetricsResult,
     defaults: Record<string, { threshold: number; duration?: string }>,
     overrides: Record<string, Record<string, { threshold: number; duration?: string }>>
 ) {
+    // 1. System Reboot Check
+    if (metrics.system.health.bootTime) {
+        if (lastBootTime !== null && metrics.system.health.bootTime > lastBootTime + 5) {
+            // Boot time changed significantly -> Reboot
+            await sendSystemAlert('System Reboot', new Date(metrics.system.health.bootTime * 1000).toLocaleString(), 0, '', true);
+            await logActivity('system', { event: 'reboot', bootTime: metrics.system.health.bootTime });
+        }
+        lastBootTime = metrics.system.health.bootTime;
+    }
+
     for (const app of metrics.apps) {
         const appName = app.name;
         const appOverrides = overrides[appName] || {};
-
         const getRule = (name: string) => appOverrides[name] || defaults[name] || APP_DEFAULTS[name] || { threshold: 80, duration: '5m' };
 
         // State (Not Running)
         const stateRule = getRule('state_not_running');
-        const isNotRunning = app.status !== 'running';
-        if (shouldAlert(`app:${appName}:state`, isNotRunning, parseDuration(stateRule.duration || '1m'))) {
+        if (shouldAlert(`app:${appName}:state`, app.status !== 'running', parseDuration(stateRule.duration || '1m'))) {
             await sendAppAlert(appName, 'State', app.status, 'running');
         }
 
-        // CPU Usage
+        // Resources
         const cpuRule = getRule('cpu_usage');
         if (shouldAlert(`app:${appName}:cpu`, app.resources.cpu > cpuRule.threshold, parseDuration(cpuRule.duration || '5m'))) {
-            await sendAppAlert(appName, 'CPU', app.resources.cpu, cpuRule.threshold);
+            await sendAppAlert(appName, 'CPU Usage', app.resources.cpu, cpuRule.threshold, '%');
         }
-
-        // Memory Percent
+        const throttleRule = getRule('cpu_throttling');
+        if (app.resources.throttling && shouldAlert(`app:${appName}:throttle`, app.resources.throttling > throttleRule.threshold, parseDuration(throttleRule.duration || '5m'))) {
+            await sendAppAlert(appName, 'CPU Throttling', app.resources.throttling, throttleRule.threshold, '%');
+        }
         const memRule = getRule('memory_percent');
         if (app.resources.memoryLimit > 0 && shouldAlert(`app:${appName}:mem`, app.resources.memoryPercent > memRule.threshold, parseDuration(memRule.duration || '5m'))) {
-            await sendAppAlert(appName, 'Memory', app.resources.memoryPercent, memRule.threshold);
+            await sendAppAlert(appName, 'Memory Usage', app.resources.memoryPercent, memRule.threshold, '%');
         }
 
-        // Restart Count (if available, detected from Docker inspect)
+        // Restarts & Health
         const restartRule = getRule('restart_count');
         if (shouldAlert(`app:${appName}:restarts`, app.restarts.count >= restartRule.threshold, parseDuration(restartRule.duration || '10m'))) {
             await sendAppAlert(appName, 'Restart Count', app.restarts.count, restartRule.threshold);
         }
-
-        // Healthcheck Failures
         const healthRule = getRule('healthcheck_failures');
         if (shouldAlert(`app:${appName}:health`, app.health.failingStreak >= healthRule.threshold, parseDuration(healthRule.duration || '0m'))) {
             await sendAppAlert(appName, 'Healthcheck Failures', app.health.failingStreak, healthRule.threshold);
+        }
+
+        // Traffic & Latency
+        const err5Rule = getRule('error_rate_5xx');
+        if (app.traffic.totalRequests > 50 && shouldAlert(`app:${appName}:5xx`, app.traffic.errorRate5xx > err5Rule.threshold, parseDuration(err5Rule.duration || '5m'))) {
+            await sendAppAlert(appName, '5xx Error Rate', app.traffic.errorRate5xx, err5Rule.threshold, '%');
+        }
+        const latRule = getRule('upstream_latency');
+        if (app.traffic.p95Latency && shouldAlert(`app:${appName}:latency`, app.traffic.p95Latency > latRule.threshold, parseDuration(latRule.duration || '5m'))) {
+            await sendAppAlert(appName, 'p95 Latency', app.traffic.p95Latency, latRule.threshold, 'ms');
         }
     }
 }
@@ -233,20 +308,21 @@ async function checkAppAlerts(
 /**
  * Send System Alert Email
  */
-async function sendSystemAlert(resource: string, current: number | string, threshold: number) {
+async function sendSystemAlert(resource: string, current: number | string, threshold: number, unit: string = '%', lowerThan: boolean = false) {
+    const operator = lowerThan ? '<' : '>';
     const html = `
 <!DOCTYPE html>
 <html>
 <body style="font-family: sans-serif; color: #333;">
-    <h2 style="color: #DC2626;">🚨 High ${resource} Usage Alert</h2>
-    <p>Your server resource usage has exceeded the configured threshold for the required duration.</p>
+    <h2 style="color: #DC2626;">🚨 System Alert: ${resource}</h2>
+    <p>Your server resource ${resource} has crossed the threshold.</p>
     
     <div style="background: #FEF2F2; border: 1px solid #FCA5A5; padding: 15px; border-radius: 6px; margin: 20px 0;">
         <p style="margin: 0; font-size: 18px;">
-            <strong>${resource} Usage:</strong> <span style="color: #DC2626; font-size: 24px;">${current}%</span>
+            <strong>${resource}:</strong> <span style="color: #DC2626; font-size: 24px;">${current}${unit}</span>
         </p>
         <p style="margin: 5px 0 0 0; color: #7F1D1D; font-size: 14px;">
-            Threshold: ${threshold}%
+            Threshold: ${operator} ${threshold}${unit}
         </p>
     </div>
 
@@ -256,15 +332,15 @@ async function sendSystemAlert(resource: string, current: number | string, thres
 </body>
 </html>`;
 
-    console.log(`[ALERT] System ${resource}: ${current}% > ${threshold}%`);
-    await logActivity('resource', { resource, current, threshold, type: 'system' });
-    await sendAdminEmail(`Alert: High ${resource} Usage (${current}%)`, html);
+    console.log(`[ALERT] System ${resource}: ${current}${unit} ${operator} ${threshold}${unit}`);
+    await logActivity('resource', { resource, current, threshold, type: 'system', unit });
+    await sendAdminEmail(`Alert: ${resource} (${current}${unit})`, html);
 }
 
 /**
  * Send Per-App Alert Email
  */
-async function sendAppAlert(appName: string, metric: string, current: number | string, threshold: number | string) {
+async function sendAppAlert(appName: string, metric: string, current: number | string, threshold: number | string, unit: string = '') {
     const html = `
 <!DOCTYPE html>
 <html>
@@ -277,7 +353,7 @@ async function sendAppAlert(appName: string, metric: string, current: number | s
             <strong>App:</strong> ${appName}
         </p>
         <p style="margin: 5px 0 0 0; font-size: 16px;">
-            <strong>${metric}:</strong> <span style="color: #DC2626;">${current}</span> (Threshold: ${threshold})
+            <strong>${metric}:</strong> <span style="color: #DC2626;">${current}${unit}</span> (Threshold: ${threshold}${unit})
         </p>
     </div>
 
@@ -287,7 +363,7 @@ async function sendAppAlert(appName: string, metric: string, current: number | s
 </body>
 </html>`;
 
-    console.log(`[ALERT] App ${appName} - ${metric}: ${current} > ${threshold}`);
-    await logActivity('resource', { resource: metric, current, threshold, type: 'app', app: appName });
-    await sendAdminEmail(`Alert: ${appName} - High ${metric} (${current})`, html);
+    console.log(`[ALERT] App ${appName} - ${metric}: ${current}${unit} > ${threshold}${unit}`);
+    await logActivity('resource', { resource: metric, current, threshold, type: 'app', app: appName, unit });
+    await sendAdminEmail(`Alert: ${appName} - ${metric} (${current}${unit})`, html);
 }

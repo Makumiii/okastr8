@@ -15,6 +15,8 @@
         Network,
         RefreshCw,
         Heart,
+        ArrowDown,
+        ArrowUp,
     } from "lucide-svelte";
 
     // App metrics from new backend structure
@@ -27,6 +29,7 @@
             memory: number;
             memoryPercent: number;
             memoryLimit: number;
+            throttling?: number;
         };
         uptime: {
             seconds: number;
@@ -39,6 +42,7 @@
         restarts: {
             count: number;
             lastExitCode?: number;
+            lastExitReason?: string;
         };
         traffic: {
             totalRequests: number;
@@ -55,18 +59,27 @@
     // Backend response structure
     interface BackendMetrics {
         system: {
-            cpu: { usage: number; cores: number; model: string; speed: number };
+            cpu: {
+                usage: number;
+                cores: number;
+                model: string;
+                speed: number;
+                steal: number;
+            };
             memory: {
                 used: number;
                 total: number;
                 percent: number;
                 free: number;
                 available: number;
+                cached?: number; // Optional, might be added later
             };
             swap: {
                 used: number;
                 total: number;
                 percent: number;
+                inRate: number;
+                outRate: number;
             };
             disk: {
                 mounts: {
@@ -75,8 +88,13 @@
                     total: number;
                     percent: number;
                     free: number;
+                    inodesPercent: number;
                 }[];
-                io: { readPerSec: number; writePerSec: number };
+                io: {
+                    readPerSec: number;
+                    writePerSec: number;
+                    busyPercent: number;
+                };
             };
             network: {
                 interfaces: {
@@ -86,6 +104,20 @@
                 }[];
                 totalRxPerSec: number;
                 totalTxPerSec: number;
+                retransmits: number;
+                activeConnections: number;
+            };
+            limits: {
+                fileDescriptors: {
+                    used: number;
+                    total: number;
+                    percent: number;
+                };
+            };
+            health: {
+                oomKills: number;
+                unexpectedReboot: boolean;
+                bootTime?: number;
             };
             load: { avg1: number; avg5: number; avg15: number };
             uptime: { seconds: number; readable: string };
@@ -148,6 +180,18 @@
         const sizes = ["B", "KB", "MB", "GB", "TB"];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+    }
+
+    function formatRate(bytesPerSec: number): string {
+        if (bytesPerSec === 0) return "0 B/s";
+        const k = 1024;
+        const sizes = ["B/s", "KB/s", "MB/s", "GB/s"];
+        const i = Math.floor(Math.log(bytesPerSec) / Math.log(k));
+        return (
+            parseFloat((bytesPerSec / Math.pow(k, i)).toFixed(1)) +
+            " " +
+            sizes[i]
+        );
     }
 
     function getColor(percent: number): string {
@@ -268,9 +312,25 @@
                 >
                     CPU
                 </h3>
-                <p class="text-xs text-[var(--text-secondary)]">
-                    {metrics.system.cpu.cores} cores
+                <p
+                    class="text-[10px] text-[var(--text-secondary)] font-medium text-center px-2 truncate w-full"
+                    title={metrics.system.cpu.model}
+                >
+                    {metrics.system.cpu.model}
                 </p>
+                <div class="mt-1 flex flex-col items-center gap-0.5">
+                    <p
+                        class="text-[10px] text-[var(--text-tertiary)] uppercase font-bold"
+                    >
+                        {metrics.system.cpu.cores} cores @ {metrics.system.cpu
+                            .speed}MHz
+                    </p>
+                    {#if (metrics.system.cpu.steal || 0) > 0}
+                        <p class="text-[10px] text-[var(--error)] font-bold">
+                            Steal: {metrics.system.cpu.steal}%
+                        </p>
+                    {/if}
+                </div>
             </Card>
 
             <!-- Memory -->
@@ -328,6 +388,18 @@
                     {metrics.system.memory.used} / {metrics.system.memory.total}
                     MB
                 </p>
+                <p
+                    class="text-[10px] text-[var(--text-tertiary)] font-bold mt-1 uppercase"
+                >
+                    {metrics.system.memory.available} MB Available
+                </p>
+                {#if (metrics.system.memory.cached || 0) > 0}
+                    <p
+                        class="text-[10px] text-[var(--text-tertiary)] font-bold uppercase"
+                    >
+                        {metrics.system.memory.cached} MB Cached
+                    </p>
+                {/if}
             </Card>
 
             <!-- Swap -->
@@ -384,6 +456,20 @@
                 <p class="text-xs text-[var(--text-secondary)]">
                     {metrics.system.swap.used} / {metrics.system.swap.total} MB
                 </p>
+                <div class="mt-1 flex gap-2 text-[9px] font-mono font-bold">
+                    <span
+                        class={(metrics.system.swap.inRate || 0) > 0
+                            ? "text-[var(--warning)]"
+                            : "text-[var(--text-tertiary)]"}
+                        >IN: {metrics.system.swap.inRate || 0} MB/m</span
+                    >
+                    <span
+                        class={(metrics.system.swap.outRate || 0) > 0
+                            ? "text-[var(--warning)]"
+                            : "text-[var(--text-tertiary)]"}
+                        >OUT: {metrics.system.swap.outRate || 0} MB/m</span
+                    >
+                </div>
             </Card>
 
             <!-- Uptime -->
@@ -397,6 +483,159 @@
                 <p class="text-xl font-bold text-[var(--text-primary)]">
                     {metrics.system.uptime.readable}
                 </p>
+            </Card>
+            <!-- Network & I/O Advanced -->
+            <Card>
+                <div class="flex items-center justify-between mb-4">
+                    <h3
+                        class="flex items-center gap-2 font-bold uppercase text-[var(--text-tertiary)]"
+                    >
+                        <span
+                            class="i-heroicons-globe-alt text-[var(--primary)]"
+                        ></span>
+                        Network & I/O
+                    </h3>
+                </div>
+                <div class="space-y-4">
+                    <!-- Network Stats -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <div
+                            class="bg-[var(--surface-dark)] p-2 rounded-[var(--radius-sm)]"
+                        >
+                            <p
+                                class="text-[9px] uppercase font-bold text-[var(--text-tertiary)] mb-0.5"
+                            >
+                                Active Conns
+                            </p>
+                            <p
+                                class="text-sm font-mono font-bold text-[var(--text-primary)]"
+                            >
+                                {metrics.system.network.activeConnections || 0}
+                            </p>
+                        </div>
+                        <div
+                            class="bg-[var(--surface-dark)] p-2 rounded-[var(--radius-sm)]"
+                        >
+                            <p
+                                class="text-[9px] uppercase font-bold text-[var(--text-tertiary)] mb-0.5"
+                            >
+                                TCP Retrans
+                            </p>
+                            <p
+                                class="text-sm font-mono font-bold {metrics
+                                    .system.network.retransmits > 50
+                                    ? 'text-[var(--error)]'
+                                    : 'text-[var(--text-primary)]'}"
+                            >
+                                {metrics.system.network.retransmits || 0}
+                            </p>
+                        </div>
+                    </div>
+                    <!-- Disk I/O -->
+                    <div class="pt-2 border-t border-[var(--border)]">
+                        <div class="flex justify-between items-center mb-1">
+                            <span
+                                class="text-[10px] uppercase font-bold text-[var(--text-tertiary)]"
+                                >Disk I/O Saturation</span
+                            >
+                            <span
+                                class="text-[10px] font-bold text-[var(--text-secondary)]"
+                                >{metrics.system.disk.io.busyPercent}%</span
+                            >
+                        </div>
+                        <div
+                            class="h-1.5 w-full rounded-full bg-[var(--border)] overflow-hidden"
+                        >
+                            <div
+                                class="h-full bg-[var(--warning)] rounded-full"
+                                style="width: {metrics.system.disk.io
+                                    .busyPercent}%"
+                            ></div>
+                        </div>
+                        <div
+                            class="flex justify-between mt-2 text-[10px] font-mono"
+                        >
+                            <span class="text-[var(--text-secondary)]"
+                                >R: {metrics.system.disk.io
+                                    .readPerSec}MB/s</span
+                            >
+                            <span class="text-[var(--text-secondary)]"
+                                >W: {metrics.system.disk.io
+                                    .writePerSec}MB/s</span
+                            >
+                        </div>
+                    </div>
+                </div>
+            </Card>
+
+            <!-- System Health & Status -->
+            <Card>
+                <div class="flex items-center justify-between mb-4">
+                    <h3
+                        class="flex items-center gap-2 font-bold uppercase text-[var(--text-tertiary)]"
+                    >
+                        <span class="i-heroicons-heart text-[var(--error)]"
+                        ></span>
+                        System Health
+                    </h3>
+                </div>
+                <div class="space-y-3">
+                    <div
+                        class="flex justify-between items-center p-2 bg-[var(--surface-dark)] rounded-[var(--radius-sm)]"
+                    >
+                        <span
+                            class="text-xs font-medium text-[var(--text-secondary)]"
+                            >OOM Kills</span
+                        >
+                        <span
+                            class="text-xs font-bold font-mono {metrics.system
+                                .health.oomKills > 0
+                                ? 'text-[var(--error)] animate-pulse'
+                                : 'text-[var(--success)]'}"
+                            >{metrics.system.health.oomKills || 0}</span
+                        >
+                    </div>
+                    <div
+                        class="flex justify-between items-center p-2 bg-[var(--surface-dark)] rounded-[var(--radius-sm)]"
+                    >
+                        <span
+                            class="text-xs font-medium text-[var(--text-secondary)]"
+                            >Reboot Status</span
+                        >
+                        <span
+                            class="text-xs font-bold uppercase {metrics.system
+                                .health.unexpectedReboot
+                                ? 'text-[var(--error)]'
+                                : 'text-[var(--success)]'}"
+                        >
+                            {metrics.system.health.unexpectedReboot
+                                ? "UNEXPECTED"
+                                : "Stable"}
+                        </span>
+                    </div>
+                    <div class="pt-2 border-t border-[var(--border)]">
+                        <div class="flex justify-between items-center mb-1">
+                            <span
+                                class="text-[10px] uppercase font-bold text-[var(--text-tertiary)]"
+                                >File Descriptors</span
+                            >
+                            <span
+                                class="text-[10px] font-bold text-[var(--text-secondary)]"
+                                >{metrics.system.limits.fileDescriptors
+                                    .percent || 0}%</span
+                            >
+                        </div>
+                        <div
+                            class="h-1.5 w-full rounded-full bg-[var(--border)] overflow-hidden"
+                        >
+                            <div
+                                class="h-full bg-[var(--primary)] rounded-full"
+                                style="width: {metrics.system.limits
+                                    .fileDescriptors.percent}%"
+                            ></div>
+                        </div>
+                    </div>
+                </div>
             </Card>
         </div>
 
@@ -421,32 +660,71 @@
                 {/if}
             </h3>
             <div class="grid gap-4 md:grid-cols-3">
-                {#each metrics.system.disk.mounts as mount}
-                    <div
-                        class="rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] p-4"
-                    >
-                        <p
-                            class="text-sm font-medium text-[var(--text-primary)] mb-2"
-                        >
-                            {mount.mount}
-                        </p>
-                        <div
-                            class="h-2 w-full rounded-full bg-[var(--border)] overflow-hidden mb-1"
-                        >
-                            <div
-                                class="h-full rounded-full transition-all duration-300"
-                                style="width: {mount.percent}%; background-color: {getColor(
-                                    mount.percent,
-                                )}"
-                            ></div>
-                        </div>
-                        <p class="text-xs text-[var(--text-secondary)]">
-                            {formatBytes(mount.used)} / {formatBytes(
-                                mount.total,
-                            )} ({mount.percent}%)
-                        </p>
-                    </div>
-                {/each}
+                <div class="col-span-3 overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-[var(--surface-dark)]">
+                            <tr>
+                                <th
+                                    class="p-3 text-left text-xs font-bold uppercase text-[var(--text-tertiary)]"
+                                    >Mount</th
+                                >
+                                <th
+                                    class="p-3 text-left text-xs font-bold uppercase text-[var(--text-tertiary)]"
+                                    >Usage</th
+                                >
+                                <th
+                                    class="p-3 text-left text-xs font-bold uppercase text-[var(--text-tertiary)]"
+                                    >Inodes</th
+                                >
+                                <th
+                                    class="p-3 text-right text-xs font-bold uppercase text-[var(--text-tertiary)]"
+                                    >Capacity</th
+                                >
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-[var(--border)]">
+                            {#each metrics.system.disk.mounts as mount}
+                                <tr class="hover:bg-[var(--surface-dark)]">
+                                    <td
+                                        class="p-3 text-sm font-medium text-[var(--text-primary)]"
+                                        >{mount.mount}</td
+                                    >
+                                    <td class="p-3">
+                                        <div class="flex items-center gap-2">
+                                            <div
+                                                class="h-2 w-24 rounded-full bg-[var(--border)]"
+                                            >
+                                                <div
+                                                    class="h-full rounded-full bg-[var(--primary)]"
+                                                    style="width: {mount.percent}%"
+                                                ></div>
+                                            </div>
+                                            <span
+                                                class="text-xs font-bold text-[var(--text-secondary)]"
+                                                >{mount.percent}%</span
+                                            >
+                                        </div>
+                                    </td>
+                                    <td class="p-3">
+                                        <span
+                                            class="text-xs font-medium {(mount.inodesPercent ||
+                                                0) > 80
+                                                ? 'text-[var(--error)] animate-pulse'
+                                                : 'text-[var(--text-secondary)]'}"
+                                        >
+                                            {mount.inodesPercent || 0}%
+                                        </span>
+                                    </td>
+                                    <td
+                                        class="p-3 text-right text-sm text-[var(--text-secondary)] italic"
+                                    >
+                                        {formatBytes(mount.total)}
+                                    </td>
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </Card>
 
@@ -485,6 +763,86 @@
                         </p>
                     </div>
                 {/each}
+            </div>
+        </Card>
+
+        <!-- Network Traffic -->
+        <Card>
+            <h3
+                class="mb-4 text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2"
+            >
+                <Network size={18} /> Network Traffic
+            </h3>
+
+            <!-- Global Rates -->
+            <div class="grid gap-4 md:grid-cols-2 mb-6">
+                <div
+                    class="rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] p-4 border-l-4 border-[var(--success)]"
+                >
+                    <p
+                        class="text-xs font-bold uppercase text-[var(--text-tertiary)] mb-1"
+                    >
+                        Total Download
+                    </p>
+                    <p class="text-2xl font-bold text-[var(--text-primary)]">
+                        {formatRate(metrics.system.network.totalRxPerSec)}
+                    </p>
+                </div>
+                <div
+                    class="rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] p-4 border-l-4 border-[var(--primary)]"
+                >
+                    <p
+                        class="text-xs font-bold uppercase text-[var(--text-tertiary)] mb-1"
+                    >
+                        Total Upload
+                    </p>
+                    <p class="text-2xl font-bold text-[var(--text-primary)]">
+                        {formatRate(metrics.system.network.totalTxPerSec)}
+                    </p>
+                </div>
+            </div>
+
+            <!-- per Interface -->
+            <div class="space-y-2">
+                <p
+                    class="text-xs font-bold uppercase text-[var(--text-tertiary)] px-1"
+                >
+                    Interfaces
+                </p>
+                <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {#each metrics.system.network.interfaces as iface}
+                        <div
+                            class="flex items-center justify-between p-3 rounded-[var(--radius-sm)] bg-[var(--bg-sidebar)] hover:bg-[var(--border)] transition-colors"
+                        >
+                            <div class="flex items-center gap-2">
+                                <Activity
+                                    size={14}
+                                    class="text-[var(--text-tertiary)]"
+                                />
+                                <span
+                                    class="text-sm font-medium text-[var(--text-primary)]"
+                                    >{iface.name}</span
+                                >
+                            </div>
+                            <div
+                                class="flex flex-col items-end text-[10px] font-mono"
+                            >
+                                <div
+                                    class="flex items-center gap-1 text-[var(--success)]"
+                                >
+                                    <ArrowDown size={10} />
+                                    <span>{formatBytes(iface.rxBytes)}</span>
+                                </div>
+                                <div
+                                    class="flex items-center gap-1 text-[var(--primary)]"
+                                >
+                                    <ArrowUp size={10} />
+                                    <span>{formatBytes(iface.txBytes)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    {/each}
+                </div>
             </div>
         </Card>
 

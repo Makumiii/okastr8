@@ -8,19 +8,21 @@ export interface SystemMetrics {
         cores: number;
         model: string;
         speed: number;
+        steal: number;     // Percentage
     };
     memory: {
         used: number;      // MB
         total: number;     // MB
         percent: number;   // Percentage used
         free: number;      // MB
-        available: number; // MB (estimated via free + buffers/cache - not strictly available in Node os module without parsing /proc/meminfo)
+        available: number; // MB
     };
     swap: {
         used: number;      // MB
         total: number;     // MB
         percent: number;
-        swapping: boolean; // Heuristic based on recent calls? No, simplistic snapshot for now.
+        inRate: number;    // MB/min
+        outRate: number;   // MB/min
     };
     disk: {
         mounts: {
@@ -29,10 +31,13 @@ export interface SystemMetrics {
             total: number; // Bytes
             percent: number;
             free: number;  // Bytes
+            inodesPercent: number;
         }[];
         io: {
-            readPerSec: number;  // Bytes/sec (snapshot diff needed by caller or state?)
-            writePerSec: number; // Bytes/sec
+            readPerSec: number;
+            writePerSec: number;
+            busyPercent: number;
+            latencyMs: number;
         };
     };
     network: {
@@ -45,8 +50,17 @@ export interface SystemMetrics {
             rxDropped: number;
             txDropped: number;
         }[];
-        totalRxPerSec: number; // Calculated by caller state or internally
+        totalRxPerSec: number;
         totalTxPerSec: number;
+        retransmits: number;
+        activeConnections: number;
+    };
+    limits: {
+        fileDescriptors: {
+            used: number;
+            total: number;
+            percent: number;
+        };
     };
     load: {
         avg1: number;
@@ -56,6 +70,11 @@ export interface SystemMetrics {
     uptime: {
         seconds: number;
         readable: string;
+    };
+    health: {
+        oomKills: number;
+        unexpectedReboot: boolean;
+        bootTime?: number; // Unix timestamp
     };
 }
 
@@ -72,123 +91,251 @@ export function formatUptime(seconds: number): string {
     return `${minutes}m`;
 }
 
+// State for calculating throughput (rates)
+let lastState: {
+    timestamp: number;
+    cpu: { total: number; steal: number };
+    network: Record<string, { rx: number; tx: number }>;
+    swap: { in: number; out: number };
+    disk: Record<string, { read: number; write: number; active: number }>;
+} | null = null;
+
+let bootTime: number | null = null;
+
 /**
  * Collect raw system metrics
  */
 export async function getDetailedSystemMetrics(): Promise<SystemMetrics> {
+    const now = Date.now();
     const uptimeSec = osUptime();
     const load = loadavg();
     const cpuList = cpus();
     const cores = cpuList.length;
 
-    // 1. CPU Usage (Instantaneous Snapshot)
-    // To get accurate %, we need two samples. For stateless call, we rely on load avg approximation or simple non-blocking trick if possible.
-    // However, existing metrics.ts used load/cores. We can do better by reading /proc/stat if Linux.
-    const cpuUsage = Math.min(100, ((load[0] || 0) / cores) * 100);
+    // 1. CPU Usage & Steal
+    let cpuUsage = Math.min(100, ((load[0] || 0) / cores) * 100);
+    let cpuStealPercent = 0;
+    try {
+        const stat = await readFile('/proc/stat', 'utf-8');
+        const statLines = stat.split('\n');
 
-    // 2. Memory (parsing /proc/meminfo for accuracy on Linux)
+        // Boot time (Unix timestamp)
+        const btimeLine = statLines.find(l => l.startsWith('btime '));
+        bootTime = btimeLine ? parseInt(btimeLine.split(/\s+/)[1] || '0', 10) : 0;
+
+        const cpuLine = statLines.find(l => l.startsWith('cpu '));
+        if (cpuLine) {
+            const parts = cpuLine.trim().split(/\s+/).slice(1).map(Number);
+            // user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice
+            const total = parts.reduce((a, b) => a + b, 0);
+            const steal = parts[7] || 0;
+
+            if (lastState && lastState.cpu) {
+                const totalDelta = total - lastState.cpu.total;
+                const stealDelta = steal - lastState.cpu.steal;
+                if (totalDelta > 0) {
+                    cpuStealPercent = (stealDelta / totalDelta) * 100;
+                }
+            }
+
+            // Update boot time (btime)
+            const btimeLine = stat.split('\n').find(l => l.startsWith('btime '));
+            if (btimeLine) {
+                const btime = parseInt(btimeLine.split(' ')[1] || '0', 10);
+                if (bootTime && btime !== bootTime) {
+                    // Unexpected reboot detected logic would go here or in monitor
+                }
+                bootTime = btime;
+            }
+
+            if (!lastState) lastState = { timestamp: now, cpu: { total, steal }, network: {}, swap: { in: 0, out: 0 }, disk: {} };
+            else {
+                lastState.cpu = { total, steal };
+            }
+        }
+    } catch { }
+
+    // 2. Memory & VMStat (OOM, Swap Rates)
     let memTotal = totalmem();
     let memFree = freemem();
     let memAvailable = memFree;
     let swapTotal = 0;
     let swapFree = 0;
+    let oomKills = 0;
+    let swapInRate = 0;
+    let swapOutRate = 0;
 
     try {
         const memInfo = await readFile('/proc/meminfo', 'utf-8');
         const lines = memInfo.split('\n');
-        const parseLine = (key: string) => {
+        const parseMem = (key: string) => {
             const line = lines.find(l => l.startsWith(key));
-            if (!line) return 0;
-            const match = line.match(/(\d+)/);
-            return match ? parseInt(match[1], 10) * 1024 : 0; // kB to Bytes
+            return line ? parseInt(line.match(/(\d+)/)?.[1] || '0', 10) * 1024 : 0;
         };
+        memAvailable = parseMem('MemAvailable:');
+        swapTotal = parseMem('SwapTotal:');
+        swapFree = parseMem('SwapFree:');
 
-        const procMemTotal = parseLine('MemTotal:');
-        if (procMemTotal > 0) memTotal = procMemTotal;
+        const vmstat = await readFile('/proc/vmstat', 'utf-8');
+        const vmLines = vmstat.split('\n');
+        const parseVm = (key: string) => parseInt(vmLines.find(l => l.startsWith(key))?.split(/\s+/)[1] || '0', 10);
 
-        memAvailable = parseLine('MemAvailable:');
-        swapTotal = parseLine('SwapTotal:');
-        swapFree = parseLine('SwapFree:');
-    } catch {
-        // Fallback to os module (already set defaults)
-    }
+        oomKills = parseVm('oom_kill');
+        const pswpin = parseVm('pswpin');
+        const pswpout = parseVm('pswpout');
+
+        if (lastState && lastState.swap) {
+            const timeDeltaMin = (now - lastState.timestamp) / 60000;
+            if (timeDeltaMin > 0) {
+                swapInRate = Math.max(0, (pswpin - lastState.swap.in) * 4096 / 1024 / 1024 / timeDeltaMin); // pages to MB/min
+                swapOutRate = Math.max(0, (pswpout - lastState.swap.out) * 4096 / 1024 / 1024 / timeDeltaMin);
+            }
+        }
+        if (lastState) lastState.swap = { in: pswpin, out: pswpout };
+    } catch { }
 
     const memUsed = memTotal - memAvailable;
     const swapUsed = swapTotal - swapFree;
 
-    // 3. Disk Usage (Multi-mount)
+    // 3. Disk Usage & Inodes & I/O
     const diskMounts = [];
+    const EXCLUDED_FS_TYPES = ['squashfs', 'tmpfs', 'devtmpfs', 'overlay', 'proc', 'sysfs', 'cgroup', 'rpc_pipefs', 'securityfs', 'efivarfs', 'vfat'];
+    const EXCLUDED_PATH_PREFIXES = ['/var/lib/snapd', '/snap', '/proc', '/sys', '/run', '/dev'];
+
     try {
-        // df -B1 -P (Posix portability, bytes)
-        const { stdout } = await runCommand('df', ['-B1', '-P']);
-        const lines = stdout.trim().split('\n').slice(1);
-        for (const line of lines) {
+        // Space usage
+        const { stdout: spaceOut } = await runCommand('df', ['-B1', '-P', '-T']);
+        const spaceLines = spaceOut.trim().split('\n').slice(1);
+
+        // Inode usage
+        const { stdout: inodeOut } = await runCommand('df', ['-i', '-P']);
+        const inodeLines = inodeOut.trim().split('\n').slice(1);
+        const inodeMap: Record<string, number> = {};
+        for (const line of inodeLines) {
             const parts = line.split(/\s+/);
-            // Filesystem 1024-blocks Used Available Capacity Mounted on
-            // Need to handle spaces in mount points? df -P helps. 
-            // parts[0] = fs, parts[1]=total, parts[2]=used, parts[3]=avail, parts[4]=cap, parts[5]=mount
-            if (parts.length >= 6) {
-                const mount = parts[5];
-                // Critical mounts only for now to avoid spam (/, /home, /var)
-                if (mount === '/' || (mount && (mount.startsWith('/home') || mount.startsWith('/var')))) {
-                    const total = parseInt(parts[1] || '0', 10);
-                    const used = parseInt(parts[2] || '0', 10);
-                    const free = parseInt(parts[3] || '0', 10);
-                    const percent = parseInt((parts[4] || '0').replace('%', ''), 10);
-
-                    diskMounts.push({
-                        mount,
-                        total,
-                        used,
-                        free,
-                        percent
-                    });
-                }
-            }
+            if (parts.length >= 6) inodeMap[parts[5]!] = parseInt((parts[4] || '0').replace('%', ''), 10);
         }
-    } catch { }
 
-    if (diskMounts.length === 0) {
-        // Fallback root
-        diskMounts.push({ mount: '/', total: 0, used: 0, free: 0, percent: 0 });
-    }
+        for (const line of spaceLines) {
+            const parts = line.split(/\s+/);
+            if (parts.length >= 7) {
+                const fsType = parts[1];
+                const mount = parts[6];
+                if (!fsType || !mount || EXCLUDED_FS_TYPES.includes(fsType) || EXCLUDED_PATH_PREFIXES.some(p => mount.startsWith(p))) continue;
 
-    // 4. Network (/proc/net/dev)
-    const netInterfaces = [];
-    try {
-        const netDev = await readFile('/proc/net/dev', 'utf-8');
-        const lines = netDev.split('\n').slice(2); // Skip 2 header lines
-        for (const line of lines) {
-            if (!line.trim()) continue;
-            const [namePart, dataPart] = line.split(':');
-            if (!namePart || !dataPart) continue;
-
-            const name = namePart.trim();
-            if (name === 'lo') continue; // Skip loopback
-
-            const stats = dataPart.trim().split(/\s+/).map(Number);
-            // RX: bytes(0), packets(1), errs(2), drop(3)...
-            // TX: bytes(8), packets(9), errs(10), drop(11)...
-            if (stats.length >= 16) {
-                netInterfaces.push({
-                    name,
-                    rxBytes: stats[0] || 0,
-                    rxErrors: stats[2] || 0,
-                    rxDropped: stats[3] || 0,
-                    txBytes: stats[8] || 0,
-                    txErrors: stats[10] || 0,
-                    txDropped: stats[11] || 0
+                diskMounts.push({
+                    mount,
+                    total: parseInt(parts[2] || '0', 10),
+                    used: parseInt(parts[3] || '0', 10),
+                    free: parseInt(parts[4] || '0', 10),
+                    percent: parseInt((parts[5] || '0').replace('%', ''), 10),
+                    inodesPercent: inodeMap[mount] || 0
                 });
             }
         }
     } catch { }
 
+    // Disk I/O (simplistic busy % and rates from /proc/diskstats)
+    let diskReadRate = 0;
+    let diskWriteRate = 0;
+    let diskBusyPercent = 0;
+    try {
+        const stats = await readFile('/proc/diskstats', 'utf-8');
+        const lines = stats.split('\n');
+        let totalRead = 0, totalWrite = 0, totalActiveTime = 0;
+
+        for (const line of lines) {
+            const p = line.trim().split(/\s+/);
+            if (p.length < 14) continue;
+            // Filter for physical disks (sda, sdb, nvme, etc.)
+            const dev = p[2] || '';
+            if (!/^(sd[a-z]|nvme[0-9]n[0-9]|vd[a-z])[0-9]*$/.test(dev)) continue;
+
+            totalRead += parseInt(p[5] || '0', 10) * 512; // sectors to bytes
+            totalWrite += parseInt(p[9] || '0', 10) * 512;
+            totalActiveTime += parseInt(p[12] || '0', 10); // ms spent doing I/O
+        }
+
+        if (lastState && lastState.disk) {
+            const timeDeltaMs = now - lastState.timestamp;
+            if (timeDeltaMs > 0) {
+                diskReadRate = Math.max(0, (totalRead - (lastState.disk['_total']?.read || 0)) / (timeDeltaMs / 1000));
+                diskWriteRate = Math.max(0, (totalWrite - (lastState.disk['_total']?.write || 0)) / (timeDeltaMs / 1000));
+                diskBusyPercent = Math.min(100, ((totalActiveTime - (lastState.disk['_total']?.active || 0)) / timeDeltaMs) * 100);
+            }
+        }
+        if (lastState) lastState.disk['_total'] = { read: totalRead, write: totalWrite, active: totalActiveTime };
+    } catch { }
+
+    // 4. Network Advanced (Retransmits, Connections)
+    let retransmits = 0;
+    let activeConnections = 0;
+    let totalRxPerSec = 0;
+    let totalTxPerSec = 0;
+    const netInterfaces = [];
+    const currentNet: Record<string, { rx: number; tx: number }> = {};
+
+    try {
+        const snmp = await readFile('/proc/net/snmp', 'utf-8');
+        const tcpLine = snmp.split('\n').find(l => l.startsWith('Tcp: '))?.split(/\s+/);
+        if (tcpLine) retransmits = parseInt(tcpLine[12] || '0', 10); // RetransSegs
+
+        const netTcp = await readFile('/proc/net/tcp', 'utf-8');
+        activeConnections = netTcp.split('\n').length - 2; // Subtract header and empty line
+
+        const netDev = await readFile('/proc/net/dev', 'utf-8');
+        const devLines = netDev.split('\n').slice(2);
+        for (const line of devLines) {
+            if (!line.trim()) continue;
+            const [namePart, dataPart] = line.split(':');
+            const name = namePart?.trim();
+            if (!name || name === 'lo') continue;
+            const stats = dataPart?.trim().split(/\s+/).map(Number);
+            if (stats && stats.length >= 16) {
+                const rx = stats[0] || 0, tx = stats[8] || 0;
+                currentNet[name] = { rx, tx };
+                netInterfaces.push({
+                    name, rxBytes: rx, txBytes: tx,
+                    rxErrors: stats[2] || 0, rxDropped: stats[3] || 0,
+                    txErrors: stats[10] || 0, txDropped: stats[11] || 0
+                });
+            }
+        }
+
+        if (lastState && lastState.network) {
+            const timeDeltaSec = (now - lastState.timestamp) / 1000;
+            if (timeDeltaSec > 0) {
+                for (const iface of netInterfaces) {
+                    const prev = lastState.network[iface.name];
+                    if (prev) {
+                        totalRxPerSec += (iface.rxBytes - prev.rx) / timeDeltaSec;
+                        totalTxPerSec += (iface.txBytes - prev.tx) / timeDeltaSec;
+                    }
+                }
+            }
+        }
+        if (lastState) lastState.network = currentNet;
+    } catch { }
+
+    // 5. Limits (File Descriptors)
+    let fdUsed = 0, fdTotal = 0, fdPercent = 0;
+    try {
+        const nr = await readFile('/proc/sys/fs/file-nr', 'utf-8');
+        const p = nr.trim().split(/\s+/).map(Number);
+        fdUsed = p[0] || 0;
+        fdTotal = p[2] || 1;
+        fdPercent = (fdUsed / fdTotal) * 100;
+    } catch { }
+
+    if (lastState) lastState.timestamp = now;
+
     return {
         cpu: {
             usage: parseFloat(cpuUsage.toFixed(1)),
             cores,
-            model: (cpuList[0] && cpuList[0].model) ? cpuList[0].model : 'Unknown',
-            speed: (cpuList[0] && cpuList[0].speed) ? cpuList[0].speed : 0
+            model: cpuList[0]?.model || 'Unknown',
+            speed: cpuList[0]?.speed || 0,
+            steal: parseFloat(cpuStealPercent.toFixed(1))
         },
         memory: {
             used: Math.round(memUsed / 1024 / 1024),
@@ -201,25 +348,30 @@ export async function getDetailedSystemMetrics(): Promise<SystemMetrics> {
             used: Math.round(swapUsed / 1024 / 1024),
             total: Math.round(swapTotal / 1024 / 1024),
             percent: swapTotal > 0 ? Math.round((swapUsed / swapTotal) * 100) : 0,
-            swapping: false // Logic requires state tracking (diff)
+            inRate: parseFloat(swapInRate.toFixed(1)),
+            outRate: parseFloat(swapOutRate.toFixed(1))
         },
         disk: {
             mounts: diskMounts,
-            io: { readPerSec: 0, writePerSec: 0 } // Requires state tracking
+            io: {
+                readPerSec: Math.round(diskReadRate),
+                writePerSec: Math.round(diskWriteRate),
+                busyPercent: parseFloat(diskBusyPercent.toFixed(1)),
+                latencyMs: 0 // Placeholder
+            }
         },
         network: {
             interfaces: netInterfaces,
-            totalRxPerSec: 0, // Requires state tracking
-            totalTxPerSec: 0
+            totalRxPerSec: Math.round(totalRxPerSec),
+            totalTxPerSec: Math.round(totalTxPerSec),
+            retransmits,
+            activeConnections
         },
-        load: {
-            avg1: load[0] || 0,
-            avg5: load[1] || 0,
-            avg15: load[2] || 0
+        limits: {
+            fileDescriptors: { used: fdUsed, total: fdTotal, percent: parseFloat(fdPercent.toFixed(1)) }
         },
-        uptime: {
-            seconds: uptimeSec,
-            readable: formatUptime(uptimeSec)
-        }
+        load: { avg1: load[0] || 0, avg5: load[1] || 0, avg15: load[2] || 0 },
+        uptime: { seconds: uptimeSec, readable: formatUptime(uptimeSec) },
+        health: { oomKills, unexpectedReboot: false, bootTime: bootTime || undefined } // Logic in monitor
     };
 }
