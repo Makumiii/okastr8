@@ -93,6 +93,19 @@ export function generateCompose(
 /**
  * Parse database service string (e.g., "postgres:15") and return service config
  */
+const DEFAULT_DB_VERSIONS: Record<string, string> = {
+    postgres: "15",
+    postgresql: "15",
+    mysql: "8",
+    mariadb: "10.11",
+    mongodb: "7",
+    mongo: "7",
+};
+
+const DEFAULT_CACHE_VERSIONS: Record<string, string> = {
+    redis: "7",
+};
+
 function parseDatabaseService(database: string): {
     name: string;
     config: any;
@@ -101,7 +114,7 @@ function parseDatabaseService(database: string): {
 } {
     const parts = database.split(":");
     const type = parts[0];
-    const version = parts[1] || "latest";
+    const version = parts[1] || DEFAULT_DB_VERSIONS[type] || "latest";
 
     if (!type) {
         throw new Error("Database type not specified");
@@ -225,7 +238,7 @@ function parseCacheService(cache: string): {
 } {
     const parts = cache.split(":");
     const type = parts[0];
-    const version = parts[1] || "latest";
+    const version = parts[1] || DEFAULT_CACHE_VERSIONS[type] || "latest";
 
     if (!type) {
         throw new Error("Cache type not specified");

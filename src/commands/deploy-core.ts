@@ -95,8 +95,8 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
             runtime: rawConfig.runtime,
             buildSteps: rawConfig.build || [],
             startCommand: rawConfig.start || '',
-            port: rawConfig.networking?.port || rawConfig.port || 3000,
-            domain: rawConfig.networking?.domain || rawConfig.domain,
+            port: rawConfig.port || 3000,
+            domain: rawConfig.domain,
             database: rawConfig.database,
             cache: rawConfig.cache,
         };
@@ -317,7 +317,7 @@ async function checkRegistryConflict(port: number, myAppName: string) {
             try {
                 const content = await readFile(metaPath, "utf-8");
                 const meta = JSON.parse(content);
-                const metaPort = meta.networking?.port || meta.port;
+                const metaPort = meta.port;
 
                 if (metaPort === port) {
                     throw new Error(`Port ${port} is already registered to application '${app}'`);

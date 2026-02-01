@@ -1,9 +1,10 @@
 <script lang="ts">
     import { page } from "$app/stores";
     import { Card, Badge, Button } from "$lib/components/ui";
-    import { get, post } from "$lib/api";
+    import { post } from "$lib/api";
     import { onMount } from "svelte";
     import { toasts } from "$lib/stores/toasts";
+    import DeployConfig from "$lib/components/DeployConfig.svelte";
     import {
         Check,
         TriangleAlert,
@@ -11,26 +12,41 @@
         X,
         Clipboard,
         XCircle,
+        Loader2,
     } from "lucide-svelte";
 
     const repoFullName = decodeURIComponent($page.params.repo ?? "");
     const [owner, repoName] = repoFullName.split("/");
 
+    // State machine
+    type DeployState = "idle" | "loading" | "deploying" | "finished";
+    let deployState = $state<DeployState>("idle");
+
     let branches = $state<string[]>([]);
     let selectedBranch = $state("");
     let hasConfig = $state<boolean | null>(null);
     let webhookEnabled = $state(true);
-    let envVars = $state("");
+    type EnvEntry = { id: number; key: string; value: string };
+    let envEntries = $state<EnvEntry[]>([{ id: 1, key: "", value: "" }]);
+    let nextEnvId = $state(2);
+
     let isLoading = $state(true);
-    let isDeploying = $state(false);
-    let deploymentId = $state("");
+    let activeDeploymentId = $state("");
     let logs = $state<string[]>([]);
-    let deployComplete = $state(false);
     let deploySuccess = $state(false);
     let isCancelling = $state(false);
     let eventSourceRef = $state<EventSource | null>(null);
-
     let logsContainer = $state<HTMLDivElement>();
+
+    // Config inspection result
+    let preparedConfig = $state<any>({});
+    let preparedAppName = $state<string>("");
+    let preparedRuntime = $state<string>("");
+    let preparedHasUserDocker = $state<boolean>(false);
+    let preparedHasUserCompose = $state<boolean>(false);
+    let deployConfigRef = $state<any>(null);
+    let showConfirm = $state(false);
+    let pendingConfig = $state<any>(null);
 
     onMount(() => {
         loadBranches();
@@ -43,62 +59,200 @@
         if (result.success && result.data?.branches) {
             branches = result.data.branches;
             if (branches.length > 0) {
-                selectedBranch = branches[0]; // branches is string[], not object[]
-                await checkConfig();
+                selectedBranch = branches[0];
+                await loadConfig();
             }
         }
         isLoading = false;
     }
 
-    async function checkConfig() {
+    async function loadConfig() {
+        if (!selectedBranch) return;
         hasConfig = null;
-        const result = await post<{ hasConfig: boolean }>(
-            "/github/check-config",
-            {
-                repoFullName,
-                ref: selectedBranch,
-            },
-        );
-        hasConfig = result.data?.hasConfig ?? false;
+        deployState = "loading";
+        const result = await post<any>("/github/inspect-config", {
+            repoFullName,
+            ref: selectedBranch,
+        });
+
+        if (result.success && result.data) {
+            hasConfig = result.data.hasConfig ?? false;
+            preparedConfig = result.data.config ?? {};
+            preparedRuntime = result.data.detectedRuntime ?? "";
+            preparedHasUserDocker = result.data.hasUserDocker ?? false;
+            preparedHasUserCompose = result.data.hasUserCompose ?? false;
+            if (result.data.config?.env) {
+                setEntriesFromEnv(result.data.config.env);
+            }
+            deployState = "idle";
+        } else {
+            hasConfig = false;
+            deployState = "idle";
+            toasts.error(result.message || "Failed to inspect config");
+        }
     }
 
-    async function startDeploy() {
-        if (!selectedBranch || isDeploying) return;
+    function parseEnvText(text: string): Record<string, string> {
+        const env: Record<string, string> = {};
+        text.split("\n").forEach((line) => {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith("#")) return;
+            const [key, ...valueParts] = trimmed.split("=");
+            if (!key) return;
+            env[key.trim()] = valueParts.join("=").trim();
+        });
+        return env;
+    }
 
-        isDeploying = true;
+    function entriesToEnv(entries: EnvEntry[]): Record<string, string> {
+        const env: Record<string, string> = {};
+        entries.forEach((entry) => {
+            if (!entry.key.trim()) return;
+            env[entry.key.trim()] = entry.value?.trim?.() ?? entry.value;
+        });
+        return env;
+    }
+
+    function setEntriesFromEnv(env: Record<string, string> | undefined) {
+        if (!env || typeof env !== "object") {
+            envEntries = [{ id: 1, key: "", value: "" }];
+            nextEnvId = 2;
+            return;
+        }
+        const items = Object.entries(env).map(([key, value]) => ({
+            id: nextEnvId++,
+            key,
+            value: value ?? "",
+        }));
+        envEntries = items.length ? items : [{ id: 1, key: "", value: "" }];
+    }
+
+    function addEnvEntry() {
+        envEntries = [...envEntries, { id: nextEnvId++, key: "", value: "" }];
+    }
+
+    function removeEnvEntry(id: number) {
+        const next = envEntries.filter((entry) => entry.id !== id);
+        envEntries = next.length ? next : [{ id: nextEnvId++, key: "", value: "" }];
+    }
+
+    function clearEnvEntries() {
+        envEntries = [{ id: nextEnvId++, key: "", value: "" }];
+    }
+
+    function isValidEnvKey(key: string) {
+        return /^[A-Za-z_][A-Za-z0-9_]*$/.test(key);
+    }
+
+    const invalidEnvKeys = $derived(
+        envEntries
+            .map((entry) => entry.key.trim())
+            .filter((key) => key.length > 0 && !isValidEnvKey(key)),
+    );
+
+    const duplicateEnvKeys = $derived(
+        (() => {
+            const counts: Record<string, number> = {};
+            envEntries.forEach((entry) => {
+                const key = entry.key.trim();
+                if (!key) return;
+                counts[key] = (counts[key] || 0) + 1;
+            });
+            return Object.keys(counts).filter((key) => counts[key] > 1);
+        })(),
+    );
+
+    const hasEnvIssues = $derived(
+        invalidEnvKeys.length > 0 || duplicateEnvKeys.length > 0,
+    );
+
+    async function handleEnvFile(file: File) {
+        const text = await file.text();
+        const parsed = parseEnvText(text);
+        const merged = { ...entriesToEnv(envEntries), ...parsed };
+        setEntriesFromEnv(merged);
+    }
+
+    async function handleEnvDrop(event: DragEvent) {
+        event.preventDefault();
+        if (!event.dataTransfer?.files?.length) return;
+        await handleEnvFile(event.dataTransfer.files[0]);
+    }
+
+    function handleEnvPaste(event: ClipboardEvent) {
+        const text = event.clipboardData?.getData("text");
+        if (!text) return;
+        const parsed = parseEnvText(text);
+        const merged = { ...entriesToEnv(envEntries), ...parsed };
+        setEntriesFromEnv(merged);
+    }
+
+    function openConfirm() {
+        if (deployState !== "idle") return;
+        if (hasEnvIssues) {
+            toasts.error("Fix environment variable errors before deploying.");
+            return;
+        }
+        const config = deployConfigRef?.getConfig?.();
+        if (!config) return;
+        pendingConfig = config;
+        showConfirm = true;
+    }
+
+    async function deployWithConfig(config: any) {
+        const env = entriesToEnv(envEntries);
+        const finalConfig = { ...config, env };
+        deployState = "deploying";
         logs = [];
-        deployComplete = false;
         deploySuccess = false;
 
-        // Parse env vars
-        const env: Record<string, string> = {};
-        if (envVars.trim()) {
-            envVars.split("\n").forEach((line) => {
-                const [key, ...valueParts] = line.split("=");
-                if (key) env[key.trim()] = valueParts.join("=").trim();
-            });
-        }
-
-        const result = await post<{ deploymentId: string }>("/github/import", {
+        const result = await post<any>("/github/deploy", {
             repoFullName,
             branch: selectedBranch,
-            webhookAutoDeploy: webhookEnabled,
-            env,
+            config: finalConfig,
         });
 
         if (result.success && result.data?.deploymentId) {
-            deploymentId = result.data.deploymentId;
-            connectToStream();
+            activeDeploymentId = result.data.deploymentId;
+            connectToStream(activeDeploymentId, (finalSuccess) => {
+                deployState = "finished";
+                deploySuccess = finalSuccess;
+            });
         } else {
-            logs = [`❌ Failed to start deployment: ${result.message}`];
-            isDeploying = false;
+            logs = [`❌ Deployment failed to start: ${result.message}`];
+            deployState = "finished";
+            deploySuccess = false;
         }
     }
 
-    function connectToStream() {
-        const eventSource = new EventSource(
-            `/api/github/deploy-stream/${deploymentId}`,
-        );
+    function confirmDeploy() {
+        if (!pendingConfig) return;
+        showConfirm = false;
+        deployWithConfig(pendingConfig);
+    }
+
+    function getStrategySummary(config: any) {
+        if (preparedHasUserCompose) {
+            return "Use existing docker-compose.yml";
+        }
+        if (preparedHasUserDocker) {
+            return "Use existing Dockerfile";
+        }
+        if (config?.database || config?.cache) {
+            return "Auto-generate docker-compose with database/cache services";
+        }
+        return "Auto-generate Dockerfile";
+    }
+
+    function connectToStream(
+        id: string,
+        onComplete: (success: boolean) => void,
+    ) {
+        if (eventSourceRef) {
+            eventSourceRef.close();
+        }
+
+        const eventSource = new EventSource(`/api/github/deploy-stream/${id}`);
 
         eventSource.onmessage = (event) => {
             const data = JSON.parse(event.data);
@@ -109,37 +263,40 @@
             } else if (data.type === "end") {
                 eventSource.close();
                 eventSourceRef = null;
-                isDeploying = false;
-                deployComplete = true;
-                deploySuccess = logs.some(
+                const success = logs.some(
                     (l) => l.includes("✅") || l.includes("succeeded"),
                 );
+                onComplete(success);
             }
         };
 
         eventSource.onerror = () => {
             eventSource.close();
             eventSourceRef = null;
-            isDeploying = false;
-            deployComplete = true;
+            // Assume failure on error if not explicit end
+            // But let's check logs
+            const success = logs.some(
+                (l) => l.includes("✅") || l.includes("succeeded"),
+            );
+            onComplete(success);
         };
 
         eventSourceRef = eventSource;
     }
 
     async function cancelDeploy() {
-        if (!deploymentId || isCancelling) return;
+        if (!activeDeploymentId || isCancelling) return;
 
         isCancelling = true;
         const result = await post(
-            `/github/cancel-deployment/${deploymentId}`,
+            `/github/cancel-deployment/${activeDeploymentId}`,
             {},
         );
 
         if (result.success) {
-            toasts.success("Deployment cancellation requested");
+            toasts.success("Cancellation requested");
         } else {
-            toasts.error("Failed to cancel deployment");
+            toasts.error("Failed to cancel");
         }
         isCancelling = false;
     }
@@ -148,7 +305,7 @@
         const logsText = logs.join("\n");
         try {
             await navigator.clipboard.writeText(logsText);
-            toasts.success("Logs copied to clipboard!");
+            toasts.success("Logs copied!");
         } catch (error) {
             toasts.error("Failed to copy logs");
         }
@@ -188,10 +345,10 @@
         </Card>
     {:else}
         <div class="grid gap-6 lg:grid-cols-2">
-            <!-- Configuration -->
+            <!-- Configuration / Inputs -->
             <Card>
                 <h2 class="text-lg font-semibold text-[var(--text-primary)]">
-                    Configuration
+                    Setup Deployment
                 </h2>
 
                 <!-- Branch -->
@@ -204,8 +361,9 @@
                     <select
                         id="branch-select"
                         bind:value={selectedBranch}
-                        onchange={checkConfig}
-                        class="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm focus:border-[var(--primary)] focus:outline-none"
+                        onchange={loadConfig}
+                        disabled={deployState === "loading" || deployState === "deploying"}
+                        class="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm focus:border-[var(--primary)] focus:outline-none disabled:opacity-50"
                         style="color: #1a1a1a; background-color: #ffffff;"
                     >
                         {#each branches as branch}
@@ -240,6 +398,7 @@
                         <input
                             type="checkbox"
                             bind:checked={webhookEnabled}
+                            disabled={deployState === "loading" || deployState === "deploying"}
                             class="h-4 w-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
                         />
                         <span class="text-sm text-[var(--text-primary)]"
@@ -248,57 +407,160 @@
                     </label>
                 </div>
 
-                <!-- Env Vars -->
-                <div class="mt-4">
-                    <label
-                        for="env-vars"
-                        class="mb-2 block text-sm font-medium text-[var(--text-primary)]"
-                    >
-                        Environment Variables (optional)
-                    </label>
-                    <textarea
-                        id="env-vars"
-                        bind:value={envVars}
-                        placeholder="KEY=value&#10;ANOTHER_KEY=another_value"
-                        rows="4"
-                        class="w-full rounded-[var(--radius-md)] border border-[var(--border)] px-4 py-2.5 font-mono text-sm placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none"
-                        style="color: #000000 !important; background-color: #ffffff !important;"
-                    ></textarea>
+                <!-- Config Form -->
+                <div class="mt-6 border-t border-[var(--border)] pt-6 space-y-2">
+                    {#if deployState === "loading"}
+                        <p class="text-sm text-[var(--text-secondary)]">
+                            Loading configuration for this branch...
+                        </p>
+                    {:else if !hasConfig}
+                        <p class="text-sm text-[var(--text-secondary)]">
+                            No okastr8.yaml found. Fill in the settings below.
+                        </p>
+                    {/if}
+                    <DeployConfig
+                        bind:this={deployConfigRef}
+                        appName={preparedAppName}
+                        config={preparedConfig ?? {}}
+                        detectedRuntime={preparedRuntime}
+                        hasUserDocker={preparedHasUserDocker}
+                        disabled={deployState === "loading" || deployState === "deploying"}
+                        showActions={false}
+                        embedded={true}
+                    />
                 </div>
 
-                <!-- Deploy Button -->
-                <Button
-                    class="mt-6 w-full"
-                    onclick={startDeploy}
-                    disabled={isDeploying || !hasConfig}
-                >
-                    {#if isDeploying}
-                        <div
-                            class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
-                        ></div>
-                        Deploying...
-                    {:else}
-                        <Rocket size={16} class="mr-2" /> Start Deploy
-                    {/if}
-                </Button>
+                <!-- Env Vars -->
+                <div class="mt-6 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span
+                            id="env-vars-label"
+                            class="block text-sm font-medium text-[var(--text-primary)]"
+                        >
+                            Environment Variables (optional)
+                        </span>
+                        <div class="flex items-center gap-3 text-xs">
+                            <button
+                                type="button"
+                                class="font-medium text-[var(--primary)] hover:underline"
+                                onclick={addEnvEntry}
+                                disabled={deployState === "loading" || deployState === "deploying"}
+                            >
+                                + Add variable
+                            </button>
+                            <button
+                                type="button"
+                                class="font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                onclick={clearEnvEntries}
+                                disabled={deployState === "loading" || deployState === "deploying"}
+                            >
+                                Clear all
+                            </button>
+                        </div>
+                    </div>
 
-                <!-- Cancel Button (shown during deployment) -->
-                {#if isDeploying}
-                    <button
-                        onclick={cancelDeploy}
-                        disabled={isCancelling}
-                        class="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-red-500 rounded-xl border border-red-500 hover:bg-red-500 hover:text-white transition-colors disabled:opacity-50"
+                    <div
+                        role="region"
+                        aria-labelledby="env-vars-label"
+                        class="rounded-[var(--radius-md)] border border-[var(--border)] bg-white p-3"
+                        ondrop={handleEnvDrop}
+                        ondragover={(event) => event.preventDefault()}
+                        onpaste={handleEnvPaste}
                     >
-                        {#if isCancelling}
-                            <div
-                                class="h-4 w-4 animate-spin rounded-full border-2 border-red-500 border-t-transparent"
-                            ></div>
-                        {:else}
-                            <XCircle size={16} />
+                        <div class="grid gap-3">
+                            {#each envEntries as entry (entry.id)}
+                                <div class="grid grid-cols-12 gap-2 items-center">
+                                    <input
+                                        type="text"
+                                        class="col-span-5 rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+                                        placeholder="KEY"
+                                        bind:value={entry.key}
+                                        disabled={deployState === "loading" || deployState === "deploying"}
+                                    />
+                                    <input
+                                        type="text"
+                                        class="col-span-6 rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+                                        placeholder="VALUE"
+                                        bind:value={entry.value}
+                                        disabled={deployState === "loading" || deployState === "deploying"}
+                                    />
+                                    <button
+                                        type="button"
+                                        class="col-span-1 text-xs text-[var(--text-secondary)] hover:text-[var(--error)]"
+                                        onclick={() => removeEnvEntry(entry.id)}
+                                        disabled={deployState === "loading" || deployState === "deploying"}
+                                        title="Remove"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            {/each}
+                        </div>
+                        <div class="mt-3 flex items-center justify-between text-xs text-[var(--text-secondary)]">
+                            <span>Paste or drag & drop a .env file here</span>
+                            <label class="cursor-pointer text-[var(--primary)] hover:underline">
+                                Import .env
+                                <input
+                                    type="file"
+                                    accept=".env,text/plain"
+                                    class="hidden"
+                                    disabled={deployState === "loading" || deployState === "deploying"}
+                                    onchange={async (event) => {
+                                        const file = event.currentTarget.files?.[0];
+                                        if (file) await handleEnvFile(file);
+                                        event.currentTarget.value = "";
+                                    }}
+                                />
+                            </label>
+                        </div>
+                        {#if invalidEnvKeys.length > 0}
+                            <p class="mt-3 text-xs text-[var(--error)]">
+                                Invalid keys: {invalidEnvKeys.join(", ")}. Use
+                                letters, numbers, and underscores only.
+                            </p>
                         {/if}
-                        Cancel Deployment
-                    </button>
-                {/if}
+                        {#if duplicateEnvKeys.length > 0}
+                            <p class="mt-1 text-xs text-[var(--error)]">
+                                Duplicate keys: {duplicateEnvKeys.join(", ")}.
+                            </p>
+                        {/if}
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="mt-6 flex flex-col gap-3">
+                    {#if deployState === "loading" || deployState === "deploying"}
+                        <div
+                            class="flex items-center justify-center p-4 bg-[var(--bg-secondary)] rounded-lg"
+                        >
+                            <Loader2 class="animate-spin text-blue-500 mr-2" />
+                            <span
+                                class="text-sm text-[var(--text-secondary)] capitalize"
+                                >{deployState}...</span
+                            >
+                        </div>
+                        <button
+                            onclick={cancelDeploy}
+                            disabled={isCancelling}
+                            class="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-red-500 rounded-xl border border-red-500 hover:bg-red-500 hover:text-white transition-colors disabled:opacity-50"
+                        >
+                            {#if isCancelling}
+                                <Loader2 size={16} class="animate-spin" />
+                            {:else}
+                                <XCircle size={16} />
+                            {/if}
+                            Cancel
+                        </button>
+                    {:else}
+                        <Button
+                            class="w-full"
+                            onclick={openConfirm}
+                            disabled={!selectedBranch || deployState !== "idle"}
+                        >
+                            <Rocket size={16} class="mr-2" /> Confirm Deployment
+                        </Button>
+                    {/if}
+                </div>
             </Card>
 
             <!-- Logs -->
@@ -308,13 +570,13 @@
                         <h2
                             class="text-lg font-semibold text-[var(--text-primary)]"
                         >
-                            Deployment Logs
+                            Logs
                         </h2>
                         {#if logs.length > 0}
                             <button
                                 onclick={copyLogs}
                                 class="p-1.5 rounded hover:bg-[var(--border)] transition-colors"
-                                title="Copy logs to clipboard"
+                                title="Copy logs"
                             >
                                 <Clipboard
                                     size={16}
@@ -323,15 +585,8 @@
                             </button>
                         {/if}
                     </div>
-                    <div class="flex items-center gap-2">
-                        {#if isDeploying}
-                            <Badge variant="warning">
-                                <div
-                                    class="h-2 w-2 animate-pulse rounded-full bg-yellow-500"
-                                ></div>
-                                Deploying
-                            </Badge>
-                        {:else if deployComplete}
+                    <div>
+                        {#if deployState === "finished"}
                             <Badge
                                 variant={deploySuccess ? "success" : "error"}
                                 class="flex gap-1 items-center"
@@ -348,21 +603,25 @@
 
                 <div
                     bind:this={logsContainer}
-                    class="mt-4 flex-1 overflow-auto rounded-[var(--radius-md)] bg-[var(--bg-terminal)] p-4 font-mono text-sm text-green-400"
-                    style="min-height: 300px; max-height: 400px;"
+                    class="mt-4 flex-1 overflow-auto rounded-[var(--radius-md)] bg-[var(--bg-terminal)] p-4 font-mono text-sm text-green-400 border border-[var(--border)]"
+                    style="min-height: 300px; max-height: 500px;"
                 >
                     {#if logs.length === 0}
-                        <p class="text-[var(--text-muted)]">
-                            Waiting to start deployment...
+                        <p class="text-[var(--text-muted)] italic">
+                            Logs will appear here...
                         </p>
                     {:else}
                         {#each logs as log}
-                            <p class="whitespace-pre-wrap">{log}</p>
+                            <p
+                                class="whitespace-pre-wrap font-mono text-xs md:text-sm"
+                            >
+                                {log}
+                            </p>
                         {/each}
                     {/if}
                 </div>
 
-                {#if deployComplete && deploySuccess}
+                {#if deployState === "finished" && deploySuccess}
                     <a
                         href="/apps"
                         class="mt-4 inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--success)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-600"
@@ -371,6 +630,79 @@
                     </a>
                 {/if}
             </Card>
+        </div>
+    {/if}
+
+    {#if showConfirm}
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div class="w-full max-w-xl rounded-[var(--radius-md)] border border-[var(--border)] bg-white p-6 text-[var(--text-primary)] shadow-xl">
+                <h3 class="text-lg font-semibold text-[var(--text-primary)]">
+                    Confirm deployment settings
+                </h3>
+                <p class="mt-1 text-sm text-[var(--text-secondary)]">
+                    Review the generated okastr8.yaml and deployment strategy before continuing.
+                </p>
+
+                <div class="mt-4 space-y-2 text-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[var(--text-secondary)]">Strategy</span>
+                        <span class="font-medium">{getStrategySummary(pendingConfig)}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[var(--text-secondary)]">Runtime</span>
+                        <span class="font-medium">{pendingConfig?.runtime || "custom"}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[var(--text-secondary)]">Port</span>
+                        <span class="font-medium">{pendingConfig?.port ?? "—"}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[var(--text-secondary)]">Start Command</span>
+                        <span class="font-medium">{pendingConfig?.startCommand || "—"}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[var(--text-secondary)]">Build Steps</span>
+                        <span class="font-medium">
+                            {pendingConfig?.buildSteps?.length ?? 0}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[var(--text-secondary)]">Domain</span>
+                        <span class="font-medium">{pendingConfig?.domain || "—"}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[var(--text-secondary)]">Database</span>
+                        <span class="font-medium">{pendingConfig?.database || "—"}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[var(--text-secondary)]">Cache</span>
+                        <span class="font-medium">{pendingConfig?.cache || "—"}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[var(--text-secondary)]">Env Vars</span>
+                        <span class="font-medium">
+                            {Object.keys(entriesToEnv(envEntries)).length}
+                        </span>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex items-center justify-end gap-3">
+                    <button
+                        class="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        onclick={() => {
+                            showConfirm = false;
+                        }}
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        class="rounded-[var(--radius-md)] bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                        onclick={confirmDeploy}
+                    >
+                        Deploy now
+                    </button>
+                </div>
+            </div>
         </div>
     {/if}
 </div>

@@ -17,7 +17,7 @@ export interface AppVersion {
     commit: string;
     branch: string;
     timestamp: string;
-    status: "pending" | "building" | "success" | "failed";
+    status: "pending" | "building" | "deploying" | "active" | "success" | "failed";
     message?: string;
 }
 
@@ -233,7 +233,11 @@ export async function rollback(
         return { success: false, message: `Version ${versionId} not found` };
     }
 
-    if (version.status !== "success") {
+    if (data.current === versionId) {
+        return { success: false, message: "Cannot rollback to the active version" };
+    }
+
+    if (version.status !== "success" && version.status !== "active") {
         return { success: false, message: `Cannot rollback to ${version.status} version` };
     }
 

@@ -959,6 +959,21 @@ api.post('/github/check-config', async (c) => {
     }
 });
 
+api.post('/github/inspect-config', async (c) => {
+    try {
+        const { getGitHubConfig, inspectRepoConfig } = await import('./commands/github');
+        const config = await getGitHubConfig();
+        if (!config.accessToken) return c.json(apiResponse(false, 'Not connected'));
+
+        const { repoFullName, ref } = await c.req.json();
+        const result = await inspectRepoConfig(config.accessToken, repoFullName, ref);
+        return c.json(apiResponse(true, 'Config inspected', result));
+    } catch (error: any) {
+        console.error("API /github/inspect-config Error:", error);
+        return c.json(apiResponse(false, error.message));
+    }
+});
+
 // Check if deploying to a different branch than originally configured
 api.post('/github/check-branch-change', async (c) => {
     console.log('API: /github/check-branch-change hit');
@@ -1004,6 +1019,130 @@ api.post('/github/check-branch-change', async (c) => {
     }
 });
 
+
+
+api.post('/github/prepare-deploy', async (c) => {
+    console.log('API: /github/prepare-deploy hit');
+    try {
+        const { prepareRepoImport } = await import('./commands/github');
+        const { startDeploymentStream, endDeploymentStream, streamLog } = await import('./utils/deploymentLogger');
+        const { randomBytes } = await import('crypto');
+
+        const options = await c.req.json();
+
+        // Generates a temp deployment ID for the prepare phase logs
+        const deploymentId = randomBytes(16).toString('hex');
+        startDeploymentStream(deploymentId);
+
+        // We wrap the async work to return the result via JSON + stream logs
+        // But we need to await it here to return the config to the UI
+        try {
+            const result = await prepareRepoImport(options, deploymentId);
+
+            streamLog(deploymentId, `✅ Preparation ${result.success ? 'succeeded' : 'failed'}: ${result.message}`);
+            setTimeout(() => endDeploymentStream(deploymentId), 500);
+
+            if (result.success) {
+                return c.json(apiResponse(true, 'Ready for configuration', {
+                    deploymentId, // ID of the prepare logs
+                    appName: result.appName,
+                    versionId: result.versionId,
+                    config: result.config,
+                    detectedRuntime: result.detectedRuntime,
+                    hasUserDocker: result.hasUserDocker
+                }));
+            } else {
+                return c.json(apiResponse(false, result.message));
+            }
+        } catch (e: any) {
+            streamLog(deploymentId, `❌ Error: ${e.message}`);
+            setTimeout(() => endDeploymentStream(deploymentId), 500);
+            throw e;
+        }
+
+    } catch (error: any) {
+        console.error('API: /github/prepare-deploy error:', error);
+        return c.json(apiResponse(false, error.message || 'Internal Server Error'));
+    }
+});
+
+api.post('/github/finalize-deploy', async (c) => {
+    console.log('API: /github/finalize-deploy hit');
+    try {
+        const { finalizeRepoImport } = await import('./commands/github');
+        const { startDeploymentStream, endDeploymentStream, streamLog } = await import('./utils/deploymentLogger');
+        const { randomBytes } = await import('crypto');
+
+        const { appName, versionId, config } = await c.req.json();
+
+        // New deployment ID for the build/deploy phase
+        const deploymentId = randomBytes(16).toString('hex');
+        startDeploymentStream(deploymentId);
+
+        // Run finalize async
+        finalizeRepoImport(appName, versionId, config, deploymentId)
+            .then((result) => {
+                streamLog(deploymentId, `✅ Deployment ${result.success ? 'succeeded' : 'failed'}: ${result.message}`);
+                setTimeout(() => endDeploymentStream(deploymentId), 1000);
+            })
+            .catch((error) => {
+                streamLog(deploymentId, `❌ Deployment error: ${error.message}`);
+                setTimeout(() => endDeploymentStream(deploymentId), 1000);
+            });
+
+        return c.json(apiResponse(true, 'Deployment finalized', {
+            deploymentId
+        }));
+
+    } catch (error: any) {
+        console.error('API: /github/finalize-deploy error:', error);
+        return c.json(apiResponse(false, error.message || 'Internal Server Error'));
+    }
+});
+
+api.post('/github/deploy', async (c) => {
+    console.log('API: /github/deploy hit');
+    try {
+        const { prepareRepoImport, finalizeRepoImport } = await import('./commands/github');
+        const { startDeploymentStream, endDeploymentStream, streamLog } = await import('./utils/deploymentLogger');
+        const { randomBytes } = await import('crypto');
+
+        const { repoFullName, branch, config } = await c.req.json();
+
+        const deploymentId = randomBytes(16).toString('hex');
+        startDeploymentStream(deploymentId);
+
+        try {
+            const prep = await prepareRepoImport({ repoFullName, branch }, deploymentId);
+            if (!prep.success || !prep.appName || !prep.versionId) {
+                streamLog(deploymentId, `❌ Prepare failed: ${prep.message}`);
+                setTimeout(() => endDeploymentStream(deploymentId), 500);
+                return c.json(apiResponse(false, prep.message));
+            }
+
+            finalizeRepoImport(prep.appName, prep.versionId, config, deploymentId)
+                .then((result) => {
+                    streamLog(deploymentId, `✅ Deployment ${result.success ? 'succeeded' : 'failed'}: ${result.message}`);
+                    setTimeout(() => endDeploymentStream(deploymentId), 1000);
+                })
+                .catch((error) => {
+                    streamLog(deploymentId, `❌ Deployment error: ${error.message}`);
+                    setTimeout(() => endDeploymentStream(deploymentId), 1000);
+                });
+
+            return c.json(apiResponse(true, 'Deployment started', { deploymentId }));
+        } catch (e: any) {
+            streamLog(deploymentId, `❌ Error: ${e.message}`);
+            setTimeout(() => endDeploymentStream(deploymentId), 500);
+            throw e;
+        }
+    } catch (error: any) {
+        console.error('API: /github/deploy error:', error);
+        return c.json(apiResponse(false, error.message || 'Internal Server Error'));
+    }
+});
+
+// Legacy import (kept for backward compatibility, wrapped)
 api.post('/github/import', async (c) => {
     console.log('API: /github/import hit');
     try {

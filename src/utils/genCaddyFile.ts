@@ -40,9 +40,8 @@ export async function genCaddyFile(onLog?: (msg: string) => void) {
         const content = await readFile(appMetadataPath, 'utf-8');
         const metadata = JSON.parse(content);
 
-        // Support both new nested networking config and legacy top-level config
-        const domain = metadata.networking?.domain || metadata.domain;
-        const port = metadata.networking?.port || metadata.port;
+        const domain = metadata.domain;
+        const port = metadata.port;
 
         if (domain && port) {
           // Use http:// prefix for localhost domains to avoid auto-HTTPS
@@ -87,4 +86,3 @@ export async function genCaddyFile(onLog?: (msg: string) => void) {
     // throw e; 
   }
 }
-
