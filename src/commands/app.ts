@@ -177,10 +177,17 @@ export async function listApps() {
                         }
                     }
 
+                    // Extra health status from state (format: "running (healthy)")
+                    let health: string | undefined = undefined;
+                    if (state?.includes('(') && state.includes(')')) {
+                        health = state.split('(')[1]?.split(')')[0];
+                    }
+
                     apps.push({
                         ...metadata,
-                        running: state === 'running',
-                        status: state || 'stopped'
+                        running: state === 'running' || state?.includes('running'),
+                        status: state || 'stopped',
+                        health: health
                     });
                 } catch {
                     apps.push({ name: entry.name, status: 'unknown' });

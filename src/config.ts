@@ -70,6 +70,31 @@ export interface SystemConfig {
             deployment_success?: boolean;
             service_down?: boolean;
             login_approval?: boolean;
+
+            // New Granular Alert Config
+            system?: {
+                enabled?: boolean;
+                interval?: string; // e.g. "5m"
+                rules?: Record<string, {
+                    threshold: number;
+                    duration?: string; // e.g. "5m"
+                }>;
+            };
+
+            apps?: {
+                enabled?: boolean;
+                interval?: string;
+                defaults?: Record<string, {
+                    threshold: number;
+                    duration?: string;
+                }>;
+                overrides?: Record<string, Record<string, {
+                    threshold: number;
+                    duration?: string;
+                }>>;
+            };
+
+            // Legacy (keep for backward compat until migration complete)
             resources?: {
                 enabled?: boolean;
                 interval?: string;

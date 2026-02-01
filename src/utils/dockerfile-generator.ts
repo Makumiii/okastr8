@@ -120,7 +120,7 @@ EXPOSE ${config.port}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
-  CMD wget --spider -q http://localhost:${config.port}/health || exit 1
+  CMD wget --spider -q http://127.0.0.1:${config.port}/ || exit 1
 
 # Start application
 CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(' '))}
@@ -151,7 +151,7 @@ EXPOSE ${config.port}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
-  CMD curl -f http://localhost:${config.port}/health || exit 1
+  CMD curl -f http://127.0.0.1:${config.port}/ || exit 1
 
 # Start application
 CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(' '))}
@@ -194,7 +194,7 @@ EXPOSE ${config.port}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
-  CMD wget --spider -q http://localhost:${config.port}/health || exit 1
+  CMD wget --spider -q http://127.0.0.1:${config.port}/ || exit 1
 
 # Start application
 CMD ["./main"]
@@ -226,7 +226,7 @@ EXPOSE ${config.port}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
-  CMD wget --spider -q http://localhost:${config.port}/health || exit 1
+  CMD wget --spider -q http://127.0.0.1:${config.port}/ || exit 1
 
 # Start application
 CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(' '))}
@@ -263,7 +263,7 @@ EXPOSE ${config.port}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
-  CMD wget --spider -q http://localhost:${config.port}/health || exit 1
+  CMD wget --spider -q http://127.0.0.1:${config.port}/ || exit 1
 
 # Start application
 CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(' '))}

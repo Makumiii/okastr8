@@ -51,13 +51,63 @@ notifications:
     deployment_success: false # Email on successful deploy
     service_down: true        # Email when service goes down
     
-    # Resource monitoring thresholds (percentage)
-    resources:
+    # ========== NEW: Advanced System Metrics Alerting ==========
+    system:
       enabled: true
-      interval: 5m            # Check every 5 minutes
-      cpu_threshold: 90       # Alert if CPU > 90%
-      ram_threshold: 85       # Alert if RAM > 85%
-      disk_threshold: 90      # Alert if Disk > 90%
+      interval: 5m            # Check interval
+      rules:
+        cpu_usage:
+          threshold: 90       # Alert if CPU > 90%
+          duration: 5m        # for 5 minutes
+        ram_usage:
+          threshold: 90
+          duration: 5m
+        swap_usage:
+          threshold: 20
+          duration: 5m
+        disk_usage:
+          threshold: 90
+          duration: 5m
+        load_per_core:
+          threshold: 1.5
+          duration: 5m
+    
+    # ========== NEW: Per-App Alerting ==========
+    apps:
+      enabled: true
+      interval: 5m
+      # Defaults apply to all apps
+      defaults:
+        cpu_usage:
+          threshold: 80
+          duration: 5m
+        memory_percent:
+          threshold: 80
+          duration: 5m
+        restart_count:
+          threshold: 3
+          duration: 10m
+        state_not_running:
+          threshold: 1
+          duration: 1m
+        healthcheck_failures:
+          threshold: 2
+          duration: 0m   # Immediate
+      # Override for specific critical apps
+      overrides:
+        "my-critical-api":
+          cpu_usage:
+            threshold: 50
+          memory_percent:
+            threshold: 70
+    
+    # Legacy (still supported for backwards compatibility)
+    resources:
+      enabled: false  # Superseded by 'system' above
+      interval: 5m
+      cpu_threshold: 90
+      ram_threshold: 85
+      disk_threshold: 90
 
 # Security settings
 security:

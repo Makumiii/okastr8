@@ -8,65 +8,122 @@
         Square,
         TriangleAlert,
         HelpCircle,
+        Info,
+        Cpu,
+        HardDrive,
+        MemoryStick,
+        Network,
+        RefreshCw,
+        Heart,
     } from "lucide-svelte";
 
-    // Service metrics from backend
-    interface ServiceMetrics {
+    // App metrics from new backend structure
+    interface AppMetrics {
         name: string;
-        cpu: number;
-        memory: number;
-        memoryPercent: number;
-        diskUsage: number;
-        uptime: string;
-        uptimeSeconds: number;
-        status: "running" | "stopped" | "failed" | "unknown";
         domain?: string;
-        requestsTotal?: number;
-        requestsPerSec?: number;
+        status: "running" | "stopped" | "failed" | "unknown";
+        resources: {
+            cpu: number;
+            memory: number;
+            memoryPercent: number;
+            memoryLimit: number;
+        };
+        uptime: {
+            seconds: number;
+            readable: string;
+        };
+        health: {
+            status: "healthy" | "unhealthy" | "starting" | "none";
+            failingStreak: number;
+        };
+        restarts: {
+            count: number;
+            lastExitCode?: number;
+        };
+        traffic: {
+            totalRequests: number;
+            requestsPerSec: number;
+            p95Latency?: number;
+            errorRate4xx: number;
+            errorRate5xx: number;
+        };
+        disk: {
+            used: number;
+        };
     }
 
     // Backend response structure
     interface BackendMetrics {
         system: {
-            cpu: { usage: number; cores: number };
+            cpu: { usage: number; cores: number; model: string; speed: number };
             memory: {
                 used: number;
                 total: number;
                 percent: number;
                 free: number;
+                available: number;
             };
-            disk: {
+            swap: {
                 used: number;
                 total: number;
                 percent: number;
-                free: number;
             };
-            uptime: string;
-            uptimeSeconds: number;
-            load: [number, number, number];
+            disk: {
+                mounts: {
+                    mount: string;
+                    used: number;
+                    total: number;
+                    percent: number;
+                    free: number;
+                }[];
+                io: { readPerSec: number; writePerSec: number };
+            };
+            network: {
+                interfaces: {
+                    name: string;
+                    rxBytes: number;
+                    txBytes: number;
+                }[];
+                totalRxPerSec: number;
+                totalTxPerSec: number;
+            };
+            load: { avg1: number; avg5: number; avg15: number };
+            uptime: { seconds: number; readable: string };
         };
-        services: ServiceMetrics[];
-        traffic: any;
+        apps: AppMetrics[];
         timestamp: string;
     }
 
-    // Frontend display structure for system metrics
-    interface SystemDisplayMetrics {
-        cpu: { usage: number; cores: number };
-        memory: { used: number; total: number; usedPercent: number };
-        disk: { used: number; total: number; usedPercent: number };
-        uptime: number;
-        loadAvg: number[];
-    }
+    // Metric Tooltips
+    const TOOLTIPS: Record<string, string> = {
+        cpu_usage:
+            "Shows how much processing power is being used. High sustained CPU means apps will slow down.",
+        ram_usage:
+            "High memory use increases risk of crashes and OOM kills. Sustained pressure hurts performance.",
+        swap_usage:
+            "Swap usage indicates memory pressure. Apps may become slow and unstable when swapping starts.",
+        disk_usage:
+            "Running out of disk causes databases, logs, and deployments to fail.",
+        load_avg:
+            "Measures how many tasks are waiting to run. Useful to spot CPU queueing.",
+        app_cpu:
+            "Shows app CPU pressure. Sustained high CPU can starve other apps.",
+        app_memory:
+            "Best memory alert. Warns before OOM kills and avoids false alarms.",
+        app_restarts:
+            "Detects crashloops. Frequent restarts usually mean a broken release.",
+        app_health:
+            "Confirms functional health, not just 'process is running.'",
+    };
 
-    let metrics = $state<SystemDisplayMetrics | null>(null);
-    let services = $state<ServiceMetrics[]>([]);
+    let metrics = $state<BackendMetrics | null>(null);
     let isLoading = $state(true);
     let error = $state("");
+    let tooltipVisible = $state<string | null>(null);
 
     onMount(() => {
         loadData();
-        const interval = setInterval(loadData, 10000); // Refresh every 10s
+        const interval = setInterval(loadData, 10000);
         return () => clearInterval(interval);
     });
 
@@ -74,25 +131,7 @@
         try {
             const result = await get<BackendMetrics>("/system/metrics");
             if (result.success && result.data?.system) {
-                const sys = result.data.system;
-                // Map backend structure to frontend display structure
-                metrics = {
-                    cpu: sys.cpu,
-                    memory: {
-                        used: sys.memory.used * 1024 * 1024, // Convert MB to bytes for formatBytes
-                        total: sys.memory.total * 1024 * 1024,
-                        usedPercent: sys.memory.percent,
-                    },
-                    disk: {
-                        used: sys.disk.used, // Already in bytes
-                        total: sys.disk.total,
-                        usedPercent: sys.disk.percent,
-                    },
-                    uptime: sys.uptimeSeconds,
-                    loadAvg: sys.load,
-                };
-                // Extract services
-                services = result.data.services || [];
+                metrics = result.data;
             } else {
                 error = result.message || "Failed to load metrics";
             }
@@ -130,8 +169,12 @@
         }
     }
 
-    function getStatusLabel(status: string): string {
-        return status.charAt(0).toUpperCase() + status.slice(1);
+    function showTooltip(key: string) {
+        tooltipVisible = key;
+    }
+
+    function hideTooltip() {
+        tooltipVisible = null;
     }
 </script>
 
@@ -163,69 +206,107 @@
             <p class="text-[var(--error)]">{error}</p>
         </Card>
     {:else if metrics}
-        <!-- Progress Rings -->
-        <div class="grid gap-6 md:grid-cols-3">
+        <!-- System Metrics Section -->
+        <div>
+            <h2
+                class="mb-4 text-xl font-semibold text-[var(--text-primary)] flex items-center gap-2"
+            >
+                <Cpu size={20} /> System Resources
+            </h2>
+        </div>
+
+        <!-- Progress Rings: CPU, Memory, Swap -->
+        <div class="grid gap-6 md:grid-cols-4">
             <!-- CPU -->
-            <Card class="flex flex-col items-center p-8">
-                <div class="relative h-32 w-32">
+            <Card class="flex flex-col items-center p-6 relative">
+                <button
+                    class="absolute top-2 right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                    on:mouseenter={() => showTooltip("cpu_usage")}
+                    on:mouseleave={hideTooltip}
+                >
+                    <Info size={14} />
+                </button>
+                {#if tooltipVisible === "cpu_usage"}
+                    <div
+                        class="absolute top-8 right-2 z-10 w-48 p-2 text-xs bg-[var(--surface-dark)] border border-[var(--border)] rounded shadow-lg"
+                    >
+                        {TOOLTIPS.cpu_usage}
+                    </div>
+                {/if}
+                <div class="relative h-24 w-24">
                     <svg class="h-full w-full -rotate-90" viewBox="0 0 100 100">
                         <circle
                             class="fill-none stroke-[var(--border)]"
                             cx="50"
                             cy="50"
                             r="42"
-                            stroke-width="12"
+                            stroke-width="10"
                         />
                         <circle
                             class="fill-none transition-all duration-500"
                             cx="50"
                             cy="50"
                             r="42"
-                            stroke-width="12"
-                            stroke={getColor(metrics.cpu.usage)}
+                            stroke-width="10"
+                            stroke={getColor(metrics.system.cpu.usage)}
                             stroke-linecap="round"
-                            stroke-dasharray="{metrics.cpu.usage * 2.64}, 264"
+                            stroke-dasharray="{metrics.system.cpu.usage *
+                                2.64}, 264"
                         />
                     </svg>
                     <div
                         class="absolute inset-0 flex flex-col items-center justify-center"
                     >
                         <span
-                            class="text-2xl font-bold text-[var(--text-primary)]"
-                            >{metrics.cpu.usage.toFixed(0)}%</span
+                            class="text-xl font-bold text-[var(--text-primary)]"
+                            >{metrics.system.cpu.usage.toFixed(0)}%</span
                         >
                     </div>
                 </div>
                 <h3
-                    class="mt-4 text-lg font-semibold text-[var(--text-primary)]"
+                    class="mt-3 text-sm font-semibold text-[var(--text-primary)]"
                 >
-                    CPU Usage
+                    CPU
                 </h3>
-                <p class="text-sm text-[var(--text-secondary)]">
-                    {metrics.cpu.cores} cores
+                <p class="text-xs text-[var(--text-secondary)]">
+                    {metrics.system.cpu.cores} cores
                 </p>
             </Card>
 
             <!-- Memory -->
-            <Card class="flex flex-col items-center p-8">
-                <div class="relative h-32 w-32">
+            <Card class="flex flex-col items-center p-6 relative">
+                <button
+                    class="absolute top-2 right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                    on:mouseenter={() => showTooltip("ram_usage")}
+                    on:mouseleave={hideTooltip}
+                >
+                    <Info size={14} />
+                </button>
+                {#if tooltipVisible === "ram_usage"}
+                    <div
+                        class="absolute top-8 right-2 z-10 w-48 p-2 text-xs bg-[var(--surface-dark)] border border-[var(--border)] rounded shadow-lg"
+                    >
+                        {TOOLTIPS.ram_usage}
+                    </div>
+                {/if}
+                <div class="relative h-24 w-24">
                     <svg class="h-full w-full -rotate-90" viewBox="0 0 100 100">
                         <circle
                             class="fill-none stroke-[var(--border)]"
                             cx="50"
                             cy="50"
                             r="42"
-                            stroke-width="12"
+                            stroke-width="10"
                         />
                         <circle
                             class="fill-none transition-all duration-500"
                             cx="50"
                             cy="50"
                             r="42"
-                            stroke-width="12"
-                            stroke={getColor(metrics.memory.usedPercent)}
+                            stroke-width="10"
+                            stroke={getColor(metrics.system.memory.percent)}
                             stroke-linecap="round"
-                            stroke-dasharray="{metrics.memory.usedPercent *
+                            stroke-dasharray="{metrics.system.memory.percent *
                                 2.64}, 264"
                         />
                     </svg>
@@ -233,43 +314,56 @@
                         class="absolute inset-0 flex flex-col items-center justify-center"
                     >
                         <span
-                            class="text-2xl font-bold text-[var(--text-primary)]"
-                            >{metrics.memory.usedPercent.toFixed(0)}%</span
+                            class="text-xl font-bold text-[var(--text-primary)]"
+                            >{metrics.system.memory.percent}%</span
                         >
                     </div>
                 </div>
                 <h3
-                    class="mt-4 text-lg font-semibold text-[var(--text-primary)]"
+                    class="mt-3 text-sm font-semibold text-[var(--text-primary)]"
                 >
-                    Memory
+                    RAM
                 </h3>
-                <p class="text-sm text-[var(--text-secondary)]">
-                    {formatBytes(metrics.memory.used)} / {formatBytes(
-                        metrics.memory.total,
-                    )}
+                <p class="text-xs text-[var(--text-secondary)]">
+                    {metrics.system.memory.used} / {metrics.system.memory.total}
+                    MB
                 </p>
             </Card>
 
-            <!-- Disk -->
-            <Card class="flex flex-col items-center p-8">
-                <div class="relative h-32 w-32">
+            <!-- Swap -->
+            <Card class="flex flex-col items-center p-6 relative">
+                <button
+                    class="absolute top-2 right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                    on:mouseenter={() => showTooltip("swap_usage")}
+                    on:mouseleave={hideTooltip}
+                >
+                    <Info size={14} />
+                </button>
+                {#if tooltipVisible === "swap_usage"}
+                    <div
+                        class="absolute top-8 right-2 z-10 w-48 p-2 text-xs bg-[var(--surface-dark)] border border-[var(--border)] rounded shadow-lg"
+                    >
+                        {TOOLTIPS.swap_usage}
+                    </div>
+                {/if}
+                <div class="relative h-24 w-24">
                     <svg class="h-full w-full -rotate-90" viewBox="0 0 100 100">
                         <circle
                             class="fill-none stroke-[var(--border)]"
                             cx="50"
                             cy="50"
                             r="42"
-                            stroke-width="12"
+                            stroke-width="10"
                         />
                         <circle
                             class="fill-none transition-all duration-500"
                             cx="50"
                             cy="50"
                             r="42"
-                            stroke-width="12"
-                            stroke={getColor(metrics.disk.usedPercent)}
+                            stroke-width="10"
+                            stroke={getColor(metrics.system.swap.percent)}
                             stroke-linecap="round"
-                            stroke-dasharray="{metrics.disk.usedPercent *
+                            stroke-dasharray="{metrics.system.swap.percent *
                                 2.64}, 264"
                         />
                     </svg>
@@ -277,220 +371,314 @@
                         class="absolute inset-0 flex flex-col items-center justify-center"
                     >
                         <span
-                            class="text-2xl font-bold text-[var(--text-primary)]"
-                            >{metrics.disk.usedPercent.toFixed(0)}%</span
+                            class="text-xl font-bold text-[var(--text-primary)]"
+                            >{metrics.system.swap.percent}%</span
                         >
                     </div>
                 </div>
                 <h3
-                    class="mt-4 text-lg font-semibold text-[var(--text-primary)]"
+                    class="mt-3 text-sm font-semibold text-[var(--text-primary)]"
                 >
-                    Disk
+                    Swap
                 </h3>
-                <p class="text-sm text-[var(--text-secondary)]">
-                    {formatBytes(metrics.disk.used)} / {formatBytes(
-                        metrics.disk.total,
-                    )}
+                <p class="text-xs text-[var(--text-secondary)]">
+                    {metrics.system.swap.used} / {metrics.system.swap.total} MB
+                </p>
+            </Card>
+
+            <!-- Uptime -->
+            <Card
+                class="flex flex-col items-center justify-center p-6 bg-[var(--primary-light)]"
+            >
+                <Activity size={28} class="text-[var(--primary)] mb-2" />
+                <h3 class="text-sm font-semibold text-[var(--primary)]">
+                    Uptime
+                </h3>
+                <p class="text-xl font-bold text-[var(--text-primary)]">
+                    {metrics.system.uptime.readable}
                 </p>
             </Card>
         </div>
 
-        <!-- Load Average -->
+        <!-- Disk Mounts -->
         <Card>
-            <h3 class="mb-4 text-lg font-semibold text-[var(--text-primary)]">
-                System Load
+            <h3
+                class="mb-4 text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2"
+            >
+                <HardDrive size={18} /> Disk Usage
+                <button
+                    class="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                    on:mouseenter={() => showTooltip("disk_usage")}
+                    on:mouseleave={hideTooltip}
+                >
+                    <Info size={14} />
+                </button>
+                {#if tooltipVisible === "disk_usage"}
+                    <span
+                        class="text-xs font-normal text-[var(--text-secondary)] ml-2"
+                        >{TOOLTIPS.disk_usage}</span
+                    >
+                {/if}
             </h3>
             <div class="grid gap-4 md:grid-cols-3">
-                {#each [1, 5, 15] as min, i}
+                {#each metrics.system.disk.mounts as mount}
                     <div
                         class="rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] p-4"
                     >
-                        <p class="text-sm text-[var(--text-secondary)]">
-                            {min} min avg
-                        </p>
                         <p
-                            class="mt-1 text-2xl font-bold text-[var(--text-primary)]"
+                            class="text-sm font-medium text-[var(--text-primary)] mb-2"
                         >
-                            {metrics.loadAvg[i]?.toFixed(2) || "0.00"}
+                            {mount.mount}
+                        </p>
+                        <div
+                            class="h-2 w-full rounded-full bg-[var(--border)] overflow-hidden mb-1"
+                        >
+                            <div
+                                class="h-full rounded-full transition-all duration-300"
+                                style="width: {mount.percent}%; background-color: {getColor(
+                                    mount.percent,
+                                )}"
+                            ></div>
+                        </div>
+                        <p class="text-xs text-[var(--text-secondary)]">
+                            {formatBytes(mount.used)} / {formatBytes(
+                                mount.total,
+                            )} ({mount.percent}%)
                         </p>
                     </div>
                 {/each}
             </div>
         </Card>
 
-        <!-- Uptime -->
-        <Card class="bg-[var(--primary-light)]">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm text-[var(--primary)]">Server Uptime</p>
-                    <p
-                        class="mt-1 text-2xl font-bold text-[var(--text-primary)]"
+        <!-- Load Average -->
+        <Card>
+            <h3
+                class="mb-4 text-lg font-semibold text-[var(--text-primary)] flex items-center gap-2"
+            >
+                <Cpu size={18} /> Load Average
+                <button
+                    class="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+                    on:mouseenter={() => showTooltip("load_avg")}
+                    on:mouseleave={hideTooltip}
+                >
+                    <Info size={14} />
+                </button>
+                {#if tooltipVisible === "load_avg"}
+                    <span
+                        class="text-xs font-normal text-[var(--text-secondary)] ml-2"
+                        >{TOOLTIPS.load_avg}</span
                     >
-                        {Math.floor(metrics.uptime / 86400)}d {Math.floor(
-                            (metrics.uptime % 86400) / 3600,
-                        )}h {Math.floor((metrics.uptime % 3600) / 60)}m
-                    </p>
-                </div>
-                <Activity size={32} class="text-[var(--primary)]" />
+                {/if}
+            </h3>
+            <div class="grid gap-4 md:grid-cols-3">
+                {#each [{ label: "1 min", value: metrics.system.load.avg1 }, { label: "5 min", value: metrics.system.load.avg5 }, { label: "15 min", value: metrics.system.load.avg15 }] as item}
+                    <div
+                        class="rounded-[var(--radius-md)] bg-[var(--bg-sidebar)] p-4"
+                    >
+                        <p class="text-sm text-[var(--text-secondary)]">
+                            {item.label}
+                        </p>
+                        <p
+                            class="mt-1 text-2xl font-bold text-[var(--text-primary)]"
+                        >
+                            {item.value.toFixed(2)}
+                        </p>
+                    </div>
+                {/each}
             </div>
         </Card>
 
-        <!-- Service Resource Usage -->
-        {#if services.length > 0}
+        <!-- Per-App Metrics -->
+        {#if metrics.apps.length > 0}
             <div>
                 <h2
-                    class="mb-4 text-xl font-semibold text-[var(--text-primary)]"
+                    class="mb-4 text-xl font-semibold text-[var(--text-primary)] flex items-center gap-2"
                 >
-                    Service Resource Usage
+                    <MemoryStick size={20} /> Application Metrics
                 </h2>
                 <p class="mb-4 text-sm text-[var(--text-secondary)]">
-                    Per-application CPU, memory, and disk consumption
+                    Per-application CPU, memory, health, and traffic
                 </p>
             </div>
 
             <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {#each services as service}
-                    {@const Icon = getStatusIcon(service.status)}
+                {#each metrics.apps as app}
+                    {@const Icon = getStatusIcon(app.status)}
                     <Card class="p-4">
-                        <!-- Service Header -->
+                        <!-- App Header -->
                         <div class="mb-4 flex items-center justify-between">
                             <div class="flex items-center gap-2">
-                                <Icon size={24} />
+                                <Icon
+                                    size={20}
+                                    class={app.status === "running"
+                                        ? "text-[var(--success)]"
+                                        : app.status === "failed"
+                                          ? "text-[var(--error)]"
+                                          : "text-[var(--text-secondary)]"}
+                                />
                                 <h3
                                     class="font-semibold text-[var(--text-primary)] truncate max-w-[150px]"
-                                    title={service.name}
+                                    title={app.name}
                                 >
-                                    {service.name}
+                                    {app.name}
                                 </h3>
                             </div>
                             <Badge
-                                variant={service.status === "running"
+                                variant={app.status === "running"
                                     ? "success"
-                                    : service.status === "stopped"
+                                    : app.status === "stopped"
                                       ? "error"
                                       : "warning"}
                             >
-                                {service.uptime ||
-                                    getStatusLabel(service.status)}
+                                {app.uptime.readable || app.status}
                             </Badge>
                         </div>
 
-                        <!-- Metrics Progress Bars -->
-                        <div class="space-y-3">
+                        <!-- Metrics Rows -->
+                        <div class="space-y-3 text-sm">
                             <!-- CPU -->
-                            <div>
-                                <div
-                                    class="flex items-center justify-between text-sm mb-1"
+                            <div class="flex items-center justify-between">
+                                <span
+                                    class="text-[var(--text-secondary)] flex items-center gap-1"
                                 >
-                                    <span class="text-[var(--text-secondary)]"
-                                        >CPU</span
-                                    >
-                                    <span
-                                        class="font-medium text-[var(--text-primary)]"
-                                        >{service.cpu.toFixed(1)}%</span
-                                    >
-                                </div>
-                                <div
-                                    class="h-2 w-full rounded-full bg-[var(--bg-sidebar)] overflow-hidden"
+                                    <Cpu size={14} /> CPU
+                                </span>
+                                <span
+                                    class="font-medium"
+                                    style="color: {getColor(app.resources.cpu)}"
+                                    >{app.resources.cpu.toFixed(1)}%</span
                                 >
-                                    <div
-                                        class="h-full rounded-full transition-all duration-300"
-                                        style="width: {Math.min(
-                                            service.cpu,
-                                            100,
-                                        )}%; background-color: {getColor(
-                                            service.cpu,
-                                        )}"
-                                    ></div>
-                                </div>
                             </div>
 
                             <!-- Memory -->
-                            <div>
-                                <div
-                                    class="flex items-center justify-between text-sm mb-1"
+                            <div class="flex items-center justify-between">
+                                <span
+                                    class="text-[var(--text-secondary)] flex items-center gap-1"
                                 >
-                                    <span class="text-[var(--text-secondary)]"
-                                        >Memory</span
-                                    >
-                                    <span
-                                        class="font-medium text-[var(--text-primary)]"
-                                        >{service.memory} MB ({service.memoryPercent.toFixed(
-                                            1,
-                                        )}%)</span
-                                    >
-                                </div>
-                                <div
-                                    class="h-2 w-full rounded-full bg-[var(--bg-sidebar)] overflow-hidden"
+                                    <MemoryStick size={14} /> Memory
+                                </span>
+                                <span class="font-medium"
+                                    >{app.resources.memory} MB ({app.resources
+                                        .memoryPercent}%)</span
                                 >
-                                    <div
-                                        class="h-full rounded-full transition-all duration-300"
-                                        style="width: {Math.min(
-                                            service.memoryPercent,
-                                            100,
-                                        )}%; background-color: {getColor(
-                                            service.memoryPercent,
-                                        )}"
-                                    ></div>
+                            </div>
+
+                            <!-- Restarts -->
+                            <div class="flex items-center justify-between">
+                                <span
+                                    class="text-[var(--text-secondary)] flex items-center gap-1"
+                                >
+                                    <RefreshCw size={14} /> Restarts
+                                </span>
+                                <span
+                                    class="font-medium"
+                                    style="color: {app.restarts.count >= 3
+                                        ? 'var(--error)'
+                                        : 'var(--text-primary)'}"
+                                    >{app.restarts.count}</span
+                                >
+                            </div>
+
+                            <!-- Health -->
+                            <div class="flex items-center justify-between">
+                                <span
+                                    class="text-[var(--text-secondary)] flex items-center gap-1"
+                                >
+                                    <Heart size={14} /> Health
+                                </span>
+                                <div class="flex items-center gap-2">
+                                    {#if app.health.failingStreak > 0}
+                                        <span
+                                            class="text-[10px] text-[var(--error)] font-bold"
+                                        >
+                                            {app.health.failingStreak} FAILS
+                                        </span>
+                                    {/if}
+                                    <Badge
+                                        variant={app.health.status === "healthy"
+                                            ? "success"
+                                            : app.health.status === "unhealthy"
+                                              ? "error"
+                                              : "warning"}
+                                    >
+                                        {app.health.status === "none"
+                                            ? "N/A"
+                                            : app.health.status}
+                                    </Badge>
                                 </div>
                             </div>
 
-                            <!-- Disk -->
-                            <div>
-                                <div
-                                    class="flex items-center justify-between text-sm mb-1"
+                            <!-- App Disk -->
+                            <div class="flex items-center justify-between">
+                                <span
+                                    class="text-[var(--text-secondary)] flex items-center gap-1"
                                 >
-                                    <span class="text-[var(--text-secondary)]"
-                                        >Disk</span
-                                    >
-                                    <span
-                                        class="font-medium text-[var(--text-primary)]"
-                                        >{formatBytes(service.diskUsage)}</span
-                                    >
-                                </div>
-                                <div
-                                    class="h-2 w-full rounded-full bg-[var(--bg-primary)]"
-                                    style="width: {Math.min(
-                                        (service.diskUsage /
-                                            (1024 * 1024 * 1024)) *
-                                            100,
-                                        100,
-                                    )}%"
-                                ></div>
+                                    <HardDrive size={14} /> Disk
+                                </span>
+                                <span
+                                    class="font-medium text-[var(--text-primary)]"
+                                >
+                                    {formatBytes(app.disk.used)}
+                                </span>
                             </div>
                         </div>
 
-                        <!-- Domain/Traffic Info (if available) -->
-                        {#if service.domain}
+                        <!-- Traffic -->
+                        <div class="mt-4 pt-3 border-t border-[var(--border)]">
                             <div
-                                class="mt-4 pt-3 border-t border-[var(--border)]"
+                                class="flex items-center justify-between text-sm mb-2"
                             >
-                                <div
-                                    class="flex items-center justify-between text-sm"
+                                <span
+                                    class="text-[var(--text-secondary)] truncate max-w-[150px] flex items-center gap-1"
+                                    title={app.domain || "No domain"}
                                 >
-                                    <span
-                                        class="text-[var(--text-secondary)] truncate max-w-[120px]"
-                                        title={service.domain}
+                                    <Network size={14} />
+                                    {app.domain || "No domain"}
+                                </span>
+                                <span
+                                    class="font-medium text-[var(--text-primary)]"
+                                >
+                                    {app.traffic.totalRequests} reqs
+                                </span>
+                            </div>
+
+                            <div
+                                class="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] uppercase font-bold text-[var(--text-tertiary)]"
+                            >
+                                <div class="flex justify-between">
+                                    <span>Rate</span>
+                                    <span class="text-[var(--text-secondary)]"
+                                        >{app.traffic.requestsPerSec}/s</span
                                     >
-                                        {service.domain}
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>P95</span>
+                                    <span class="text-[var(--text-secondary)]"
+                                        >{app.traffic.p95Latency || 0}ms</span
+                                    >
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>4xx</span>
+                                    <span
+                                        class={app.traffic.errorRate4xx > 0
+                                            ? "text-[var(--warning)]"
+                                            : "text-[var(--text-secondary)]"}
+                                    >
+                                        {app.traffic.errorRate4xx}
                                     </span>
-                                    {#if service.requestsTotal !== undefined}
-                                        <span
-                                            class="text-[var(--text-primary)]"
-                                        >
-                                            {service.requestsTotal} reqs
-                                            {#if service.requestsPerSec !== undefined && service.requestsPerSec > 0}
-                                                <span
-                                                    class="text-[var(--text-secondary)]"
-                                                >
-                                                    ({service.requestsPerSec}/s)
-                                                </span>
-                                            {/if}
-                                        </span>
-                                    {/if}
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>5xx</span>
+                                    <span
+                                        class={app.traffic.errorRate5xx > 0
+                                            ? "text-[var(--error)]"
+                                            : "text-[var(--text-secondary)]"}
+                                    >
+                                        {app.traffic.errorRate5xx}
+                                    </span>
                                 </div>
                             </div>
-                        {/if}
+                        </div>
                     </Card>
                 {/each}
             </div>

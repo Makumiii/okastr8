@@ -31,7 +31,7 @@ export function generateCompose(
                     "wget",
                     "--spider",
                     "-q",
-                    `http://localhost:${config.port}/health`,
+                    `http://127.0.0.1:${config.port}/`,
                 ],
                 interval: "10s",
                 timeout: "5s",
@@ -114,7 +114,7 @@ function parseDatabaseService(database: string): {
 } {
     const parts = database.split(":");
     const type = parts[0];
-    const version = parts[1] || DEFAULT_DB_VERSIONS[type] || "latest";
+    const version = parts[1] || (type ? DEFAULT_DB_VERSIONS[type] : undefined) || "latest";
 
     if (!type) {
         throw new Error("Database type not specified");
@@ -238,7 +238,7 @@ function parseCacheService(cache: string): {
 } {
     const parts = cache.split(":");
     const type = parts[0];
-    const version = parts[1] || DEFAULT_CACHE_VERSIONS[type] || "latest";
+    const version = parts[1] || (type ? DEFAULT_CACHE_VERSIONS[type] : undefined) || "latest";
 
     if (!type) {
         throw new Error("Cache type not specified");

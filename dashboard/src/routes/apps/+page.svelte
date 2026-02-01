@@ -8,6 +8,7 @@
         name: string;
         status: string;
         running: boolean;
+        health?: string;
         uptime?: string;
         gitRepo?: string;
         gitBranch?: string;
@@ -124,9 +125,25 @@
                                     {/if}
                                 </div>
                             </div>
-                            <Badge variant={app.running ? "success" : "error"}>
-                                {app.running ? "Running" : "Stopped"}
-                            </Badge>
+                            <div class="flex flex-col items-end gap-2">
+                                <Badge
+                                    variant={app.running ? "success" : "error"}
+                                >
+                                    {app.running ? "Running" : "Stopped"}
+                                </Badge>
+                                {#if app.health}
+                                    <Badge
+                                        variant={app.health === "healthy"
+                                            ? "success"
+                                            : app.health === "unhealthy"
+                                              ? "error"
+                                              : "warning"}
+                                        class="text-[10px] uppercase py-0 px-1"
+                                    >
+                                        {app.health}
+                                    </Badge>
+                                {/if}
+                            </div>
                         </div>
 
                         {#if app.uptime}
