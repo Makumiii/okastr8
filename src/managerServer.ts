@@ -3,8 +3,17 @@ import { serveStatic } from 'hono/bun';
 import api from './api';
 import { startScheduler } from './services/scheduler';
 import { startResourceMonitor } from './services/monitor';
+import { installConsoleLogger, logPaths } from './utils/structured-logger';
 
 const app = new Hono();
+
+installConsoleLogger({
+  filePath: logPaths.unified,
+  source: "manager",
+  service: "okastr8-manager",
+  maxBytes: 10 * 1024 * 1024,
+  maxBackups: 3,
+});
 
 // Start background services
 startScheduler();

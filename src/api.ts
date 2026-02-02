@@ -246,17 +246,11 @@ api.get('/activity/stats', async (c) => {
 api.get('/activity/log/:id', async (c) => {
     try {
         const id = c.req.param('id');
-        const { join } = await import('path');
-        const { homedir } = await import('os');
-        const { readFile } = await import('fs/promises');
-        const { existsSync } = await import('fs');
-
-        const logPath = join(homedir(), '.okastr8', 'logs', `deploy-${id}.log`);
-        if (!existsSync(logPath)) {
+        const { getDeploymentLog } = await import('./utils/activity');
+        const content = await getDeploymentLog(id);
+        if (!content) {
             return c.json(apiResponse(false, 'Log not found'), 404);
         }
-
-        const content = await readFile(logPath, 'utf-8');
         return c.json(apiResponse(true, 'Deployment log', { log: content }));
     } catch (error: any) {
         return c.json(apiResponse(false, error.message));

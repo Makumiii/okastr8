@@ -1,13 +1,12 @@
 /**
  * Activity Logging System
- * Tracks persistent events (Login, Deploy, Resource) in ~/.okastr8/activity.jsonl
+ * Tracks persistent events (Login, Deploy, Resource) in unified log
  */
 
-import { join } from 'path';
-import { homedir } from 'os';
-import { appendFile, readFile, writeFile, mkdir } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { randomUUID } from 'crypto';
+import { logPaths, type LogEntry, writeUnifiedEntry } from './structured-logger';
 
 export type ActivityType = 'login' | 'deploy' | 'resource' | 'system';
 
@@ -19,7 +18,7 @@ export interface ActivityEntry {
     user?: string; // Masked email (for logins/actions)
 }
 
-const ACTIVITY_FILE = join(homedir(), '.okastr8', 'activity.jsonl');
+const UNIFIED_LOG = logPaths.unified;
 
 /**
  * Mask email for privacy (johndoe@gmail.com -> joh***@gmail.com)
@@ -44,28 +43,51 @@ export async function logActivity(
     userEmail?: string
 ) {
     try {
-        const dir = join(homedir(), '.okastr8');
-        if (!existsSync(dir)) {
-            await mkdir(dir, { recursive: true });
-        }
+        const entryId = data?.id || randomUUID();
+        const timestamp = new Date().toISOString();
+        const level =
+            type === 'resource'
+                ? 'warn'
+                : type === 'deploy' && data?.status === 'failed'
+                  ? 'error'
+                  : 'info';
 
-        const entry: ActivityEntry = {
-            id: randomUUID(),
-            timestamp: new Date().toISOString(),
-            type,
+        await writeUnifiedEntry({
+            timestamp,
+            level,
+            source: 'system',
+            service: 'activity',
+            message: `${type} activity`,
+            traceId: entryId,
+            action: type,
+            user: userEmail ? maskEmail(userEmail) : undefined,
+            app: data?.appName ? { name: data.appName, branch: data.branch, versionId: data.versionId } : undefined,
             data,
-            user: userEmail ? maskEmail(userEmail) : undefined
-        };
-
-        // Append to file (JSONL format)
-        await appendFile(ACTIVITY_FILE, JSON.stringify(entry) + '\n');
-
-        // Trigger cleanup occasionally (1% chance) to avoid performance hit on every write
-        if (Math.random() < 0.01) {
-            cleanOldActivities().catch(console.error);
-        }
+        });
     } catch (error) {
         console.error('Failed to log activity:', error);
+    }
+}
+
+async function readUnifiedEntries(): Promise<LogEntry[]> {
+    try {
+        if (!existsSync(UNIFIED_LOG)) return [];
+        const content = await readFile(UNIFIED_LOG, 'utf-8');
+        if (!content.trim()) return [];
+        return content
+            .trim()
+            .split('\n')
+            .map((line) => {
+                try {
+                    return JSON.parse(line) as LogEntry;
+                } catch {
+                    return null;
+                }
+            })
+            .filter((entry): entry is LogEntry => !!entry);
+    } catch (error) {
+        console.error('Failed to read unified logs:', error);
+        return [];
     }
 }
 
@@ -78,31 +100,32 @@ export async function getRecentActivity(
     date?: string // YYYY-MM-DD
 ): Promise<ActivityEntry[]> {
     try {
-        if (!existsSync(ACTIVITY_FILE)) return [];
-
-        const content = await readFile(ACTIVITY_FILE, 'utf-8');
-        const lines = content.trim().split('\n');
-
-        // Parse and filter
-        let entries = lines
-            .map(line => {
-                try { return JSON.parse(line); } catch { return null; }
-            })
-            .filter(e => e !== null) as ActivityEntry[];
-
-        // Reverse to show newest first
-        entries.reverse();
+        let entries = await readUnifiedEntries();
+        entries = entries.filter((entry) =>
+            entry.service === 'activity' &&
+            (entry.action === 'login' || entry.action === 'deploy' || entry.action === 'resource' || entry.action === 'system')
+        );
 
         if (type) {
-            entries = entries.filter(e => e.type === type);
+            entries = entries.filter((entry) => entry.action === type);
         }
 
         if (date) {
-            const targetDate = new Date(date).toDateString(); // "Fri Feb 01 2026"
-            entries = entries.filter(e => new Date(e.timestamp).toDateString() === targetDate);
+            const targetDate = new Date(date).toDateString();
+            entries = entries.filter((entry) => new Date(entry.timestamp).toDateString() === targetDate);
         }
 
-        return entries.slice(0, limit);
+        const mapped = entries
+            .map((entry): ActivityEntry => ({
+                id: entry.traceId || randomUUID(),
+                timestamp: entry.timestamp,
+                type: entry.action as ActivityType,
+                data: entry.data,
+                user: entry.user,
+            }))
+            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+        return mapped.slice(0, limit);
     } catch (error) {
         console.error('Failed to get activity:', error);
         return [];
@@ -131,33 +154,11 @@ export async function getActivityStats() {
     }
 }
 
-/**
- * Cleanup activities older than 7 days
- */
-export async function cleanOldActivities() {
-    try {
-        if (!existsSync(ACTIVITY_FILE)) return;
-
-        const content = await readFile(ACTIVITY_FILE, 'utf-8');
-        const lines = content.trim().split('\n');
-
-        const now = Date.now();
-        const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-
-        const validLines = lines.filter(line => {
-            try {
-                const entry = JSON.parse(line);
-                const time = new Date(entry.timestamp).getTime();
-                return (now - time) < SEVEN_DAYS_MS;
-            } catch {
-                return false;
-            }
-        });
-
-        if (validLines.length < lines.length) {
-            await writeFile(ACTIVITY_FILE, validLines.join('\n') + '\n');
-        }
-    } catch (error) {
-        console.error('Failed to cleanup activity logs:', error);
-    }
+export async function getDeploymentLog(deploymentId: string): Promise<string | null> {
+    const entries = await readUnifiedEntries();
+    const lines = entries
+        .filter((entry) => entry.traceId === deploymentId && entry.action === 'deploy-log')
+        .map((entry) => entry.message);
+    if (lines.length === 0) return null;
+    return lines.join('\n');
 }

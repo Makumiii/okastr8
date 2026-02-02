@@ -16,20 +16,7 @@ const deploymentStreams = new Map<string, DeploymentStream>();
 // Cleanup old streams after 1 hour
 const STREAM_TIMEOUT = 60 * 60 * 1000;
 
-// Log storage
-import { appendFile, mkdir } from 'fs/promises';
-import { join } from 'path';
-import { homedir } from 'os';
-
-const LOG_DIR = join(homedir(), '.okastr8', 'logs');
-
-async function ensureLogDir() {
-    try {
-        await mkdir(LOG_DIR, { recursive: true });
-    } catch { }
-}
-
-ensureLogDir();
+import { writeUnifiedEntry } from './structured-logger';
 
 /**
  * Start a new deployment stream
@@ -63,9 +50,16 @@ export function streamLog(deploymentId: string, message: string): void {
     // Always log to console as well
     console.log(message);
 
-    // Append to persistent log file
-    const logPath = join(LOG_DIR, `deploy-${deploymentId}.log`);
-    appendFile(logPath, message + '\n').catch(() => { });
+    void writeUnifiedEntry({
+        timestamp: new Date().toISOString(),
+        level: "info",
+        source: "deploy",
+        service: "deployment",
+        message,
+        traceId: deploymentId,
+        action: "deploy-log",
+        data: { deploymentId },
+    });
 }
 
 /**

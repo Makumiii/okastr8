@@ -11,8 +11,17 @@ import { addMetricsCommands } from './commands/metrics-cli';
 import { addAuthCommands } from './commands/auth-cli';
 import { addAccessUserCommands } from './commands/user-cli';
 import { addTunnelCommands } from './commands/tunnel';
+import { installConsoleLogger, logPaths } from './utils/structured-logger';
 
 const program = new Command();
+
+installConsoleLogger({
+  filePath: logPaths.unified,
+  source: "cli",
+  service: "okastr8-cli",
+  maxBytes: 10 * 1024 * 1024,
+  maxBackups: 3,
+});
 
 program
   .name('okastr8')
