@@ -81,9 +81,6 @@
             preparedRuntime = result.data.detectedRuntime ?? "";
             preparedHasUserDocker = result.data.hasUserDocker ?? false;
             preparedHasUserCompose = result.data.hasUserCompose ?? false;
-            if (result.data.config?.env) {
-                setEntriesFromEnv(result.data.config.env);
-            }
             deployState = "idle";
         } else {
             hasConfig = false;

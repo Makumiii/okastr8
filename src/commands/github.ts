@@ -5,6 +5,7 @@ import { readFile, writeFile, mkdir, rm } from "fs/promises";
 import { existsSync } from "fs";
 import { runCommand } from "../utils/command";
 import { randomBytes } from "crypto";
+import { randomUUID } from "crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -430,7 +431,7 @@ export async function inspectRepoConfig(
                 domain: parsed.domain,
                 database: parsed.database,
                 cache: parsed.cache,
-                env: parsed.env || {},
+                env: {},
             };
         } catch {
             // keep defaults if parse fails
@@ -603,7 +604,7 @@ export async function prepareRepoImport(
                     domain: config.domain,
                     database: config.database,
                     cache: config.cache,
-                    env: config.env || {},
+                    env: {},
                 };
             } catch (e: any) {
                 log(`⚠️ Failed to parse okastr8.yaml: ${e.message}`);
@@ -663,6 +664,7 @@ export async function finalizeRepoImport(
     deploymentId?: string
 ): Promise<{ success: boolean; message: string }> {
     const { updateVersionStatus, removeVersion, getVersions, setCurrentVersion, cleanOldVersions } = await import("./version");
+    const { logActivity } = await import("../utils/activity");
 
     // Helper log
     const log = (message: string) => {
@@ -686,7 +688,27 @@ export async function finalizeRepoImport(
     };
 
     const appDir = join(APPS_DIR, appName);
+    const appMetaPath = join(appDir, "app.json");
     const releasePath = join(appDir, "releases", `v${versionId}`);
+    const activityId = deploymentId ?? randomUUID();
+    const startTime = Date.now();
+
+    let branch: string | undefined;
+    try {
+        if (existsSync(appMetaPath)) {
+            const meta = JSON.parse(await readFile(appMetaPath, "utf-8"));
+            branch = meta.gitBranch || meta.branch;
+        }
+    } catch { }
+
+    await logActivity("deploy", {
+        id: activityId,
+        status: "started",
+        appName,
+        branch,
+        versionId,
+        source: "github"
+    });
 
     // CLEANUP HELPER
     const cleanupFailedDeployment = async (reason: string) => {
@@ -747,6 +769,16 @@ export async function finalizeRepoImport(
             await writeFile(join(releasePath, "okastr8.yaml"), yamlContent);
             log("✅ Configuration saved to release");
         } catch (e: any) {
+            await logActivity("deploy", {
+                id: activityId,
+                status: "failed",
+                appName,
+                branch,
+                versionId,
+                error: e.message,
+                duration: (Date.now() - startTime) / 1000,
+                source: "github"
+            });
             await cleanupFailedDeployment("Failed to save config");
             return { success: false, message: `Config save failed: ${e.message}` };
         }
@@ -759,6 +791,16 @@ export async function finalizeRepoImport(
             const { checkRuntimeInstalled, formatMissingRuntimeError } = await import("./env");
             const isInstalled = await checkRuntimeInstalled(config.runtime);
             if (!isInstalled) {
+                await logActivity("deploy", {
+                    id: activityId,
+                    status: "failed",
+                    appName,
+                    branch,
+                    versionId,
+                    error: `Runtime missing: ${config.runtime}`,
+                    duration: (Date.now() - startTime) / 1000,
+                    source: "github"
+                });
                 await cleanupFailedDeployment("Runtime missing");
                 return { success: false, message: formatMissingRuntimeError(config.runtime as any) };
             }
@@ -779,6 +821,16 @@ export async function finalizeRepoImport(
                 const buildResult = await runCommand("bash", ["-c", step], releasePath);
                 if (buildResult.exitCode !== 0) {
                     await updateVersionStatus(appName, versionId, "failed", "Build failed");
+                    await logActivity("deploy", {
+                        id: activityId,
+                        status: "failed",
+                        appName,
+                        branch,
+                        versionId,
+                        error: buildResult.stderr || "Build failed",
+                        duration: (Date.now() - startTime) / 1000,
+                        source: "github"
+                    });
                     await cleanupFailedDeployment("Build failed");
                     return { success: false, message: `Build failed: ${buildResult.stderr}` };
                 }
@@ -802,6 +854,16 @@ export async function finalizeRepoImport(
 
         if (!deployResult.success) {
             await updateVersionStatus(appName, versionId, "failed", deployResult.message);
+            await logActivity("deploy", {
+                id: activityId,
+                status: "failed",
+                appName,
+                branch,
+                versionId,
+                error: deployResult.message,
+                duration: (Date.now() - startTime) / 1000,
+                source: "github"
+            });
             await cleanupFailedDeployment(deployResult.message);
             return { success: false, message: deployResult.message };
         }
@@ -817,12 +879,42 @@ export async function finalizeRepoImport(
 
         // 7. Setup Webhook (skipped for now for brevity, or can be added back if needed)
 
+        await logActivity("deploy", {
+            id: activityId,
+            status: "success",
+            appName,
+            branch,
+            versionId,
+            duration: (Date.now() - startTime) / 1000,
+            source: "github"
+        });
+
         return { success: true, message: `Successfully deployed ${appName}` };
 
     } catch (error: any) {
         if (error.message === 'DEPLOYMENT_CANCELLED') {
+            await logActivity("deploy", {
+                id: activityId,
+                status: "failed",
+                appName,
+                branch,
+                versionId,
+                error: "Deployment cancelled",
+                duration: (Date.now() - startTime) / 1000,
+                source: "github"
+            });
             return { success: false, message: 'Deployment was cancelled by user' };
         }
+        await logActivity("deploy", {
+            id: activityId,
+            status: "failed",
+            appName,
+            branch,
+            versionId,
+            error: error.message,
+            duration: (Date.now() - startTime) / 1000,
+            source: "github"
+        });
         await cleanupFailedDeployment(`Unexpected error: ${error.message}`);
         return { success: false, message: error.message };
     }
