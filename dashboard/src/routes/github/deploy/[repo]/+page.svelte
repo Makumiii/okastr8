@@ -13,6 +13,7 @@
         Clipboard,
         XCircle,
         Loader2,
+        Lock,
     } from "lucide-svelte";
 
     const repoFullName = decodeURIComponent($page.params.repo ?? "");
@@ -29,7 +30,6 @@
     type EnvEntry = { id: number; key: string; value: string };
     let envEntries = $state<EnvEntry[]>([{ id: 1, key: "", value: "" }]);
     let nextEnvId = $state(2);
-
     let isLoading = $state(true);
     let activeDeploymentId = $state("");
     let logs = $state<string[]>([]);
@@ -47,6 +47,13 @@
     let deployConfigRef = $state<any>(null);
     let showConfirm = $state(false);
     let pendingConfig = $state<any>(null);
+    type DeployStrategy = "docker" | "yaml";
+    let deployStrategy = $state<DeployStrategy>("yaml");
+    let dockerPort = $state<number>(3000);
+    let dockerDomain = $state<string>("");
+    const hasDockerStrategy = $derived(
+        preparedHasUserDocker || preparedHasUserCompose,
+    );
 
     onMount(() => {
         loadBranches();
@@ -81,6 +88,12 @@
             preparedRuntime = result.data.detectedRuntime ?? "";
             preparedHasUserDocker = result.data.hasUserDocker ?? false;
             preparedHasUserCompose = result.data.hasUserCompose ?? false;
+            const prefersDocker =
+                (result.data.hasUserDocker ?? false) ||
+                (result.data.hasUserCompose ?? false);
+            deployStrategy = prefersDocker ? "docker" : "yaml";
+            dockerPort = result.data.config?.port ?? 3000;
+            dockerDomain = result.data.config?.domain ?? "";
             deployState = "idle";
         } else {
             hasConfig = false;
@@ -190,10 +203,25 @@
             toasts.error("Fix environment variable errors before deploying.");
             return;
         }
-        const config = deployConfigRef?.getConfig?.();
+        const config = getConfigForStrategy();
         if (!config) return;
         pendingConfig = config;
         showConfirm = true;
+    }
+
+    function getConfigForStrategy() {
+        if (deployStrategy === "yaml") {
+            return deployConfigRef?.getConfig?.();
+        }
+        return {
+            runtime: preparedRuntime || preparedConfig?.runtime || "custom",
+            buildSteps: preparedConfig?.buildSteps ?? [],
+            startCommand: "",
+            port: Number(dockerPort) || 3000,
+            domain: dockerDomain?.trim?.() || "",
+            database: preparedConfig?.database,
+            cache: preparedConfig?.cache,
+        };
     }
 
     async function deployWithConfig(config: any) {
@@ -403,6 +431,69 @@
                     </label>
                 </div>
 
+                <!-- Strategy -->
+                <div class="mt-6 border-t border-[var(--border)] pt-6">
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h3 class="text-sm font-semibold text-[var(--text-primary)]">
+                                Deployment strategy
+                            </h3>
+                            <p class="text-xs text-[var(--text-secondary)]">
+                                Choose how to configure this deploy.
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            {#if preparedHasUserCompose}
+                                <Badge variant="success">docker-compose.yml detected</Badge>
+                            {:else if preparedHasUserDocker}
+                                <Badge variant="success">Dockerfile detected</Badge>
+                            {/if}
+                        </div>
+                    </div>
+                    <div class="mt-4 grid gap-3 md:grid-cols-2">
+                        <button
+                            type="button"
+                            class="flex h-full flex-col gap-2 rounded-[var(--radius-md)] border p-4 text-left transition-colors {deployStrategy ===
+                            'docker'
+                                ? 'border-[var(--primary)] bg-[var(--primary-light)]'
+                                : 'border-[var(--border)] hover:bg-[var(--surface-dark)]'} {hasDockerStrategy
+                            ? ''
+                            : 'opacity-60 cursor-not-allowed'}"
+                            onclick={() =>
+                                hasDockerStrategy && (deployStrategy = "docker")}
+                            disabled={!hasDockerStrategy}
+                            title={!hasDockerStrategy
+                                ? "Dockerfile or docker-compose.yml not found in this repo."
+                                : "Use repo container configuration."}
+                        >
+                            <span class="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                                Dockerfile / Compose
+                                {#if !hasDockerStrategy}
+                                    <Lock size={14} class="text-[var(--text-muted)]" />
+                                {/if}
+                            </span>
+                            <span class="text-xs text-[var(--text-secondary)]">
+                                Use repo container config. Provide port, domain, and env vars.
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            class="flex h-full flex-col gap-2 rounded-[var(--radius-md)] border p-4 text-left transition-colors {deployStrategy ===
+                            'yaml'
+                                ? 'border-[var(--primary)] bg-[var(--primary-light)]'
+                                : 'border-[var(--border)] hover:bg-[var(--surface-dark)]'}"
+                            onclick={() => (deployStrategy = "yaml")}
+                        >
+                            <span class="text-sm font-semibold text-[var(--text-primary)]">
+                                okastr8.yaml
+                            </span>
+                            <span class="text-xs text-[var(--text-secondary)]">
+                                Full configuration with runtime, build, and service options.
+                            </span>
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Config Form -->
                 <div class="mt-6 border-t border-[var(--border)] pt-6 space-y-2">
                     {#if deployState === "loading"}
@@ -414,16 +505,58 @@
                             No okastr8.yaml found. Fill in the settings below.
                         </p>
                     {/if}
-                    <DeployConfig
-                        bind:this={deployConfigRef}
-                        appName={preparedAppName}
-                        config={preparedConfig ?? {}}
-                        detectedRuntime={preparedRuntime}
-                        hasUserDocker={preparedHasUserDocker}
-                        disabled={deployState === "loading" || deployState === "deploying"}
-                        showActions={false}
-                        embedded={true}
-                    />
+                    {#if deployStrategy === "yaml"}
+                        <DeployConfig
+                            bind:this={deployConfigRef}
+                            appName={preparedAppName}
+                            config={preparedConfig ?? {}}
+                            detectedRuntime={preparedRuntime}
+                            hasUserDocker={preparedHasUserDocker}
+                            disabled={deployState === "loading" || deployState === "deploying"}
+                            showActions={false}
+                            embedded={true}
+                        />
+                    {:else}
+                        <div class="space-y-4">
+                            <p class="text-sm text-[var(--text-secondary)]">
+                                Runtime and start command are managed by your Dockerfile or docker-compose.
+                            </p>
+                            <div class="grid gap-4 md:grid-cols-2">
+                                <div class="space-y-2">
+                                    <label
+                                        for="docker-port"
+                                        class="text-sm font-medium text-[var(--text-primary)]"
+                                        >Port</label
+                                    >
+                                    <input
+                                        id="docker-port"
+                                        type="number"
+                                        min="1"
+                                        max="65535"
+                                        bind:value={dockerPort}
+                                        class="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                                        placeholder="3000"
+                                        disabled={deployState === "loading" || deployState === "deploying"}
+                                    />
+                                </div>
+                                <div class="space-y-2">
+                                    <label
+                                        for="docker-domain"
+                                        class="text-sm font-medium text-[var(--text-primary)]"
+                                        >Domain (optional)</label
+                                    >
+                                    <input
+                                        id="docker-domain"
+                                        type="text"
+                                        bind:value={dockerDomain}
+                                        class="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                                        placeholder="app.example.com"
+                                        disabled={deployState === "loading" || deployState === "deploying"}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    {/if}
                 </div>
 
                 <!-- Env Vars -->
@@ -645,23 +778,36 @@
                         <span class="font-medium">{getStrategySummary(pendingConfig)}</span>
                     </div>
                     <div class="flex items-center justify-between">
-                        <span class="text-[var(--text-secondary)]">Runtime</span>
-                        <span class="font-medium">{pendingConfig?.runtime || "custom"}</span>
+                        <span class="text-[var(--text-secondary)]">Input mode</span>
+                        <span class="font-medium">{deployStrategy === "docker" ? "Dockerfile / Compose" : "okastr8.yaml"}</span>
                     </div>
+                    {#if deployStrategy === "yaml"}
+                        <div class="flex items-center justify-between">
+                            <span class="text-[var(--text-secondary)]">Runtime</span>
+                            <span class="font-medium">{pendingConfig?.runtime || "custom"}</span>
+                        </div>
+                    {:else}
+                        <div class="flex items-center justify-between">
+                            <span class="text-[var(--text-secondary)]">Runtime</span>
+                            <span class="font-medium">Dockerfile / compose</span>
+                        </div>
+                    {/if}
                     <div class="flex items-center justify-between">
                         <span class="text-[var(--text-secondary)]">Port</span>
                         <span class="font-medium">{pendingConfig?.port ?? "—"}</span>
                     </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-[var(--text-secondary)]">Start Command</span>
-                        <span class="font-medium">{pendingConfig?.startCommand || "—"}</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-[var(--text-secondary)]">Build Steps</span>
-                        <span class="font-medium">
-                            {pendingConfig?.buildSteps?.length ?? 0}
-                        </span>
-                    </div>
+                    {#if deployStrategy === "yaml"}
+                        <div class="flex items-center justify-between">
+                            <span class="text-[var(--text-secondary)]">Start Command</span>
+                            <span class="font-medium">{pendingConfig?.startCommand || "—"}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[var(--text-secondary)]">Build Steps</span>
+                            <span class="font-medium">
+                                {pendingConfig?.buildSteps?.length ?? 0}
+                            </span>
+                        </div>
+                    {/if}
                     <div class="flex items-center justify-between">
                         <span class="text-[var(--text-secondary)]">Domain</span>
                         <span class="font-medium">{pendingConfig?.domain || "—"}</span>
