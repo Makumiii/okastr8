@@ -46,7 +46,7 @@
         </div>
         <a
             href="/github"
-            class="inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--primary-hover)]"
+            class="inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-[var(--primary-ink)] transition-colors hover:bg-[var(--primary-strong)]"
         >
             + Deploy New
         </a>
@@ -85,7 +85,7 @@
             </p>
             <a
                 href="/github"
-                class="mt-6 inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--primary)] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--primary-hover)]"
+                class="mt-6 inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--primary)] px-6 py-2.5 text-sm font-medium text-[var(--primary-ink)] transition-colors hover:bg-[var(--primary-strong)]"
             >
                 Go to GitHub
             </a>
@@ -165,7 +165,7 @@
                         {/if}
 
                         <div
-                            class="mt-4 flex items-center justify-end gap-1 text-sm font-medium text-[var(--primary)]"
+                            class="mt-4 flex items-center justify-end gap-1 text-sm font-medium text-[var(--primary-strong)]"
                         >
                             Manage <ArrowRight size={16} />
                         </div>

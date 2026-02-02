@@ -106,7 +106,7 @@
         {#if status?.connected}
             <div class="flex items-center gap-3">
                 <Badge variant="success">
-                    <span class="inline-block h-2 w-2 rounded-full bg-green-500"
+                    <span class="inline-block h-2 w-2 rounded-full bg-[var(--success)]"
                     ></span>
                     Connected as @{status.username}
                 </Badge>
@@ -145,7 +145,7 @@
                 type="text"
                 bind:value={search}
                 placeholder="Search repositories..."
-                class="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none"
+                class="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none"
             />
         </Card>
 
@@ -197,7 +197,7 @@
                             href="/github/deploy/{encodeURIComponent(
                                 repo.full_name,
                             )}"
-                            class="inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--primary-hover)]"
+                            class="inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-ink)] transition-colors hover:bg-[var(--primary-strong)]"
                         >
                             Deploy
                         </a>

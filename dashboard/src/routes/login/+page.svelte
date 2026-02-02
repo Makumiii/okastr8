@@ -119,7 +119,7 @@
                             bind:value={token}
                             onkeydown={handleKeydown}
                             placeholder="Enter your API token"
-                            class="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2"
+                            class="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2"
                         />
                     </div>
 
@@ -138,7 +138,7 @@
                     >
                         {#if isLoading}
                             <div
-                                class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
+                                class="h-4 w-4 animate-spin rounded-full border-2 border-[var(--primary-ink)] border-t-transparent"
                             ></div>
                             Verifying...
                         {:else}

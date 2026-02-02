@@ -179,7 +179,7 @@
 <div class="space-y-6">
     <!-- Breadcrumb -->
     <div class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-        <a href="/apps" class="hover:text-[var(--primary)]">Apps</a>
+        <a href="/apps" class="hover:text-[var(--primary-strong)]">Apps</a>
         <span>→</span>
         <span class="font-medium text-[var(--text-primary)]">{appName}</span>
     </div>
@@ -344,7 +344,7 @@
 <!-- Logs Modal -->
 {#if showLogs}
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4"
         role="button"
         tabindex="0"
         onclick={() => (showLogs = false)}
@@ -352,7 +352,7 @@
     >
         <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
         <div
-            class="max-h-[80vh] w-full max-w-4xl overflow-hidden rounded-[var(--radius-lg)] bg-white shadow-xl"
+            class="max-h-[80vh] w-full max-w-4xl overflow-hidden rounded-[var(--radius-lg)] bg-[var(--bg-card)] shadow-xl"
             role="document"
             tabindex="-1"
             onclick={(e) => e.stopPropagation()}
@@ -373,7 +373,7 @@
             </div>
             <div class="max-h-[60vh] overflow-auto bg-[var(--bg-terminal)] p-4">
                 <pre
-                    class="whitespace-pre-wrap font-mono text-sm text-green-400">{logs}</pre>
+                    class="whitespace-pre-wrap font-mono text-sm text-[var(--accent)]">{logs}</pre>
             </div>
         </div>
     </div>
@@ -382,7 +382,7 @@
 <!-- Delete Confirmation Modal -->
 {#if showConfirmDelete}
     <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4"
         role="button"
         tabindex="0"
         onclick={() => (showConfirmDelete = false)}

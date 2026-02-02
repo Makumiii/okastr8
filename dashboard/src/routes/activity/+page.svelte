@@ -132,7 +132,7 @@
             if (data.status === "failed") return "text-[var(--error)]";
             if (data.status === "success") return "text-[var(--success)]";
         }
-        return "text-[var(--primary)]";
+        return "text-[var(--primary-strong)]";
     }
 </script>
 
@@ -241,7 +241,7 @@
         {:else}
             {#each activities as item (item.id)}
                 <Card
-                    class="flex flex-col gap-4 !p-4 transition-all hover:bg-[var(--surface-dark)]/50"
+                    class="flex flex-col gap-4 !p-4 transition-all hover:bg-[var(--surface-dark)]"
                 >
                     <div class="flex items-start gap-4">
                         <div
@@ -314,7 +314,7 @@
                             {#if item.type === "deploy" && (item.data.status === "success" || item.data.status === "failed")}
                                 <div class="mt-3">
                                     <button
-                                        class="flex items-center gap-1 text-xs font-medium text-[var(--primary)] hover:underline"
+                                        class="flex items-center gap-1 text-xs font-medium text-[var(--primary-strong)] hover:underline"
                                         on:click={() =>
                                             toggleLog(item.data.id || item.id)}
                                     >
@@ -332,7 +332,7 @@
                     <!-- Expanded Logs -->
                     {#if expandedLogId === (item.data.id || item.id)}
                         <div
-                            class="mt-2 rounded-lg bg-black/90 p-4 font-mono text-xs text-gray-300 overflow-x-auto"
+                            class="mt-2 rounded-lg bg-[var(--bg-terminal)] p-4 font-mono text-xs text-[var(--accent)] overflow-x-auto"
                         >
                             {#if isLoadingLog}
                                 <div class="flex items-center gap-2">

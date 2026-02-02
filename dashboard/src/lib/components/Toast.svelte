@@ -3,10 +3,10 @@
     import { cn } from "$lib/utils";
 
     const typeStyles = {
-        success: "bg-[var(--success)] text-white",
-        error: "bg-[var(--error)] text-white",
-        warning: "bg-[var(--warning)] text-white",
-        info: "bg-[var(--primary)] text-white",
+        success: "bg-[var(--success)] text-[var(--primary-ink)]",
+        error: "bg-[var(--error)] text-[var(--text-inverse)]",
+        warning: "bg-[var(--warning)] text-[var(--text-inverse)]",
+        info: "bg-[var(--primary)] text-[var(--primary-ink)]",
     };
 
     const icons = {

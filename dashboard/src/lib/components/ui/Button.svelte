@@ -28,14 +28,15 @@
 
     const variants: Record<Variant, string> = {
         default:
-            "bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)]",
-        destructive: "bg-[var(--error)] text-white hover:bg-red-700",
+            "bg-[var(--primary)] text-[var(--primary-ink)] hover:bg-[var(--primary-strong)]",
+        destructive:
+            "bg-[var(--error)] text-[var(--text-inverse)] hover:bg-[var(--ink-strong)]",
         outline:
-            "border border-[var(--border)] bg-transparent hover:bg-[var(--bg-sidebar)]",
+            "border border-[var(--border)] bg-transparent text-[var(--text-primary)] hover:bg-[var(--surface-dark)]",
         secondary:
-            "bg-[var(--bg-sidebar)] text-[var(--text-primary)] hover:bg-[var(--border)]",
-        ghost: "hover:bg-[var(--bg-sidebar)]",
-        link: "text-[var(--primary)] underline-offset-4 hover:underline",
+            "bg-[var(--surface-dark)] text-[var(--text-primary)] hover:bg-[var(--bg-sidebar-active)]",
+        ghost: "text-[var(--text-primary)] hover:bg-[var(--surface-dark)]",
+        link: "text-[var(--primary-strong)] underline-offset-4 hover:underline",
     };
 
     const sizes: Record<Size, string> = {
@@ -48,7 +49,7 @@
 
 <button
     class={cn(
-        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[var(--radius-md)] text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-page)] disabled:pointer-events-none disabled:opacity-50",
         variants[variant],
         sizes[size],
         className,

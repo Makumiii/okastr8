@@ -208,19 +208,19 @@
 <div
     class={embedded
         ? "w-full"
-        : "bg-[#1e1e1e] p-6 rounded-lg border border-[#333] shadow-xl w-full max-w-2xl mx-auto"}
+        : "bg-[var(--surface)] p-6 rounded-[var(--radius-lg)] border border-[var(--border)] shadow-[var(--shadow-md)] w-full max-w-2xl mx-auto"}
     transition:fade
 >
     {#if !embedded}
-        <div class="flex items-center gap-3 mb-6 border-b border-[#333] pb-4">
-            <div class="p-2 bg-blue-500/20 rounded-lg">
-                <Settings class="w-6 h-6 text-blue-400" />
+        <div class="flex items-center gap-3 mb-6 border-b border-[var(--border)] pb-4">
+            <div class="p-2 bg-[var(--primary-light)] rounded-lg">
+                <Settings class="w-6 h-6 text-[var(--primary-strong)]" />
             </div>
             <div>
-                <h2 class="text-xl font-bold text-gray-100">
+                <h2 class="text-xl font-bold text-[var(--text-primary)]">
                     Deployment Configuration
                 </h2>
-                <p class="text-sm text-gray-400">
+                <p class="text-sm text-[var(--text-secondary)]">
                     Configure how {appName} should be built and run
                 </p>
             </div>
@@ -238,7 +238,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="space-y-2">
                 <label
-                    class="text-sm font-medium text-gray-300 flex items-center gap-2"
+                    class="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2"
                 >
                     <Server class="w-4 h-4" /> Runtime
                 </label>
@@ -246,7 +246,7 @@
                     type="text"
                     bind:value={runtime}
                     list="runtime-options"
-                    class="w-full bg-[#111] border border-[#333] rounded-md px-3 py-2 text-gray-200 focus:outline-none focus:border-blue-500 transition-colors"
+                    class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-3 py-2 text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] transition-colors"
                     placeholder="node:22"
                     disabled={isDisabled}
                 />
@@ -259,14 +259,14 @@
 
             <div class="space-y-2">
                 <label
-                    class="text-sm font-medium text-gray-300 flex items-center gap-2"
+                    class="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2"
                 >
                     <ExternalLink class="w-4 h-4" /> Port
                 </label>
                 <input
                     type="number"
                     bind:value={port}
-                    class="w-full bg-[#111] border border-[#333] rounded-md px-3 py-2 text-gray-200 focus:outline-none focus:border-blue-500 transition-colors"
+                    class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-3 py-2 text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] transition-colors"
                     placeholder="3000"
                     disabled={isDisabled}
                 />
@@ -276,14 +276,14 @@
         <!-- Domain -->
         <div class="space-y-2">
             <label
-                class="text-sm font-medium text-gray-300 flex items-center gap-2"
+                class="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2"
             >
                 <Globe class="w-4 h-4" /> Domain (Optional)
             </label>
                 <input
                     type="text"
                     bind:value={domain}
-                    class="w-full bg-[#111] border border-[#333] rounded-md px-3 py-2 text-gray-200 focus:outline-none focus:border-blue-500 transition-colors"
+                    class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-3 py-2 text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] transition-colors"
                     placeholder="myapp.example.com"
                     disabled={isDisabled}
                 />
@@ -291,11 +291,11 @@
 
         <!-- Infrastructure / Services -->
         <div
-            class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-[#333] pt-4 mt-4"
+            class="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-[var(--border)] pt-4 mt-4"
         >
             <div class="space-y-2">
                 <label
-                    class="text-sm font-medium text-gray-300 flex items-center gap-2"
+                    class="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2"
                 >
                     <Database class="w-4 h-4" /> Database
                 </label>
@@ -303,7 +303,7 @@
                     <div class="w-3/5">
                         <select
                             bind:value={dbType}
-                            class="w-full bg-[#111] border border-[#333] rounded-md px-3 py-2 text-gray-200 focus:outline-none focus:border-blue-500 transition-colors"
+                            class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-3 py-2 text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] transition-colors"
                             disabled={isDisabled}
                         >
                             {#each DB_TYPES as t}
@@ -316,7 +316,7 @@
                             <input
                                 type="text"
                                 bind:value={dbVersion}
-                                class="w-full bg-[#111] border border-[#333] rounded-md px-3 py-2 text-gray-200 focus:outline-none focus:border-blue-500 transition-colors"
+                                class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-3 py-2 text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] transition-colors"
                                 placeholder="Version (e.g. 15)"
                                 disabled={isDisabled}
                             />
@@ -327,7 +327,7 @@
                     <input
                         type="text"
                         bind:value={dbVersion}
-                        class="w-full bg-[#111] border border-[#333] rounded-md px-3 py-2 text-gray-200 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                        class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-3 py-2 text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] transition-colors"
                         placeholder="Full Image (e.g. postgres:15-alpine)"
                         disabled={isDisabled}
                     />
@@ -336,7 +336,7 @@
 
             <div class="space-y-2">
                 <label
-                    class="text-sm font-medium text-gray-300 flex items-center gap-2"
+                    class="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2"
                 >
                     <Zap class="w-4 h-4" /> Cache
                 </label>
@@ -344,7 +344,7 @@
                     <div class="w-3/5">
                         <select
                             bind:value={cacheType}
-                            class="w-full bg-[#111] border border-[#333] rounded-md px-3 py-2 text-gray-200 focus:outline-none focus:border-blue-500 transition-colors"
+                            class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-3 py-2 text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] transition-colors"
                             disabled={isDisabled}
                         >
                             {#each CACHE_TYPES as t}
@@ -357,7 +357,7 @@
                             <input
                                 type="text"
                                 bind:value={cacheVersion}
-                                class="w-full bg-[#111] border border-[#333] rounded-md px-3 py-2 text-gray-200 focus:outline-none focus:border-blue-500 transition-colors"
+                                class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-3 py-2 text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] transition-colors"
                                 placeholder="Version (e.g. 7)"
                                 disabled={isDisabled}
                             />
@@ -368,7 +368,7 @@
                     <input
                         type="text"
                         bind:value={cacheVersion}
-                        class="w-full bg-[#111] border border-[#333] rounded-md px-3 py-2 text-gray-200 text-sm focus:outline-none focus:border-blue-500 transition-colors"
+                        class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-3 py-2 text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] transition-colors"
                         placeholder="Full Image (e.g. redis:7-alpine)"
                         disabled={isDisabled}
                     />
@@ -377,39 +377,39 @@
         </div>
 
         <!-- Commands -->
-        <div class="space-y-4 border-t border-[#333] pt-4">
+        <div class="space-y-4 border-t border-[var(--border)] pt-4">
             <div class="space-y-2">
                 <label
-                    class="text-sm font-medium text-gray-300 flex items-center gap-2"
+                    class="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2"
                 >
                     <Terminal class="w-4 h-4" /> Build Command (Optional)
                 </label>
                 <textarea
                     bind:value={buildSteps}
                     rows="2"
-                    class="w-full bg-[#111] border border-[#333] rounded-md px-3 py-2 text-gray-200 focus:outline-none focus:border-blue-500 transition-colors font-mono text-sm"
+                    class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-3 py-2 text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] transition-colors font-mono text-sm"
                     placeholder="npm install&#10;npm run build"
                     disabled={isDisabled}
                 ></textarea>
-                <p class="text-xs text-gray-500">One command per line</p>
+                <p class="text-xs text-[var(--text-muted)]">One command per line</p>
             </div>
 
             <div class="space-y-2">
                 <label
-                    class="text-sm font-medium text-gray-300 flex items-center gap-2"
+                    class="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2"
                 >
                     <RefreshCw class="w-4 h-4" /> Start Command
                 </label>
                 <input
                     type="text"
                     bind:value={startCommand}
-                    class="w-full bg-[#111] border border-[#333] rounded-md px-3 py-2 text-gray-200 focus:outline-none focus:border-blue-500 transition-colors font-mono text-sm"
+                    class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-3 py-2 text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] transition-colors font-mono text-sm"
                     placeholder="npm run start"
                     required={startRequired}
                     disabled={isDisabled}
                 />
                 {#if !startRequired}
-                    <p class="text-xs text-gray-500">
+                    <p class="text-xs text-[var(--text-muted)]">
                         Optional when a Dockerfile or docker-compose.yml is present.
                     </p>
                 {/if}
@@ -419,12 +419,12 @@
         <!-- Actions -->
         {#if showActions}
             <div
-                class="flex items-center justify-end gap-3 pt-4 border-t border-[#333] mt-6"
+                class="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border)] mt-6"
             >
                 <button
                     type="button"
                     onclick={() => dispatch("cancel")}
-                    class="px-4 py-2 text-sm font-medium text-gray-400 hover:text-white transition-colors"
+                    class="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                     disabled={isSubmitting || isDisabled}
                 >
                     Cancel
@@ -432,11 +432,11 @@
                 <button
                     type="submit"
                     disabled={isSubmitting || isDisabled}
-                    class="flex items-center gap-2 px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    class="flex items-center gap-2 px-6 py-2 bg-[var(--primary)] hover:bg-[var(--primary-strong)] text-[var(--primary-ink)] rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {#if isSubmitting}
                         <div
-                            class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
+                            class="w-4 h-4 border-2 border-[var(--primary-ink)] border-t-transparent rounded-full animate-spin"
                         ></div>
                         Deploying...
                     {:else}

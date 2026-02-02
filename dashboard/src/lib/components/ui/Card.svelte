@@ -12,7 +12,7 @@
 
 <div
     class={cn(
-        "rounded-[var(--radius-lg)] bg-[var(--bg-card)] p-6 shadow-[var(--shadow-md)] transition-shadow hover:shadow-[var(--shadow-lg)]",
+        "rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-sm)] transition-shadow hover:shadow-[var(--shadow-md)]",
         className,
     )}
     {...restProps}

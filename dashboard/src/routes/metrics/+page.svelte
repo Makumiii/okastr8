@@ -265,8 +265,8 @@
             <Card class="flex flex-col items-center p-6 relative">
                 <button
                     class="absolute top-2 right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-                    on:mouseenter={() => showTooltip("cpu_usage")}
-                    on:mouseleave={hideTooltip}
+                    onmouseenter={() => showTooltip("cpu_usage")}
+                    onmouseleave={hideTooltip}
                 >
                     <Info size={14} />
                 </button>
@@ -337,8 +337,8 @@
             <Card class="flex flex-col items-center p-6 relative">
                 <button
                     class="absolute top-2 right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-                    on:mouseenter={() => showTooltip("ram_usage")}
-                    on:mouseleave={hideTooltip}
+                    onmouseenter={() => showTooltip("ram_usage")}
+                    onmouseleave={hideTooltip}
                 >
                     <Info size={14} />
                 </button>
@@ -406,8 +406,8 @@
             <Card class="flex flex-col items-center p-6 relative">
                 <button
                     class="absolute top-2 right-2 text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-                    on:mouseenter={() => showTooltip("swap_usage")}
-                    on:mouseleave={hideTooltip}
+                    onmouseenter={() => showTooltip("swap_usage")}
+                    onmouseleave={hideTooltip}
                 >
                     <Info size={14} />
                 </button>
@@ -476,8 +476,8 @@
             <Card
                 class="flex flex-col items-center justify-center p-6 bg-[var(--primary-light)]"
             >
-                <Activity size={28} class="text-[var(--primary)] mb-2" />
-                <h3 class="text-sm font-semibold text-[var(--primary)]">
+                <Activity size={28} class="text-[var(--primary-strong)] mb-2" />
+                <h3 class="text-sm font-semibold text-[var(--primary-strong)]">
                     Uptime
                 </h3>
                 <p class="text-xl font-bold text-[var(--text-primary)]">
@@ -491,7 +491,7 @@
                         class="flex items-center gap-2 font-bold uppercase text-[var(--text-tertiary)]"
                     >
                         <span
-                            class="i-heroicons-globe-alt text-[var(--primary)]"
+                            class="i-heroicons-globe-alt text-[var(--primary-strong)]"
                         ></span>
                         Network & I/O
                     </h3>
@@ -647,8 +647,8 @@
                 <HardDrive size={18} /> Disk Usage
                 <button
                     class="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-                    on:mouseenter={() => showTooltip("disk_usage")}
-                    on:mouseleave={hideTooltip}
+                    onmouseenter={() => showTooltip("disk_usage")}
+                    onmouseleave={hideTooltip}
                 >
                     <Info size={14} />
                 </button>
@@ -736,8 +736,8 @@
                 <Cpu size={18} /> Load Average
                 <button
                     class="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
-                    on:mouseenter={() => showTooltip("load_avg")}
-                    on:mouseleave={hideTooltip}
+                    onmouseenter={() => showTooltip("load_avg")}
+                    onmouseleave={hideTooltip}
                 >
                     <Info size={14} />
                 </button>
@@ -834,7 +834,7 @@
                                     <span>{formatBytes(iface.rxBytes)}</span>
                                 </div>
                                 <div
-                                    class="flex items-center gap-1 text-[var(--primary)]"
+                                    class="flex items-center gap-1 text-[var(--primary-strong)]"
                                 >
                                     <ArrowUp size={10} />
                                     <span>{formatBytes(iface.txBytes)}</span>

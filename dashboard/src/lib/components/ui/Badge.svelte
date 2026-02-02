@@ -18,11 +18,12 @@
     }: Props = $props();
 
     const variants: Record<Variant, string> = {
-        default: "bg-[var(--bg-sidebar)] text-[var(--text-primary)]",
+        default: "bg-[var(--surface-dark)] text-[var(--text-primary)]",
         success: "bg-[var(--success-light)] text-[var(--success)]",
         error: "bg-[var(--error-light)] text-[var(--error)]",
         warning: "bg-[var(--warning-light)] text-[var(--warning)]",
-        outline: "border border-[var(--border)] bg-transparent",
+        outline:
+            "border border-[var(--border)] bg-transparent text-[var(--text-secondary)]",
     };
 </script>
 

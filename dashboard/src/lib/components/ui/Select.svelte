@@ -60,38 +60,30 @@
         bind:this={triggerRef}
         type="button"
         onclick={toggle}
-        class="flex h-10 w-full items-center justify-between rounded-xl border px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2"
-        style="background-color: #ffffff; color: #1a1a1a; border-color: #e5e7eb;"
+        class="flex h-10 w-full items-center justify-between rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2 focus:ring-offset-[var(--bg-page)]"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
     >
-        <span style="color: #1a1a1a;">{getSelectedLabel()}</span>
-        <ChevronDown size={16} style="color: #6b7280;" />
+        <span class="text-[var(--text-primary)]">{getSelectedLabel()}</span>
+        <ChevronDown size={16} class="text-[var(--text-secondary)]" />
     </button>
 
     {#if isOpen}
         <ul
             role="listbox"
-            class="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-xl border shadow-lg"
-            style="background-color: #ffffff; border-color: #e5e7eb;"
+            class="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] shadow-[var(--shadow-lg)]"
         >
             {#each options as opt}
                 <li
                     role="option"
                     aria-selected={opt.value === value}
                     tabindex="0"
-                    class="cursor-pointer px-3 py-2 text-sm transition-colors"
-                    style="color: #1a1a1a; background-color: {opt.value ===
+                    class="cursor-pointer px-3 py-2 text-sm text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-dark)] {opt.value ===
                     value
-                        ? '#e8f5e9'
-                        : '#ffffff'};"
+                        ? 'bg-[var(--bg-sidebar-active)]'
+                        : ''}"
                     onclick={() => selectOption(opt)}
                     onkeydown={(e) => e.key === "Enter" && selectOption(opt)}
-                    onmouseenter={(e) =>
-                        (e.currentTarget.style.backgroundColor = "#f3f4f6")}
-                    onmouseleave={(e) =>
-                        (e.currentTarget.style.backgroundColor =
-                            opt.value === value ? "#e8f5e9" : "#ffffff")}
                 >
                     {opt.label}
                 </li>

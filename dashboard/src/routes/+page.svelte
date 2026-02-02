@@ -67,17 +67,21 @@
         if (status === "warning") return "warning";
         return "error";
     }
+
+    const healthVariant = $derived(
+        data ? getHealthColor(data.health.status) : "success",
+    );
 </script>
 
-<div class="space-y-6">
+<div class="space-y-8">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
             <h1 class="text-2xl font-bold text-[var(--text-primary)]">
                 Dashboard
             </h1>
             <p class="mt-1 text-[var(--text-secondary)]">
-                Monitor your server and deployments
+                Monitor your server, deployments, and runtime health.
             </p>
         </div>
 
@@ -88,13 +92,13 @@
                 data.activityStats.loginsToday}
             <a
                 href="/activity"
-                class="relative flex items-center gap-2 rounded-lg bg-[var(--surface)] px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-dark)] hover:text-[var(--text-primary)]"
+                class="relative inline-flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-dark)] hover:text-[var(--text-primary)]"
             >
-                <Inbox size={20} />
+                <Inbox size={18} />
                 <span>Inbox</span>
                 {#if totalCount > 0}
                     <span
-                        class="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--primary)] text-[10px] font-bold text-white shadow-sm"
+                        class="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--primary)] text-[10px] font-bold text-[var(--primary-ink)] shadow-sm"
                     >
                         {totalCount > 99 ? "99+" : totalCount}
                     </span>
@@ -119,35 +123,97 @@
             <p class="text-[var(--error)]">{error}</p>
         </Card>
     {:else if data}
-        <!-- Welcome Card -->
-        <Card
-            class="bg-gradient-to-br from-[var(--primary)] to-[var(--primary-hover)] text-white"
-        >
-            <div class="flex items-center justify-between">
-                <div>
-                    <h2 class="text-xl font-semibold">
-                        Welcome back, {data.user}
-                    </h2>
+        <!-- Hero Row -->
+        <section class="grid gap-6 lg:grid-cols-12">
+            <Card
+                class="relative overflow-hidden bg-gradient-to-br from-[var(--primary)] to-[var(--primary-strong)] text-[var(--primary-ink)] lg:col-span-8"
+            >
+                <div class="relative z-10 flex flex-col gap-6">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-xs uppercase tracking-wide opacity-70">
+                                Welcome
+                            </p>
+                            <h2 class="text-2xl font-semibold">
+                                {data.user}, your systems are live.
+                            </h2>
+                            <p class="mt-2 text-sm opacity-80">
+                                Review today's health signals and recent activity.
+                            </p>
+                        </div>
+                        <div class="flex flex-col items-end gap-2">
+                            <Badge variant={healthVariant} class="!bg-[var(--surface-glass)]">
+                                <span
+                                    class="inline-block h-2 w-2 rounded-full {healthVariant ===
+                                    'success'
+                                        ? 'bg-[var(--success)]'
+                                        : healthVariant === 'warning'
+                                          ? 'bg-[var(--warning)]'
+                                          : 'bg-[var(--error)]'}"
+                                ></span>
+                                {data.health.status.toUpperCase()}
+                            </Badge>
+                            <span
+                                class="flex items-center gap-2 rounded-full bg-[var(--surface-glass)] px-3 py-1.5 text-xs"
+                            >
+                                <Server size={14} />
+                                {data.hostname}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3 text-xs font-medium">
+                        <span class="rounded-full bg-[var(--surface-glass-muted)] px-3 py-1.5">
+                            {data.health.counts.info} Info
+                        </span>
+                        <span class="rounded-full bg-[var(--surface-glass-muted)] px-3 py-1.5">
+                            {data.health.counts.warning} Warnings
+                        </span>
+                        <span class="rounded-full bg-[var(--surface-glass-muted)] px-3 py-1.5">
+                            {data.health.counts.error} Errors
+                        </span>
+                    </div>
                 </div>
-                <div class="flex items-center gap-3">
-                    <Badge variant="success" class="!bg-white/20 !text-white">
-                        <span
-                            class="inline-block h-2 w-2 rounded-full bg-green-400"
-                        ></span>
-                        {data.health.status.toUpperCase()}
-                    </Badge>
-                    <span
-                        class="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-sm"
-                    >
-                        <Server size={14} />
-                        {data.hostname}
+                <div
+                    class="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-[var(--accent-glow)] blur-3xl"
+                ></div>
+            </Card>
+
+            <Card class="flex flex-col justify-between lg:col-span-4">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-xs uppercase tracking-wide text-[var(--text-muted)]">
+                            System Uptime
+                        </p>
+                        <div class="mt-3 text-2xl font-bold text-[var(--text-primary)]">
+                            {data.uptime}
+                        </div>
+                    </div>
+                    <span class="rounded-full bg-[var(--surface-dark)] p-2">
+                        <Clock size={18} />
                     </span>
                 </div>
-            </div>
-        </Card>
+                <div class="mt-6 space-y-2 text-sm text-[var(--text-secondary)]">
+                    <div class="flex items-center justify-between">
+                        <span>Server time</span>
+                        <span class="font-medium text-[var(--text-primary)]">
+                            {new Date(data.serverTime).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                            })}
+                        </span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>Host</span>
+                        <span class="font-medium text-[var(--text-primary)]">
+                            {data.hostname}
+                        </span>
+                    </div>
+                </div>
+            </Card>
+        </section>
 
         <!-- Stats Grid -->
-        <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <section class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <!-- Services -->
             <Card>
                 <div class="flex items-start justify-between">
@@ -175,23 +241,6 @@
                 </div>
             </Card>
 
-            <!-- Uptime -->
-            <Card class="bg-[var(--text-primary)] text-white">
-                <div class="flex items-start justify-between">
-                    <span class="text-sm opacity-70">System Uptime</span>
-                    <Clock size={20} />
-                </div>
-                <div class="mt-3 text-2xl font-bold">{data.uptime}</div>
-                <div
-                    class="mt-3 border-t border-white/10 pt-3 text-sm opacity-70"
-                >
-                    {new Date(data.serverTime).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                    })}
-                </div>
-            </Card>
-
             <!-- Environments -->
             <Card>
                 <div class="flex items-start justify-between">
@@ -214,10 +263,30 @@
                 </div>
             </Card>
 
-            <!-- System Load -->
-            <Card class="bg-[var(--warning-light)]">
+            <!-- Activity -->
+            <Card>
                 <div class="flex items-start justify-between">
-                    <span class="text-sm text-[var(--warning)] opacity-80"
+                    <span class="text-sm text-[var(--text-secondary)]"
+                        >Today's Activity</span
+                    >
+                    <Inbox size={20} />
+                </div>
+                <div class="mt-3 text-3xl font-bold text-[var(--text-primary)]">
+                    {data.activityStats
+                        ? data.activityStats.failedDeploysToday +
+                            data.activityStats.resourceWarningsToday +
+                            data.activityStats.loginsToday
+                        : 0}
+                </div>
+                <p class="mt-1 text-sm text-[var(--text-secondary)]">
+                    Logins & alerts today
+                </p>
+            </Card>
+
+            <!-- System Load -->
+            <Card>
+                <div class="flex items-start justify-between">
+                    <span class="text-sm text-[var(--text-secondary)]"
                         >System Load</span
                     >
                     <Activity size={20} class="text-[var(--warning)]" />
@@ -229,53 +298,104 @@
                     Active processes
                 </p>
             </Card>
-        </div>
+        </section>
 
-        <!-- Quick Actions -->
-        <Card class="flex items-center justify-between">
-            <div>
-                <h3 class="text-lg font-semibold text-[var(--text-primary)]">
-                    Deploy new app?
-                </h3>
-                <p class="mt-0.5 text-sm text-[var(--text-secondary)]">
-                    Connect to GitHub and ship in seconds.
-                </p>
-            </div>
-            <a
-                href="/github"
-                class="flex items-center gap-2 rounded-full bg-black px-6 py-2.5 text-sm font-medium !text-white transition-colors hover:bg-[var(--primary)]"
-            >
-                Go to GitHub <ArrowRight size={16} />
-            </a>
-        </Card>
-
-        <!-- Services List -->
-        <div>
-            <h3 class="mb-4 text-lg font-semibold text-[var(--text-primary)]">
-                Active Services
-            </h3>
-            <div class="space-y-3">
-                {#each data.services as service}
-                    <Card class="flex items-center justify-between !p-4">
-                        <div class="flex items-center gap-3">
-                            <span
-                                class="h-3 w-3 rounded-full {service.running
-                                    ? 'bg-[var(--success)] shadow-[0_0_8px_var(--success)]'
-                                    : 'bg-[var(--error)]'}"
-                            ></span>
-                            <span class="font-medium text-[var(--text-primary)]"
-                                >{service.name}</span
-                            >
-                            {#if service.isApp}
-                                <Badge variant="outline">App</Badge>
-                            {/if}
+        <section class="grid gap-6 lg:grid-cols-12">
+            <!-- Services List -->
+            <Card class="lg:col-span-8">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-semibold text-[var(--text-primary)]">
+                            Active Services
+                        </h3>
+                        <p class="mt-1 text-sm text-[var(--text-secondary)]">
+                            Live services and application status.
+                        </p>
+                    </div>
+                    <span class="text-xs text-[var(--text-muted)]">
+                        {data.services.length} total
+                    </span>
+                </div>
+                <div class="mt-5 divide-y divide-[var(--border)]">
+                    {#each data.services as service}
+                        <div class="flex items-center justify-between py-4">
+                            <div class="flex items-center gap-3">
+                                <span
+                                    class="h-2.5 w-2.5 rounded-full {service.running
+                                        ? 'bg-[var(--success)] shadow-[0_0_10px_var(--success)]'
+                                        : 'bg-[var(--error)]'}"
+                                ></span>
+                                <div>
+                                    <div class="font-medium text-[var(--text-primary)]">
+                                        {service.name}
+                                    </div>
+                                    <div class="text-xs text-[var(--text-muted)]">
+                                        {service.isApp ? "Application" : "Service"}
+                                    </div>
+                                </div>
+                            </div>
+                            <Badge variant={service.running ? "success" : "error"}>
+                                {service.status}
+                            </Badge>
                         </div>
-                        <Badge variant={service.running ? "success" : "error"}>
-                            {service.status}
-                        </Badge>
-                    </Card>
-                {/each}
+                    {/each}
+                </div>
+            </Card>
+
+            <!-- Actions & Health -->
+            <div class="grid gap-6 lg:col-span-4">
+                <Card class="flex flex-col gap-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-[var(--text-primary)]">
+                            Deploy new app?
+                        </h3>
+                        <p class="mt-1 text-sm text-[var(--text-secondary)]">
+                            Connect to GitHub and ship in seconds.
+                        </p>
+                    </div>
+                    <a
+                        href="/github"
+                        class="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--primary)] px-6 py-2.5 text-sm font-semibold text-[var(--primary-ink)] transition-colors hover:bg-[var(--primary-strong)]"
+                    >
+                        Go to GitHub <ArrowRight size={16} />
+                    </a>
+                </Card>
+
+                <Card>
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-base font-semibold text-[var(--text-primary)]">
+                            Activity Snapshot
+                        </h3>
+                        <Badge variant="outline">Today</Badge>
+                    </div>
+                    <div class="mt-4 space-y-3 text-sm">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[var(--text-secondary)]">
+                                Failed deploys
+                            </span>
+                            <span class="font-semibold text-[var(--text-primary)]">
+                                {data.activityStats?.failedDeploysToday ?? 0}
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[var(--text-secondary)]">
+                                Resource warnings
+                            </span>
+                            <span class="font-semibold text-[var(--text-primary)]">
+                                {data.activityStats?.resourceWarningsToday ?? 0}
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[var(--text-secondary)]">
+                                Logins
+                            </span>
+                            <span class="font-semibold text-[var(--text-primary)]">
+                                {data.activityStats?.loginsToday ?? 0}
+                            </span>
+                        </div>
+                    </div>
+                </Card>
             </div>
-        </div>
+        </section>
     {/if}
 </div>

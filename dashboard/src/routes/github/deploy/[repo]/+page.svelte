@@ -321,7 +321,7 @@
 <div class="space-y-6">
     <!-- Breadcrumb -->
     <div class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-        <a href="/github" class="hover:text-[var(--primary)]">GitHub</a>
+        <a href="/github" class="hover:text-[var(--primary-strong)]">GitHub</a>
         <span>→</span>
         <span class="font-medium text-[var(--text-primary)]"
             >{repoFullName}</span
@@ -363,13 +363,12 @@
                         bind:value={selectedBranch}
                         onchange={loadConfig}
                         disabled={deployState === "loading" || deployState === "deploying"}
-                        class="w-full rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm focus:border-[var(--primary)] focus:outline-none disabled:opacity-50"
-                        style="color: #1a1a1a; background-color: #ffffff;"
+                        class="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-card)] px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-[var(--primary)] focus:outline-none disabled:opacity-50"
                     >
                         {#each branches as branch}
                             <option
                                 value={branch}
-                                style="color: #1a1a1a; background-color: #ffffff;"
+                                class="text-[var(--text-primary)]"
                                 >{branch}</option
                             >
                         {/each}
@@ -399,7 +398,7 @@
                             type="checkbox"
                             bind:checked={webhookEnabled}
                             disabled={deployState === "loading" || deployState === "deploying"}
-                            class="h-4 w-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
+                            class="h-4 w-4 rounded border-[var(--border)] text-[var(--primary-strong)] focus:ring-[var(--primary)]"
                         />
                         <span class="text-sm text-[var(--text-primary)]"
                             >Enable auto-deploy on push</span
@@ -442,7 +441,7 @@
                         <div class="flex items-center gap-3 text-xs">
                             <button
                                 type="button"
-                                class="font-medium text-[var(--primary)] hover:underline"
+                                class="font-medium text-[var(--primary-strong)] hover:underline"
                                 onclick={addEnvEntry}
                                 disabled={deployState === "loading" || deployState === "deploying"}
                             >
@@ -462,7 +461,7 @@
                     <div
                         role="region"
                         aria-labelledby="env-vars-label"
-                        class="rounded-[var(--radius-md)] border border-[var(--border)] bg-white p-3"
+                        class="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] p-3"
                         ondrop={handleEnvDrop}
                         ondragover={(event) => event.preventDefault()}
                         onpaste={handleEnvPaste}
@@ -472,14 +471,14 @@
                                 <div class="grid grid-cols-12 gap-2 items-center">
                                     <input
                                         type="text"
-                                        class="col-span-5 rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+                                        class="col-span-5 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
                                         placeholder="KEY"
                                         bind:value={entry.key}
                                         disabled={deployState === "loading" || deployState === "deploying"}
                                     />
                                     <input
                                         type="text"
-                                        class="col-span-6 rounded-[var(--radius-md)] border border-[var(--border)] px-3 py-2 text-sm"
+                                        class="col-span-6 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
                                         placeholder="VALUE"
                                         bind:value={entry.value}
                                         disabled={deployState === "loading" || deployState === "deploying"}
@@ -498,7 +497,7 @@
                         </div>
                         <div class="mt-3 flex items-center justify-between text-xs text-[var(--text-secondary)]">
                             <span>Paste or drag & drop a .env file here</span>
-                            <label class="cursor-pointer text-[var(--primary)] hover:underline">
+                            <label class="cursor-pointer text-[var(--primary-strong)] hover:underline">
                                 Import .env
                                 <input
                                     type="file"
@@ -533,7 +532,7 @@
                         <div
                             class="flex items-center justify-center p-4 bg-[var(--bg-secondary)] rounded-lg"
                         >
-                            <Loader2 class="animate-spin text-blue-500 mr-2" />
+                            <Loader2 class="animate-spin text-[var(--primary-strong)] mr-2" />
                             <span
                                 class="text-sm text-[var(--text-secondary)] capitalize"
                                 >{deployState}...</span
@@ -542,7 +541,7 @@
                         <button
                             onclick={cancelDeploy}
                             disabled={isCancelling}
-                            class="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-red-500 rounded-xl border border-red-500 hover:bg-red-500 hover:text-white transition-colors disabled:opacity-50"
+                            class="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-[var(--error)] rounded-xl border border-[var(--error)] hover:bg-[var(--error)] hover:text-[var(--text-inverse)] transition-colors disabled:opacity-50"
                         >
                             {#if isCancelling}
                                 <Loader2 size={16} class="animate-spin" />
@@ -603,7 +602,7 @@
 
                 <div
                     bind:this={logsContainer}
-                    class="mt-4 flex-1 overflow-auto rounded-[var(--radius-md)] bg-[var(--bg-terminal)] p-4 font-mono text-sm text-green-400 border border-[var(--border)]"
+                    class="mt-4 flex-1 overflow-auto rounded-[var(--radius-md)] bg-[var(--bg-terminal)] p-4 font-mono text-sm text-[var(--accent)] border border-[var(--border)]"
                     style="min-height: 300px; max-height: 500px;"
                 >
                     {#if logs.length === 0}
@@ -624,7 +623,7 @@
                 {#if deployState === "finished" && deploySuccess}
                     <a
                         href="/apps"
-                        class="mt-4 inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--success)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-green-600"
+                        class="mt-4 inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--success)] px-4 py-2.5 text-sm font-medium text-[var(--primary-ink)] transition-colors hover:bg-[var(--primary-strong)]"
                     >
                         View Apps →
                     </a>
@@ -634,8 +633,8 @@
     {/if}
 
     {#if showConfirm}
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div class="w-full max-w-xl rounded-[var(--radius-md)] border border-[var(--border)] bg-white p-6 text-[var(--text-primary)] shadow-xl">
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4">
+            <div class="w-full max-w-xl rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] p-6 text-[var(--text-primary)] shadow-xl">
                 <h3 class="text-lg font-semibold text-[var(--text-primary)]">
                     Confirm deployment settings
                 </h3>
@@ -696,7 +695,7 @@
                         Cancel
                     </button>
                     <button
-                        class="rounded-[var(--radius-md)] bg-[var(--primary)] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                        class="rounded-[var(--radius-md)] bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-ink)] hover:bg-[var(--primary-strong)]"
                         onclick={confirmDeploy}
                     >
                         Deploy now
