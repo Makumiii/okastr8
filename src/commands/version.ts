@@ -260,9 +260,9 @@ export async function rollback(
     });
 
     if (result.success) {
-        log(`✅ Rollback to v${versionId} complete!`);
+        log(` Rollback to v${versionId} complete!`);
     } else {
-        log(`❌ Rollback failed: ${result.message}`);
+        log(` Rollback failed: ${result.message}`);
     }
 
     return result;

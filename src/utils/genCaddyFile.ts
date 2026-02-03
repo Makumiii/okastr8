@@ -80,7 +80,7 @@ export async function genCaddyFile(onLog?: (msg: string) => void) {
 
     if (onLog) onLog(`Caddyfile regenerated with ${caddyEntries.length} routes at ${caddyFilePath}`);
   } catch (e) {
-    console.error("❌ Error generating Caddyfile:", e);
+    console.error("Error generating Caddyfile:", e);
     // Don't throw, just log. Deployment shouldn't fail if Caddy fails? 
     // Actually, maybe it should warn.
     // throw e; 

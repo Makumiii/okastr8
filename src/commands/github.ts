@@ -84,15 +84,28 @@ export async function saveGitHubConfig(github: GitHubConfig): Promise<void> {
 }
 
 // OAuth Functions
-export function getAuthUrl(clientId: string, callbackUrl: string): string {
+export function getAuthUrl(clientId: string, callbackUrl: string, statePrefix?: string): string {
     const scopes = ["repo", "read:user", "admin:repo_hook", "admin:public_key"];
+    const randomState = Math.random().toString(36).substring(7);
+    const state = statePrefix ? `${statePrefix}_${randomState}` : randomState;
     const params = new URLSearchParams({
         client_id: clientId,
         redirect_uri: callbackUrl,
         scope: scopes.join(" "),
-        state: Math.random().toString(36).substring(7),
+        state,
     });
     return `https://github.com/login/oauth/authorize?${params}`;
+}
+
+export async function saveGitHubAdminIdentity(id: string | number, login: string): Promise<void> {
+    await saveSystemConfig({
+        manager: {
+            auth: {
+                github_admin_id: String(id),
+                github_admin_login: login,
+            },
+        },
+    });
 }
 
 export async function exchangeCodeForToken(
@@ -425,7 +438,7 @@ export async function inspectRepoConfig(
             const parsed = load(configContent) as any;
             config = {
                 runtime: parsed.runtime || "custom",
-                buildSteps: parsed.build || [],
+                buildSteps: normalizeBuildSteps(parsed.build),
                 startCommand: parsed.start || "",
                 port: parsed.port || 3000,
                 domain: parsed.domain,
@@ -489,6 +502,19 @@ export interface DetectedConfig {
     env?: Record<string, string>;
 }
 
+function normalizeBuildSteps(value: unknown): string[] {
+    if (Array.isArray(value)) {
+        return value.map((step) => String(step).trim()).filter((step) => step);
+    }
+    if (typeof value === "string") {
+        return value
+            .split("\n")
+            .map((step) => step.trim())
+            .filter((step) => step);
+    }
+    return [];
+}
+
 
 
 // Prepare repository for deployment (Clone & Detect Config)
@@ -541,6 +567,7 @@ export async function prepareRepoImport(
                 name: appName,
                 repo: repo.full_name,
                 branch: branch,
+                webhookBranch: branch,
                 created_at: new Date().toISOString()
             }, null, 2));
         }
@@ -552,7 +579,7 @@ export async function prepareRepoImport(
 
         // CLEANUP on failure
         const cleanupFailedPrepare = async (reason: string) => {
-            log(`🧹 Cleaning up prepare: ${reason}`);
+            log(` Cleaning up prepare: ${reason}`);
             try { await removeVersion(appName, versionId); } catch { }
             try { await rm(releasePath, { recursive: true, force: true }); } catch { }
         };
@@ -591,14 +618,14 @@ export async function prepareRepoImport(
         let detectedRuntime: string | undefined;
 
         if (configPath) {
-            log(`✅ ${configPath.endsWith(".yml") ? "okastr8.yml" : "okastr8.yaml"} found`);
+            log(` ${configPath.endsWith(".yml") ? "okastr8.yml" : "okastr8.yaml"} found`);
             try {
                 const { load } = await import('js-yaml');
                 const configContent = await readFile(configPath, 'utf-8');
                 const config = load(configContent) as any;
                 detectedConfig = {
                     runtime: config.runtime || 'custom',
-                    buildSteps: config.build || [],
+                    buildSteps: normalizeBuildSteps(config.build),
                     startCommand: config.start || '',
                     port: config.port || 3000,
                     domain: config.domain,
@@ -607,7 +634,7 @@ export async function prepareRepoImport(
                     env: {},
                 };
             } catch (e: any) {
-                log(`⚠️ Failed to parse okastr8.yaml: ${e.message}`);
+                log(`Warning: Failed to parse okastr8.yaml: ${e.message}`);
             }
         } else {
             log("ℹ️ No okastr8.yaml found - attempting auto-detection");
@@ -712,7 +739,7 @@ export async function finalizeRepoImport(
 
     // CLEANUP HELPER
     const cleanupFailedDeployment = async (reason: string) => {
-        log(`🧹 Cleaning up: ${reason}`);
+        log(` Cleaning up: ${reason}`);
         try {
             const { stopContainer, removeContainer, composeDown } = await import("./docker");
             await stopContainer(appName).catch(() => { });
@@ -767,7 +794,7 @@ export async function finalizeRepoImport(
                 cache: config.cache,
             });
             await writeFile(join(releasePath, "okastr8.yaml"), yamlContent);
-            log("✅ Configuration saved to release");
+            log(" Configuration saved to release");
         } catch (e: any) {
             await logActivity("deploy", {
                 id: activityId,
@@ -1054,7 +1081,7 @@ export async function createWebhook(repoFullName: string, accessToken: string): 
             return false;
         }
 
-        console.log("✅ Webhook created successfully");
+        console.log("Webhook created successfully");
         return true;
     } catch (e) {
         console.error("Webhook creation error:", e);

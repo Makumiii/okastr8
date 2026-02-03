@@ -116,9 +116,9 @@ export async function detectAllRuntimes(): Promise<Record<RuntimeName, RuntimeIn
         results[runtime] = await detectRuntime(runtime);
 
         if (results[runtime].installed) {
-            console.log(`  ✅ ${runtime} ${results[runtime].version || ''} found at ${results[runtime].path || 'unknown'}`);
+            console.log(`   ${runtime} ${results[runtime].version || ''} found at ${results[runtime].path || 'unknown'}`);
         } else {
-            console.log(`  ❌ ${runtime} not found`);
+            console.log(`   ${runtime} not found`);
         }
     }
 
@@ -168,7 +168,7 @@ export async function scanAndSaveEnvironments(): Promise<Record<RuntimeName, Run
     // Save to config
     await saveSystemConfig({ environments });
 
-    console.log("\n✅ Environment scan complete. Saved to system.yaml");
+    console.log("\n Environment scan complete. Saved to system.yaml");
 
     return environments;
 }
@@ -203,7 +203,7 @@ export function formatMissingRuntimeError(runtime: RuntimeName, distro?: string)
     const hint = getInstallHint(runtime, distro);
 
     return `
-❌ Runtime '${runtime}' is required but not installed.
+ Runtime '${runtime}' is required but not installed.
 
 To install ${runtime}:
   ${hint}

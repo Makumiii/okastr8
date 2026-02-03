@@ -29,7 +29,7 @@ export async function controlAllServices(action: 'start' | 'stop' | 'restart') {
             if (action === 'restart') await restartService(app.name);
             results.push({ name: app.name, success: true });
         } catch (e: any) {
-            console.error(`    ❌ Failed: ${e.message}`);
+            console.error(`     Failed: ${e.message}`);
             results.push({ name: app.name, success: false, error: e.message });
         }
     }
@@ -42,7 +42,7 @@ export async function controlAllServices(action: 'start' | 'stop' | 'restart') {
 async function nukeSystem() {
     console.clear();
     console.log(`
-☢️  WARNING: NUKE PROTOCOL INITIATED ☢️
+WARNING: NUKE PROTOCOL INITIATED
 
 You are about to DESTROY the entire okastr8 ecosystem on this machine.
 This action is IRREVERSIBLE.

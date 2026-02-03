@@ -8,6 +8,7 @@ import { sendAdminEmail } from './email';
 import { getSystemConfig } from '../config';
 import { logActivity } from '../utils/activity';
 import { collectMetrics, type MetricsResult } from '../commands/metrics';
+import { writeUnifiedEntry } from '../utils/structured-logger';
 
 // Alert State Tracking
 interface AlertState {
@@ -109,7 +110,14 @@ function shouldAlert(key: string, isViolating: boolean, requiredDurationMs: numb
  * Main Monitor Loop
  */
 export function startResourceMonitor() {
-    console.log('Resource monitor started (advanced)');
+    void writeUnifiedEntry({
+        timestamp: new Date().toISOString(),
+        level: 'info',
+        source: 'system',
+        service: 'resource-monitor',
+        message: 'Resource monitor started',
+        action: 'monitor-start',
+    });
     setTimeout(runMonitorLoop, 10000); // Initial delay
 }
 
@@ -148,6 +156,21 @@ async function runMonitorLoop() {
         setTimeout(runMonitorLoop, intervalMs);
     } catch (error) {
         console.error('Monitor loop error:', error);
+        if (error instanceof Error) {
+            void writeUnifiedEntry({
+                timestamp: new Date().toISOString(),
+                level: 'error',
+                source: 'system',
+                service: 'resource-monitor',
+                message: 'Monitor loop error',
+                action: 'monitor-error',
+                error: {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack,
+                },
+            });
+        }
         setTimeout(runMonitorLoop, 60000);
     }
 }
@@ -314,7 +337,7 @@ async function sendSystemAlert(resource: string, current: number | string, thres
 <!DOCTYPE html>
 <html>
 <body style="font-family: sans-serif; color: #333;">
-    <h2 style="color: #DC2626;">🚨 System Alert: ${resource}</h2>
+    <h2 style="color: #DC2626;"> System Alert: ${resource}</h2>
     <p>Your server resource ${resource} has crossed the threshold.</p>
     
     <div style="background: #FEF2F2; border: 1px solid #FCA5A5; padding: 15px; border-radius: 6px; margin: 20px 0;">
@@ -332,7 +355,15 @@ async function sendSystemAlert(resource: string, current: number | string, thres
 </body>
 </html>`;
 
-    console.log(`[ALERT] System ${resource}: ${current}${unit} ${operator} ${threshold}${unit}`);
+    void writeUnifiedEntry({
+        timestamp: new Date().toISOString(),
+        level: 'warn',
+        source: 'system',
+        service: 'resource-monitor',
+        message: `System alert: ${resource}`,
+        action: 'system-alert',
+        data: { resource, current, threshold, unit, operator },
+    });
     await logActivity('resource', { resource, current, threshold, type: 'system', unit });
     await sendAdminEmail(`Alert: ${resource} (${current}${unit})`, html);
 }
@@ -345,7 +376,7 @@ async function sendAppAlert(appName: string, metric: string, current: number | s
 <!DOCTYPE html>
 <html>
 <body style="font-family: sans-serif; color: #333;">
-    <h2 style="color: #DC2626;">🚨 App Alert: ${appName}</h2>
+    <h2 style="color: #DC2626;"> App Alert: ${appName}</h2>
     <p>An application metric has exceeded its configured threshold.</p>
     
     <div style="background: #FEF2F2; border: 1px solid #FCA5A5; padding: 15px; border-radius: 6px; margin: 20px 0;">
@@ -363,7 +394,36 @@ async function sendAppAlert(appName: string, metric: string, current: number | s
 </body>
 </html>`;
 
-    console.log(`[ALERT] App ${appName} - ${metric}: ${current}${unit} > ${threshold}${unit}`);
+    void writeUnifiedEntry({
+        timestamp: new Date().toISOString(),
+        level: 'warn',
+        source: 'system',
+        service: 'resource-monitor',
+        message: `App alert: ${appName} - ${metric}`,
+        action: 'app-alert',
+        data: { appName, metric, current, threshold, unit },
+    });
     await logActivity('resource', { resource: metric, current, threshold, type: 'app', app: appName, unit });
     await sendAdminEmail(`Alert: ${appName} - ${metric} (${current}${unit})`, html);
+}
+
+export async function triggerResourceAlertTest() {
+    const now = new Date().toISOString();
+    void writeUnifiedEntry({
+        timestamp: now,
+        level: 'info',
+        source: 'system',
+        service: 'resource-monitor',
+        message: 'Manual resource alert test triggered',
+        action: 'resource-alert-test',
+    });
+
+    await sendSystemAlert('CPU Usage', 95, 80, '%');
+    await sendSystemAlert('RAM Usage', 92, 80, '%');
+    await sendSystemAlert('Disk Usage', 91, 85, '%');
+    await sendSystemAlert('RAM Available', 350, 500, 'MB', true);
+
+    await sendAppAlert('test-app', 'CPU Usage', 88, 75, '%');
+    await sendAppAlert('test-app', 'Memory Usage', 86, 75, '%');
+    await sendAppAlert('test-app', 'p95 Latency', 2500, 2000, 'ms');
 }

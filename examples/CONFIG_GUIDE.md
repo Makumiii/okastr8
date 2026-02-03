@@ -11,7 +11,7 @@ okastr8 uses **YAML** for all configuration. There are two main files you need t
 |---------|-------|-------------|
 | `setup` | `user.username` | The system user created during installation. |
 | | `ssh.port` | The custom SSH port (default: 2222). |
-| `manager` | `port` | The port the dashboard runs on (8788). |
+| `manager` | `port` | The port the dashboard runs on (41788). |
 | | `api_key` | Secret key protecting the dashboard. |
 | `manager.github` | `client_id` | GitHub OAuth Client ID. |
 | | `client_secret` | GitHub OAuth Client Secret. |

@@ -28,12 +28,12 @@ export function addAccessUserCommands(program: Command): void {
             try {
                 const isAdmin = await isCurrentUserAdmin();
                 if (!isAdmin) {
-                    console.error('❌ Only admin can add users');
+                    console.error('Only admin can add users');
                     process.exit(1);
                 }
 
                 const newUser = await addUser(email);
-                console.log(`\n✅ User added: ${newUser.email}`);
+                console.log(`\n User added: ${newUser.email}`);
 
                 // Automatically generate token
                 const expiry = options.expiry || '1d';
@@ -45,9 +45,9 @@ export function addAccessUserCommands(program: Command): void {
                 const emailResult = await sendWelcomeEmail(email, token);
 
                 if (emailResult.success) {
-                    console.log('✅ Welcome email sent successfully!');
+                    console.log('Welcome email sent successfully!');
                 } else {
-                    console.error(`⚠️  Failed to send email: ${emailResult.error}`);
+                    console.error(`Warning: Failed to send email: ${emailResult.error}`);
                     console.log('   Please send the token manually below:');
                 }
 
@@ -60,7 +60,7 @@ export function addAccessUserCommands(program: Command): void {
                 if (!emailResult.success) console.log('      (Since email failed, you must share this securely manually)');
 
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -74,13 +74,13 @@ export function addAccessUserCommands(program: Command): void {
             try {
                 const isAdmin = await isCurrentUserAdmin();
                 if (!isAdmin) {
-                    console.error('❌ Only admin can generate user tokens');
+                    console.error('Only admin can generate user tokens');
                     process.exit(1);
                 }
 
                 const userData = await getUser(email);
                 if (!userData) {
-                    console.error(`❌ User not found: ${email}`);
+                    console.error(` User not found: ${email}`);
                     console.error('   Create the user first with: okastr8 access add <email>');
                     process.exit(1);
                 }
@@ -93,7 +93,7 @@ export function addAccessUserCommands(program: Command): void {
                 console.log('━'.repeat(50));
                 console.log(`\nExpires: ${new Date(expiresAt).toLocaleString()}\n`);
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -107,13 +107,13 @@ export function addAccessUserCommands(program: Command): void {
             try {
                 const isAdmin = await isCurrentUserAdmin();
                 if (!isAdmin) {
-                    console.error('❌ Only admin can renew access');
+                    console.error('Only admin can renew access');
                     process.exit(1);
                 }
 
                 const userData = await getUser(email);
                 if (!userData) {
-                    console.error(`❌ User not found: ${email}`);
+                    console.error(` User not found: ${email}`);
                     process.exit(1);
                 }
 
@@ -126,9 +126,9 @@ export function addAccessUserCommands(program: Command): void {
                 const emailResult = await sendWelcomeEmail(email, token);
 
                 if (emailResult.success) {
-                    console.log('✅ New token emailed successfully!');
+                    console.log('New token emailed successfully!');
                 } else {
-                    console.error(`⚠️  Failed to send email: ${emailResult.error}`);
+                    console.error(`Warning: Failed to send email: ${emailResult.error}`);
                     console.log('   Please send the token manually below:');
                 }
 
@@ -139,7 +139,7 @@ export function addAccessUserCommands(program: Command): void {
                 console.log(`Expires: ${new Date(expiresAt).toLocaleString()}`);
 
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -152,7 +152,7 @@ export function addAccessUserCommands(program: Command): void {
             try {
                 const isAdmin = await isCurrentUserAdmin();
                 if (!isAdmin) {
-                    console.error('❌ Only admin can list users');
+                    console.error('Only admin can list users');
                     process.exit(1);
                 }
 
@@ -173,7 +173,7 @@ export function addAccessUserCommands(program: Command): void {
                 }
                 console.log('');
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -186,20 +186,20 @@ export function addAccessUserCommands(program: Command): void {
             try {
                 const isAdmin = await isCurrentUserAdmin();
                 if (!isAdmin) {
-                    console.error('❌ Only admin can remove users');
+                    console.error('Only admin can remove users');
                     process.exit(1);
                 }
 
                 const success = await removeUser(email);
                 if (success) {
-                    console.log(`✅ User removed: ${email}`);
+                    console.log(` User removed: ${email}`);
                     console.log('   All their tokens have been revoked.');
                 } else {
-                    console.error(`❌ User not found: ${email}`);
+                    console.error(` User not found: ${email}`);
                     process.exit(1);
                 }
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -212,13 +212,13 @@ export function addAccessUserCommands(program: Command): void {
             try {
                 const isAdmin = await isCurrentUserAdmin();
                 if (!isAdmin) {
-                    console.error('❌ Only admin can view user info');
+                    console.error('Only admin can view user info');
                     process.exit(1);
                 }
 
                 const userData = await getUser(email);
                 if (!userData) {
-                    console.error(`❌ User not found: ${email}`);
+                    console.error(` User not found: ${email}`);
                     process.exit(1);
                 }
 
@@ -240,7 +240,7 @@ export function addAccessUserCommands(program: Command): void {
                 }
                 console.log('');
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -253,7 +253,7 @@ export function addAccessUserCommands(program: Command): void {
             try {
                 const isAdmin = await isCurrentUserAdmin();
                 if (!isAdmin) {
-                    console.error('❌ Only admin can view active tokens');
+                    console.error('Only admin can view active tokens');
                     process.exit(1);
                 }
 
@@ -281,7 +281,7 @@ export function addAccessUserCommands(program: Command): void {
                 }
                 console.log('');
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -294,7 +294,7 @@ export function addAccessUserCommands(program: Command): void {
             try {
                 const isAdmin = await isCurrentUserAdmin();
                 if (!isAdmin) {
-                    console.error('❌ Only admin can revoke tokens');
+                    console.error('Only admin can revoke tokens');
                     process.exit(1);
                 }
 
@@ -302,16 +302,16 @@ export function addAccessUserCommands(program: Command): void {
                 const userToken = tokens.find(t => t.userId === email);
 
                 if (!userToken) {
-                    console.error(`⚠️  No active token found for ${email}`);
+                    console.error(`Warning: No active token found for ${email}`);
                     return;
                 }
 
                 const { revokeToken } = await import('./auth');
                 await revokeToken(userToken.id);
-                console.log(`✅ Revoked active token for ${email}`);
+                console.log(` Revoked active token for ${email}`);
 
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -324,7 +324,7 @@ export function addAccessUserCommands(program: Command): void {
             const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
             const answer = await new Promise<string>(resolve => {
-                rl.question('⚠️  Are you sure you want to REVOKE ALL ACCESS TOKENS? Everyone will be logged out. (y/N): ', resolve);
+                rl.question('Warning: Are you sure you want to REVOKE ALL ACCESS TOKENS? Everyone will be logged out. (y/N): ', resolve);
             });
             rl.close();
 
@@ -335,6 +335,6 @@ export function addAccessUserCommands(program: Command): void {
 
             const { revokeAllTokens } = await import('./auth');
             const count = await revokeAllTokens();
-            console.log(`\n✅ Revoked ${count} tokens. All sessions invalidated.`);
+            console.log(`\n Revoked ${count} tokens. All sessions invalidated.`);
         });
 }

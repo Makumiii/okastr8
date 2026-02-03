@@ -42,6 +42,10 @@ export interface SystemConfig {
     manager?: {
         port?: number;
         api_key?: string;
+        auth?: {
+            github_admin_id?: string;
+            github_admin_login?: string;
+        };
         github?: {
             client_id?: string;
             client_secret?: string;
@@ -163,6 +167,10 @@ export async function saveSystemConfig(newConfig: Partial<SystemConfig>): Promis
         // Ensure manager exists (implied by above spread, but TS needs help)
         if (!updatedConfig.manager) updatedConfig.manager = {};
         updatedConfig.manager.github = { ...current.manager.github, ...newConfig.manager.github };
+    }
+    if (newConfig.manager?.auth && current.manager?.auth) {
+        if (!updatedConfig.manager) updatedConfig.manager = {};
+        updatedConfig.manager.auth = { ...current.manager.auth, ...newConfig.manager.auth };
     }
 
     // Update cache

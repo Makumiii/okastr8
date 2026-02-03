@@ -63,7 +63,7 @@ export function addUserCommands(program: Command) {
             }
 
             if (!username) {
-                console.error('❌ Username is required.');
+                console.error('Username is required.');
                 return;
             }
 
@@ -117,7 +117,7 @@ export function addUserCommands(program: Command) {
         .action(async (options) => {
             const result = await listUsers();
             if (result.exitCode !== 0) {
-                console.error(`❌ Error listing users: ${result.stderr}`);
+                console.error(`Error listing users: ${result.stderr}`);
                 return;
             }
 
@@ -134,7 +134,7 @@ export function addUserCommands(program: Command) {
             });
 
             if (options.plain) {
-                console.log('\n👥 System Users\n');
+                console.log('\nSystem Users\n');
                 users.forEach(u => {
                     const icon = u.status === 'locked' ? '[LOCKED]' : '[ACTIVE]';
                     console.log(`${icon} ${u.username} (${u.status})`);
@@ -217,20 +217,20 @@ export function addUserCommands(program: Command) {
                     if (selectedUser.status === 'locked') {
                         console.log(`Unlocking ${selectedUsername}...`);
                         await unlockUser(selectedUsername);
-                        console.log('✅ User unlocked.');
+                        console.log('User unlocked.');
                     } else {
                         // Guardrail: Don't lock admin/self
                         const authData = await loadAuthData();
                         const realUser = process.env.SUDO_USER || userInfo().username;
 
                         if (selectedUsername === authData.admin || selectedUsername === realUser) {
-                            console.log(`\n⚠️  Security Alert: You cannot lock the admin/current user (${selectedUsername}).\n`);
+                            console.log(`\nWarning: Security Alert: You cannot lock the admin/current user (${selectedUsername}).\n`);
                             return;
                         }
 
                         console.log(`Locking ${selectedUsername}...`);
                         await lockUser(selectedUsername);
-                        console.log('✅ User locked.');
+                        console.log('User locked.');
                     }
                 }
 
@@ -240,19 +240,19 @@ export function addUserCommands(program: Command) {
                     const realUser = process.env.SUDO_USER || userInfo().username;
 
                     if (selectedUsername === authData.admin || selectedUsername === realUser) {
-                        console.log(`\n⚠️  Security Alert: You cannot delete the admin/current user (${selectedUsername}).\n`);
+                        console.log(`\nWarning: Security Alert: You cannot delete the admin/current user (${selectedUsername}).\n`);
                         return;
                     }
 
                     const confirm = new Confirm({
                         name: 'sure',
-                        message: `⚠️  Are you SURE you want to DELETE user '${selectedUsername}'? This creates a backup but is destructive.`
+                        message: `Warning: Are you SURE you want to DELETE user '${selectedUsername}'? This creates a backup but is destructive.`
                     });
 
                     if (await confirm.run()) {
                         console.log(`Deleting ${selectedUsername}...`);
                         await deleteUser(selectedUsername);
-                        console.log('✅ User deleted.');
+                        console.log('User deleted.');
                     } else {
                         console.log('Cancelled.');
                     }

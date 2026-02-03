@@ -42,6 +42,7 @@ export interface AppConfig {
     domain?: string;
     gitRepo?: string;
     gitBranch?: string;
+    webhookBranch?: string;
     buildSteps?: string[];
     env?: Record<string, string>;
     webhookAutoDeploy?: boolean;
@@ -84,7 +85,8 @@ export async function createApp(config: AppConfig) {
             logsDir,
             versions: [],
             currentVersionId: null,
-            webhookAutoDeploy: config.webhookAutoDeploy ?? true
+            webhookAutoDeploy: config.webhookAutoDeploy ?? true,
+            webhookBranch: config.webhookBranch || config.gitBranch
         };
 
         await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
@@ -112,7 +114,7 @@ export async function deleteApp(appName: string) {
 
         // 1. Universal Docker Cleanup
         // Stop both single container and possible Compose services
-        console.log(`🧹 Cleaning up Docker resources for ${appName}...`);
+        console.log(` Cleaning up Docker resources for ${appName}...`);
 
         // Stop single container (container name = app name)
         await stopDockerContainer(appName).catch(() => { });
@@ -427,6 +429,20 @@ export async function setAppWebhookAutoDeploy(appName: string, enabled: boolean)
     }
 }
 
+export async function setAppWebhookBranch(appName: string, branch: string) {
+    const appDir = join(APPS_DIR, appName);
+    const metadataPath = join(appDir, "app.json");
+    try {
+        const content = await readFile(metadataPath, "utf-8");
+        const metadata = JSON.parse(content);
+        metadata.webhookBranch = branch;
+        await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+        return { success: true, message: `Webhook branch set to ${branch} for ${appName}` };
+    } catch {
+        throw new Error(`App ${appName} not found or corrupted`);
+    }
+}
+
 // Commander Integration
 export function addAppCommands(program: Command) {
     const app = program
@@ -465,7 +481,7 @@ export function addAppCommands(program: Command) {
                             if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
                         });
                     } else {
-                        console.error(`❌ Env file not found: ${options.envFile}`);
+                        console.error(` Env file not found: ${options.envFile}`);
                         process.exit(1);
                     }
                 }
@@ -630,9 +646,9 @@ export function addAppCommands(program: Command) {
             try {
                 const { importEnvFile } = await import('../utils/env-manager');
                 await importEnvFile(appName, options.file);
-                console.log(`✅ Imported environment variables from ${options.file}`);
+                console.log(` Imported environment variables from ${options.file}`);
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -652,7 +668,7 @@ export function addAppCommands(program: Command) {
                     keys.forEach(key => console.log(`  ${key}=••••••••`));
                 }
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -665,9 +681,9 @@ export function addAppCommands(program: Command) {
             try {
                 const { exportEnvFile } = await import('../utils/env-manager');
                 await exportEnvFile(appName, options.file);
-                console.log(`✅ Exported environment variables to ${options.file}`);
+                console.log(` Exported environment variables to ${options.file}`);
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -680,9 +696,9 @@ export function addAppCommands(program: Command) {
             try {
                 const { unsetEnvVar } = await import('../utils/env-manager');
                 await unsetEnvVar(appName, key);
-                console.log(`✅ Unset ${key}`);
+                console.log(` Unset ${key}`);
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -692,7 +708,7 @@ export function addAppCommands(program: Command) {
         .description("Stop an application")
         .argument("<name>", "Application name")
         .action(async (name: string) => {
-            console.log(`⏹️  Stopping ${name}...`);
+            console.log(`  Stopping ${name}...`);
             const result = await stopApp(name);
             console.log(result.message);
         });
@@ -712,13 +728,16 @@ export function addAppCommands(program: Command) {
         .description("Show or set auto-deploy webhook status for an app")
         .argument("<name>", "Application name")
         .argument("[state]", "State (enable/disable, on/off) - omit to show current status")
-        .action(async (name: string, state: string) => {
+        .option("--branch <branch>", "Set webhook trigger branch")
+        .action(async (name: string, state: string, options: { branch?: string }) => {
             try {
                 if (!state) {
                     // Show current status
                     const config = await getAppMetadata(name);
                     const enabled = config?.webhookAutoDeploy ?? true;
+                    const branch = config?.webhookBranch || config?.gitBranch || "main";
                     console.log(`Webhook auto-deploy for ${name}: ${enabled ? 'ENABLED' : 'DISABLED'}`);
+                    console.log(`Webhook branch for ${name}: ${branch}`);
                 } else {
                     // Set status
                     const enabled = ['enable', 'on', 'true', '1'].includes(state.toLowerCase());
@@ -726,8 +745,12 @@ export function addAppCommands(program: Command) {
                     const result = await setAppWebhookAutoDeploy(name, enabled);
                     console.log(result.message);
                 }
+                if (options?.branch) {
+                    const branchResult = await setAppWebhookBranch(name, options.branch);
+                    console.log(branchResult.message);
+                }
             } catch (error: any) {
-                console.error(`❌ Failed:`, error.message);
+                console.error(` Failed:`, error.message);
                 process.exit(1);
             }
         });

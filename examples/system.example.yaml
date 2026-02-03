@@ -14,7 +14,7 @@ setup:
 
 manager:
   # Runtime settings
-  port: 8788
+  port: 41788
   api_key: "your-generated-secret-key"
   
   github:
@@ -29,7 +29,7 @@ tunnel:
   # Internal settings (Managed by 'okastr8 tunnel setup')
   enabled: false
   service: manager
-  port: 8788
+  port: 41788
   auth_token: ""  # Filled by 'okastr8 tunnel setup'
 
   # <--- MANUAL CONFIG REQUIRED: The public URL of your tunnel

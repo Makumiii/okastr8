@@ -8,6 +8,7 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { randomBytes, createHmac } from 'crypto';
+import { writeUnifiedEntry } from '../utils/structured-logger';
 
 // ============ Types ============
 
@@ -45,6 +46,31 @@ export interface AuthData {
 // ============ Paths ============
 
 const AUTH_FILE = join(homedir(), '.okastr8', 'auth.json');
+
+async function logAuthEvent(options: {
+    level?: 'info' | 'warn' | 'error';
+    message: string;
+    action: string;
+    userId?: string;
+    data?: Record<string, unknown>;
+    error?: { name: string; message: string; stack?: string };
+}) {
+    try {
+        await writeUnifiedEntry({
+            timestamp: new Date().toISOString(),
+            level: options.level || 'info',
+            source: 'auth',
+            service: 'auth',
+            message: options.message,
+            action: options.action,
+            user: options.userId ? { id: options.userId } : undefined,
+            data: options.data,
+            error: options.error,
+        });
+    } catch {
+        // Ignore logging failures to avoid auth flow breakage
+    }
+}
 
 // ============ Storage ============
 
@@ -160,6 +186,12 @@ export async function generateToken(
     } catch (e) {
         console.error('Failed to log login activity:', e);
     }
+    await logAuthEvent({
+        action: 'token-generated',
+        message: 'Token generated',
+        userId,
+        data: { tokenId, expiresAt, expiry },
+    });
 
     return { token, expiresAt };
 }
@@ -227,6 +259,12 @@ export async function renewToken(userId: string, duration: string): Promise<{ su
     const tokenIdx = data.tokens.findIndex(t => t.userId === userId);
 
     if (tokenIdx === -1) {
+        await logAuthEvent({
+            level: 'warn',
+            action: 'token-renew-failed',
+            message: 'Token renewal failed: no token found for user',
+            userId,
+        });
         return { success: false, error: 'No token found for user' };
     }
 
@@ -239,6 +277,12 @@ export async function renewToken(userId: string, duration: string): Promise<{ su
     // Also clear any "renewal notification sent" flag if we add one in the future
 
     await saveAuthData(data);
+    await logAuthEvent({
+        action: 'token-renewed',
+        message: 'Token renewed',
+        userId,
+        data: { expiresAt: newExpiry },
+    });
     return { success: true, expiresAt: newExpiry };
 }
 
@@ -248,10 +292,17 @@ export async function renewToken(userId: string, duration: string): Promise<{ su
 export async function revokeToken(tokenId: string): Promise<boolean> {
     const data = await loadAuthData();
     const initialLength = data.tokens.length;
+    const token = data.tokens.find(t => t.id === tokenId);
     data.tokens = data.tokens.filter(t => t.id !== tokenId);
 
     if (data.tokens.length < initialLength) {
         await saveAuthData(data);
+        await logAuthEvent({
+            action: 'token-revoked',
+            message: 'Token revoked',
+            userId: token?.userId,
+            data: { tokenId },
+        });
         return true;
     }
     return false;
@@ -265,6 +316,11 @@ export async function revokeAllTokens(): Promise<number> {
     const count = data.tokens.length;
     data.tokens = [];
     await saveAuthData(data);
+    await logAuthEvent({
+        action: 'token-revoke-all',
+        message: 'All tokens revoked',
+        data: { count },
+    });
     return count;
 }
 
@@ -301,6 +357,12 @@ export async function addUser(
 
     data.users.push(user);
     await saveAuthData(data);
+    await logAuthEvent({
+        action: 'user-added',
+        message: 'User added',
+        userId: email,
+        data: { createdBy },
+    });
 
     return user;
 }
@@ -318,6 +380,11 @@ export async function removeUser(email: string): Promise<boolean> {
 
     if (data.users.length < initialLength) {
         await saveAuthData(data);
+        await logAuthEvent({
+            action: 'user-removed',
+            message: 'User removed',
+            userId: email,
+        });
         return true;
     }
     return false;
@@ -347,6 +414,24 @@ export async function getUser(email: string): Promise<User | null> {
 export async function getAdminUser(): Promise<string> {
     const data = await loadAuthData();
     return data.admin;
+}
+
+export async function isUserAdmin(userId: string): Promise<boolean> {
+    const data = await loadAuthData();
+    const identifiers = new Set<string>();
+
+    if (data.admin) identifiers.add(data.admin);
+
+    try {
+        const { getSystemConfig } = await import('../config');
+        const config = await getSystemConfig();
+        const adminEmail = config.notifications?.brevo?.admin_email;
+        const githubAdminId = config.manager?.auth?.github_admin_id;
+        if (adminEmail) identifiers.add(adminEmail);
+        if (githubAdminId) identifiers.add(`github:${githubAdminId}`);
+    } catch { }
+
+    return identifiers.has(userId);
 }
 
 /**
@@ -420,6 +505,12 @@ export async function createPendingApproval(
 
     data.pendingApprovals.push(approval);
     await saveAuthData(data);
+    await logAuthEvent({
+        action: 'approval-requested',
+        message: 'Login approval requested',
+        userId,
+        data: { requestId: approval.id, expiresAt: approval.expiresAt },
+    });
 
     return approval;
 }
@@ -448,15 +539,34 @@ export async function approveRequest(requestId: string): Promise<{ success: bool
     );
 
     if (!approval) {
+        await logAuthEvent({
+            level: 'warn',
+            action: 'approval-approve-failed',
+            message: 'Approval request not found',
+            data: { requestId },
+        });
         return { success: false, error: 'Pending request not found' };
     }
 
     if (new Date(approval.expiresAt).getTime() < Date.now()) {
+        await logAuthEvent({
+            level: 'warn',
+            action: 'approval-approve-failed',
+            message: 'Approval request expired',
+            userId: approval.userId,
+            data: { requestId },
+        });
         return { success: false, error: 'Request has expired' };
     }
 
     approval.status = 'approved';
     await saveAuthData(data);
+    await logAuthEvent({
+        action: 'approval-approved',
+        message: 'Login approval approved',
+        userId: approval.userId,
+        data: { requestId },
+    });
 
     return { success: true, userId: approval.userId };
 }
@@ -472,11 +582,23 @@ export async function rejectRequest(requestId: string): Promise<{ success: boole
     );
 
     if (!approval) {
+        await logAuthEvent({
+            level: 'warn',
+            action: 'approval-reject-failed',
+            message: 'Approval request not found',
+            data: { requestId },
+        });
         return { success: false, error: 'Pending request not found' };
     }
 
     approval.status = 'rejected';
     await saveAuthData(data);
+    await logAuthEvent({
+        action: 'approval-rejected',
+        message: 'Login approval rejected',
+        userId: approval.userId,
+        data: { requestId },
+    });
 
     return { success: true, userId: approval.userId };
 }

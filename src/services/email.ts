@@ -8,6 +8,7 @@ import { homedir } from 'os';
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { parse as parseYaml } from 'yaml';
+import { writeUnifiedEntry } from '../utils/structured-logger';
 
 // ============ Types ============
 
@@ -32,7 +33,14 @@ const SYSTEM_YAML_PATH = join(homedir(), '.okastr8', 'system.yaml');
 async function getBrevoConfig(): Promise<BrevoConfig | null> {
     try {
         if (!existsSync(SYSTEM_YAML_PATH)) {
-            console.error('Email: system.yaml not found');
+            void writeUnifiedEntry({
+                timestamp: new Date().toISOString(),
+                level: 'warn',
+                source: 'email',
+                service: 'email',
+                message: 'system.yaml not found',
+                action: 'email-config-missing',
+            });
             return null;
         }
 
@@ -41,7 +49,14 @@ async function getBrevoConfig(): Promise<BrevoConfig | null> {
 
         const brevo = config?.notifications?.brevo;
         if (!brevo?.api_key) {
-            console.error('Email: Brevo config not found in system.yaml');
+            void writeUnifiedEntry({
+                timestamp: new Date().toISOString(),
+                level: 'warn',
+                source: 'email',
+                service: 'email',
+                message: 'Brevo config not found in system.yaml',
+                action: 'email-config-missing',
+            });
             return null;
         }
 
@@ -52,7 +67,15 @@ async function getBrevoConfig(): Promise<BrevoConfig | null> {
             adminEmail: brevo.admin_email || ''
         };
     } catch (error: any) {
-        console.error('Email: Failed to load config:', error.message);
+        void writeUnifiedEntry({
+            timestamp: new Date().toISOString(),
+            level: 'error',
+            source: 'email',
+            service: 'email',
+            message: 'Failed to load email config',
+            action: 'email-config-error',
+            error: { name: error?.name || 'Error', message: error?.message || 'Unknown error' },
+        });
         return null;
     }
 }
@@ -92,15 +115,39 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
 
         if (!response.ok) {
             const errorData = await response.json() as { message?: string };
-            console.error('Email send failed:', errorData);
+            void writeUnifiedEntry({
+                timestamp: new Date().toISOString(),
+                level: 'error',
+                source: 'email',
+                service: 'email',
+                message: 'Email send failed',
+                action: 'email-send-failed',
+                data: { message: errorData.message || 'Unknown error' },
+            });
             return { success: false, error: errorData.message || 'Failed to send email' };
         }
 
         const result = await response.json() as { messageId?: string };
-        console.log('Email sent successfully:', result.messageId);
+        void writeUnifiedEntry({
+            timestamp: new Date().toISOString(),
+            level: 'info',
+            source: 'email',
+            service: 'email',
+            message: 'Email sent',
+            action: 'email-sent',
+            data: { messageId: result.messageId },
+        });
         return { success: true };
     } catch (error: any) {
-        console.error('Email error:', error.message);
+        void writeUnifiedEntry({
+            timestamp: new Date().toISOString(),
+            level: 'error',
+            source: 'email',
+            service: 'email',
+            message: 'Email send error',
+            action: 'email-send-error',
+            error: { name: error?.name || 'Error', message: error?.message || 'Unknown error' },
+        });
         return { success: false, error: error.message };
     }
 }
@@ -153,7 +200,7 @@ export async function sendLoginApprovalEmail(
 <body>
     <div class="container">
         <div class="header">
-            <h2 style="margin: 0;">🔐 Login Approval Request</h2>
+            <h2 style="margin: 0;">Login Approval Request</h2>
         </div>
         <div class="content">
             <p>A user is requesting access to okastr8:</p>
@@ -189,7 +236,6 @@ export async function sendDeploymentAlertEmail(
     status: 'success' | 'failed',
     details: string
 ): Promise<{ success: boolean; error?: string }> {
-    const statusEmoji = status === 'success' ? '✅' : '❌';
     const statusColor = status === 'success' ? '#10B981' : '#EF4444';
     const statusText = status === 'success' ? 'Successful' : 'Failed';
 
@@ -209,7 +255,7 @@ export async function sendDeploymentAlertEmail(
 <body>
     <div class="container">
         <div class="header">
-            <h2 style="margin: 0;">${statusEmoji} Deployment ${statusText}</h2>
+            <h2 style="margin: 0;">Deployment ${statusText}</h2>
         </div>
         <div class="content">
             <p><strong>Application:</strong> <span class="app-name">${appName}</span></p>
@@ -248,7 +294,7 @@ export async function sendServiceDownEmail(
 <body>
     <div class="container">
         <div class="header">
-            <h2 style="margin: 0;">🚨 Service Down Alert</h2>
+            <h2 style="margin: 0;">Service Down Alert</h2>
         </div>
         <div class="content">
             <p><strong>Service:</strong> <span class="service-name">${serviceName}</span></p>
@@ -282,7 +328,7 @@ export async function testEmailConfig(): Promise<{ success: boolean; error?: str
 <body>
     <div class="container">
         <div class="header">
-            <h2 style="margin: 0;">✅ Email Configuration Test</h2>
+            <h2 style="margin: 0;">Email Configuration Test</h2>
         </div>
         <div class="content">
             <p style="font-size: 18px;">Your okastr8 email notifications are working!</p>
@@ -328,7 +374,7 @@ export async function sendWelcomeEmail(
 <body>
     <div class="container">
         <div class="header">
-            <h2 style="margin: 0;">👋 Welcome to okastr8</h2>
+            <h2 style="margin: 0;">Welcome to okastr8</h2>
         </div>
         <div class="content">
             <p>You have been granted access to the okastr8 dashboard.</p>

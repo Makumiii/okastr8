@@ -3,10 +3,8 @@
  * Tracks persistent events (Login, Deploy, Resource) in unified log
  */
 
-import { readFile } from 'fs/promises';
-import { existsSync } from 'fs';
 import { randomUUID } from 'crypto';
-import { logPaths, type LogEntry, writeUnifiedEntry } from './structured-logger';
+import { type LogEntry, writeUnifiedEntry, readUnifiedEntries } from './structured-logger';
 
 export type ActivityType = 'login' | 'deploy' | 'resource' | 'system';
 
@@ -18,7 +16,6 @@ export interface ActivityEntry {
     user?: string; // Masked email (for logins/actions)
 }
 
-const UNIFIED_LOG = logPaths.unified;
 
 /**
  * Mask email for privacy (johndoe@gmail.com -> joh***@gmail.com)
@@ -69,27 +66,14 @@ export async function logActivity(
     }
 }
 
-async function readUnifiedEntries(): Promise<LogEntry[]> {
+const readEntries = async () => {
     try {
-        if (!existsSync(UNIFIED_LOG)) return [];
-        const content = await readFile(UNIFIED_LOG, 'utf-8');
-        if (!content.trim()) return [];
-        return content
-            .trim()
-            .split('\n')
-            .map((line) => {
-                try {
-                    return JSON.parse(line) as LogEntry;
-                } catch {
-                    return null;
-                }
-            })
-            .filter((entry): entry is LogEntry => !!entry);
+        return await readUnifiedEntries();
     } catch (error) {
         console.error('Failed to read unified logs:', error);
         return [];
     }
-}
+};
 
 /**
  * Get recent activity
@@ -100,7 +84,7 @@ export async function getRecentActivity(
     date?: string // YYYY-MM-DD
 ): Promise<ActivityEntry[]> {
     try {
-        let entries = await readUnifiedEntries();
+        let entries = await readEntries();
         entries = entries.filter((entry) =>
             entry.service === 'activity' &&
             (entry.action === 'login' || entry.action === 'deploy' || entry.action === 'resource' || entry.action === 'system')
@@ -155,7 +139,7 @@ export async function getActivityStats() {
 }
 
 export async function getDeploymentLog(deploymentId: string): Promise<string | null> {
-    const entries = await readUnifiedEntries();
+    const entries = await readEntries();
     const lines = entries
         .filter((entry) => entry.traceId === deploymentId && entry.action === 'deploy-log')
         .map((entry) => entry.message);

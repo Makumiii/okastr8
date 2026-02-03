@@ -30,7 +30,8 @@ import {
     configureFirewall,
     configureFail2ban,
 } from './commands/setup';
-import { validateToken } from './commands/auth';
+import { validateToken, isUserAdmin } from './commands/auth';
+import { writeUnifiedEntry } from './utils/structured-logger';
 
 const api = new Hono();
 
@@ -41,6 +42,55 @@ const apiResponse = (success: boolean, message: string, data?: any) => ({
     data,
 });
 
+// ============ Request Logging ============
+api.use('*', async (c, next) => {
+    const start = Date.now();
+    try {
+        await next();
+        const durationMs = Date.now() - start;
+        const status = c.res?.status ?? 200;
+        const level = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info';
+        void writeUnifiedEntry({
+            timestamp: new Date().toISOString(),
+            level,
+            source: 'api',
+            service: 'okastr8-api',
+            message: `${c.req.method} ${c.req.path}`,
+            action: 'request',
+            request: {
+                method: c.req.method,
+                path: c.req.path,
+                status,
+                durationMs,
+                ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || undefined,
+                userAgent: c.req.header('user-agent') || undefined,
+            },
+        });
+    } catch (error: any) {
+        const durationMs = Date.now() - start;
+        void writeUnifiedEntry({
+            timestamp: new Date().toISOString(),
+            level: 'error',
+            source: 'api',
+            service: 'okastr8-api',
+            message: `${c.req.method} ${c.req.path} failed`,
+            action: 'request-error',
+            request: {
+                method: c.req.method,
+                path: c.req.path,
+                status: 500,
+                durationMs,
+                ip: c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || undefined,
+                userAgent: c.req.header('user-agent') || undefined,
+            },
+            error: error instanceof Error
+                ? { name: error.name, message: error.message, stack: error.stack }
+                : { message: String(error) },
+        });
+        throw error;
+    }
+});
+
 // ============ Global Auth Middleware ============
 // Automatically enforces authentication and permissions on all routes
 
@@ -49,9 +99,9 @@ const PUBLIC_ROUTES = [
     'POST:/auth/verify',
     'POST:/auth/logout',
     'GET:/auth/me',
+    'GET:/auth/github',
     'POST:/github/webhook', // Webhook has its own HMAC verification
     'GET:/github/callback',  // OAuth callback - no auth yet!
-    'GET:/github/auth-url',  // Auth URL generation
     // Dynamic routes handled in middleware, but explicitly allowing this pattern not possible here easily
     // We will check for /auth/approval/ prefix in middleware
 ];
@@ -98,11 +148,23 @@ api.use('*', async (c, next) => {
     return next();
 });
 
+async function enforceAdmin(c: any) {
+    const userId = c.get('userId');
+    if (!userId) {
+        return c.json(apiResponse(false, 'Authentication required'), 401);
+    }
+    const isAdmin = await isUserAdmin(userId);
+    if (!isAdmin) {
+        return c.json(apiResponse(false, 'Admin access required'), 403);
+    }
+    return null;
+}
+
 // ============ System Status Endpoints ============
 
 api.get('/system/status', async (c) => {
     try {
-        const { detectAllRuntimes } = await import('./commands/env');
+        const { getSystemConfig } = await import('./config');
         const { getRecentLogs, getLogCounts, getHealthStatus } = await import('./utils/logger');
         const { runCommand } = await import('./utils/command');
         const os = await import('os');
@@ -118,7 +180,8 @@ api.get('/system/status', async (c) => {
         const user = process.env.SUDO_USER || process.env.USER || 'unknown';
 
         // Get environments
-        const environments = await detectAllRuntimes();
+        const systemConfig = await getSystemConfig();
+        const environments = systemConfig.environments ?? {};
 
         // Get okastr8 manager service status (still uses systemd for manager itself)
         const services = [];
@@ -257,9 +320,77 @@ api.get('/activity/log/:id', async (c) => {
     }
 });
 
+// Unified logs query
+api.get('/logs/query', async (c) => {
+    try {
+        const { readUnifiedEntries } = await import('./utils/structured-logger');
+        const levels = (c.req.query('level') || '')
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean);
+        const sources = (c.req.query('source') || '')
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean);
+        const search = (c.req.query('q') || '').toLowerCase();
+        const limit = parseInt(c.req.query('limit') || '200');
+        const offset = parseInt(c.req.query('offset') || '0');
+        const date = c.req.query('date');
+        const from = c.req.query('from') || '00:00';
+        const to = c.req.query('to') || '23:59';
+        const traceId = c.req.query('traceId');
+
+        let startTime: number | null = null;
+        let endTime: number | null = null;
+        if (date) {
+            const start = new Date(`${date}T${from}`);
+            const end = new Date(`${date}T${to}`);
+            startTime = start.getTime();
+            endTime = end.getTime();
+            if (!Number.isFinite(endTime) || endTime === startTime) {
+                endTime = startTime + 24 * 60 * 60 * 1000 - 1;
+            }
+        }
+
+        const entries = await readUnifiedEntries();
+        const filtered = entries.filter((entry) => {
+            if (levels.length && !levels.includes(entry.level)) return false;
+            if (sources.length && !sources.includes(entry.source)) return false;
+            if (traceId && entry.traceId !== traceId) return false;
+            if (search && !entry.message.toLowerCase().includes(search)) return false;
+            if (startTime !== null && endTime !== null) {
+                const ts = new Date(entry.timestamp).getTime();
+                if (ts < startTime || ts > endTime) return false;
+            }
+            return true;
+        });
+
+        const sorted = filtered.sort(
+            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+        );
+
+        const total = sorted.length;
+        const sliced = sorted.slice(offset, offset + limit);
+        const accept = c.req.header('Accept') || '';
+        if (accept.includes('text/plain')) {
+            const content = sliced.map((entry) => JSON.stringify(entry)).join('\n');
+            return new Response(content, {
+                status: 200,
+                headers: {
+                    'Content-Type': 'text/plain; charset=utf-8',
+                    'Content-Disposition': 'attachment; filename=\"okastr8-logs.jsonl\"',
+                },
+            });
+        }
+
+        return c.json(apiResponse(true, 'Logs', { logs: sliced, total }));
+    } catch (error: any) {
+        return c.json(apiResponse(false, error.message || 'Failed to load logs'));
+    }
+});
+
 // User routes
 api.post('/user/create', async (c) => {
-    console.log('API: /user/create hit');
     try {
         const { username, password, distro } = await c.req.json();
         const result = await createUser(username, password, distro);
@@ -271,7 +402,6 @@ api.post('/user/create', async (c) => {
 });
 
 api.post('/user/delete', async (c) => {
-    console.log('API: /user/delete hit');
     try {
         const { username } = await c.req.json();
         const result = await deleteUser(username);
@@ -283,7 +413,6 @@ api.post('/user/delete', async (c) => {
 });
 
 api.post('/user/last-login', async (c) => {
-    console.log('API: /user/last-login hit');
     try {
         const { username } = await c.req.json();
         const result = await getLastLogin(username);
@@ -295,7 +424,6 @@ api.post('/user/last-login', async (c) => {
 });
 
 api.post('/user/list-groups', async (c) => {
-    console.log('API: /user/list-groups hit');
     try {
         const { username } = await c.req.json();
         const result = await listGroups(username);
@@ -307,7 +435,6 @@ api.post('/user/list-groups', async (c) => {
 });
 
 api.get('/user/list-users', async (c) => {
-    console.log('API: /user/list-users hit');
     try {
         const result = await listUsers();
         return c.json(apiResponse(result.exitCode === 0, result.stdout || result.stderr));
@@ -318,7 +445,6 @@ api.get('/user/list-users', async (c) => {
 });
 
 api.post('/user/lock', async (c) => {
-    console.log('API: /user/lock hit');
     try {
         const { username } = await c.req.json();
         const result = await lockUser(username);
@@ -330,7 +456,6 @@ api.post('/user/lock', async (c) => {
 });
 
 api.post('/user/unlock', async (c) => {
-    console.log('API: /user/unlock hit');
     try {
         const { username } = await c.req.json();
         const result = await unlockUser(username);
@@ -343,7 +468,6 @@ api.post('/user/unlock', async (c) => {
 
 // Systemd routes
 api.post('/systemd/create', async (c) => {
-    console.log('API: /systemd/create hit');
     try {
         const { service_name, description, exec_start, working_directory, user, wanted_by, auto_start } = await c.req.json();
         const result = await createService(service_name, description, exec_start, working_directory, user, wanted_by, auto_start);
@@ -355,7 +479,6 @@ api.post('/systemd/create', async (c) => {
 });
 
 api.post('/systemd/delete', async (c) => {
-    console.log('API: /systemd/delete hit');
     try {
         const { service_name } = await c.req.json();
         const result = await deleteService(service_name);
@@ -367,7 +490,6 @@ api.post('/systemd/delete', async (c) => {
 });
 
 api.post('/systemd/start', async (c) => {
-    console.log('API: /systemd/start hit');
     try {
         const { service_name } = await c.req.json();
         const result = await startService(service_name);
@@ -379,7 +501,6 @@ api.post('/systemd/start', async (c) => {
 });
 
 api.post('/systemd/stop', async (c) => {
-    console.log('API: /systemd/stop hit');
     try {
         const { service_name } = await c.req.json();
         const result = await stopService(service_name);
@@ -391,7 +512,6 @@ api.post('/systemd/stop', async (c) => {
 });
 
 api.post('/systemd/restart', async (c) => {
-    console.log('API: /systemd/restart hit');
     try {
         const { service_name } = await c.req.json();
         const result = await restartService(service_name);
@@ -403,7 +523,6 @@ api.post('/systemd/restart', async (c) => {
 });
 
 api.post('/systemd/status', async (c) => {
-    console.log('API: /systemd/status hit');
     try {
         const { service_name } = await c.req.json();
         const result = await statusService(service_name);
@@ -415,7 +534,6 @@ api.post('/systemd/status', async (c) => {
 });
 
 api.post('/systemd/logs', async (c) => {
-    console.log('API: /systemd/logs hit');
     try {
         const { service_name } = await c.req.json();
         const result = await logsService(service_name);
@@ -427,7 +545,6 @@ api.post('/systemd/logs', async (c) => {
 });
 
 api.post('/systemd/enable', async (c) => {
-    console.log('API: /systemd/enable hit');
     try {
         const { service_name } = await c.req.json();
         const result = await enableService(service_name);
@@ -439,7 +556,6 @@ api.post('/systemd/enable', async (c) => {
 });
 
 api.post('/systemd/disable', async (c) => {
-    console.log('API: /systemd/disable hit');
     try {
         const { service_name } = await c.req.json();
         const result = await disableService(service_name);
@@ -451,7 +567,6 @@ api.post('/systemd/disable', async (c) => {
 });
 
 api.get('/systemd/reload', async (c) => {
-    console.log('API: /systemd/reload hit');
     try {
         const result = await reloadDaemon();
         return c.json(apiResponse(result.exitCode === 0, result.stdout || result.stderr));
@@ -462,7 +577,6 @@ api.get('/systemd/reload', async (c) => {
 });
 
 api.get('/systemd/list', async (c) => {
-    console.log('API: /systemd/list hit');
     try {
         const result = await listServices();
         return c.json(apiResponse(result.exitCode === 0, result.stdout || result.stderr));
@@ -474,7 +588,6 @@ api.get('/systemd/list', async (c) => {
 
 // Orchestrate route
 api.post('/orchestrate', async (c) => {
-    console.log('API: /orchestrate hit');
     try {
         // orchestrateEnvironment takes no arguments - reads from ~/.okastr8/environment.json
         const result = await orchestrateEnvironment();
@@ -487,7 +600,6 @@ api.post('/orchestrate', async (c) => {
 
 // Setup routes
 api.post('/setup/full', async (c) => {
-    console.log('API: /setup/full hit');
     try {
         const result = await runFullSetup();
         return c.json(apiResponse(result.exitCode === 0, result.stdout || result.stderr));
@@ -498,7 +610,6 @@ api.post('/setup/full', async (c) => {
 });
 
 api.post('/setup/ssh-harden', async (c) => {
-    console.log('API: /setup/ssh-harden hit');
     try {
         const { port } = await c.req.json().catch(() => ({}));
         const result = await hardenSsh(port);
@@ -510,7 +621,6 @@ api.post('/setup/ssh-harden', async (c) => {
 });
 
 api.post('/setup/ssh-port', async (c) => {
-    console.log('API: /setup/ssh-port hit');
     try {
         const { port } = await c.req.json();
         if (!port) {
@@ -525,7 +635,6 @@ api.post('/setup/ssh-port', async (c) => {
 });
 
 api.post('/setup/firewall', async (c) => {
-    console.log('API: /setup/firewall hit');
     try {
         const { ssh_port } = await c.req.json().catch(() => ({}));
         const result = await configureFirewall(ssh_port);
@@ -537,7 +646,6 @@ api.post('/setup/firewall', async (c) => {
 });
 
 api.post('/setup/fail2ban', async (c) => {
-    console.log('API: /setup/fail2ban hit');
     try {
         const result = await configureFail2ban();
         return c.json(apiResponse(result.exitCode === 0, result.stdout || result.stderr));
@@ -549,7 +657,6 @@ api.post('/setup/fail2ban', async (c) => {
 
 // App management routes
 api.post('/app/create', async (c) => {
-    console.log('API: /app/create hit');
     try {
         const { createApp } = await import('./commands/app');
         const config = await c.req.json();
@@ -562,7 +669,6 @@ api.post('/app/create', async (c) => {
 });
 
 api.post('/app/delete', async (c) => {
-    console.log('API: /app/delete hit');
     try {
         const { deleteApp } = await import('./commands/app');
         const { name } = await c.req.json();
@@ -575,7 +681,6 @@ api.post('/app/delete', async (c) => {
 });
 
 api.get('/app/list', async (c) => {
-    console.log('API: /app/list hit');
     try {
         const { listApps } = await import('./commands/app');
         const result = await listApps();
@@ -587,7 +692,6 @@ api.get('/app/list', async (c) => {
 });
 
 api.post('/app/status', async (c) => {
-    console.log('API: /app/status hit');
     try {
         const { getAppStatus } = await import('./commands/app');
         const { name } = await c.req.json();
@@ -600,7 +704,6 @@ api.post('/app/status', async (c) => {
 });
 
 api.post('/app/logs', async (c) => {
-    console.log('API: /app/logs hit');
     try {
         const { getAppLogs } = await import('./commands/app');
         const { name, lines } = await c.req.json();
@@ -613,7 +716,6 @@ api.post('/app/logs', async (c) => {
 });
 
 api.post('/app/export-logs', async (c) => {
-    console.log('API: /app/export-logs hit');
     try {
         const { exportAppLogs } = await import('./commands/app');
         const { name } = await c.req.json();
@@ -626,7 +728,6 @@ api.post('/app/export-logs', async (c) => {
 });
 
 api.post('/app/start', async (c) => {
-    console.log('API: /app/start hit');
     try {
         const { startApp } = await import('./commands/app');
         const { name } = await c.req.json();
@@ -639,7 +740,6 @@ api.post('/app/start', async (c) => {
 });
 
 api.post('/app/stop', async (c) => {
-    console.log('API: /app/stop hit');
     try {
         const { stopApp } = await import('./commands/app');
         const { name } = await c.req.json();
@@ -652,7 +752,6 @@ api.post('/app/stop', async (c) => {
 });
 
 api.post('/app/webhook-toggle', async (c) => {
-    console.log('API: /app/webhook-toggle hit');
     try {
         const { setAppWebhookAutoDeploy } = await import('./commands/app');
         const { name, enabled } = await c.req.json();
@@ -664,8 +763,19 @@ api.post('/app/webhook-toggle', async (c) => {
     }
 });
 
+api.post('/app/webhook-branch', async (c) => {
+    try {
+        const { setAppWebhookBranch } = await import('./commands/app');
+        const { name, branch } = await c.req.json();
+        const result = await setAppWebhookBranch(name, branch);
+        return c.json(apiResponse(result.success, result.message));
+    } catch (error: any) {
+        console.error('API: /app/webhook-branch error:', error);
+        return c.json(apiResponse(false, error.message || 'Internal Server Error'));
+    }
+});
+
 api.post('/app/restart', async (c) => {
-    console.log('API: /app/restart hit');
     try {
         const { restartApp } = await import('./commands/app');
         const { name } = await c.req.json();
@@ -678,7 +788,6 @@ api.post('/app/restart', async (c) => {
 });
 
 api.post('/app/versions', async (c) => {
-    console.log('API: /app/versions hit');
     try {
         const { name } = await c.req.json();
         const { getVersions } = await import('./commands/version');
@@ -691,7 +800,6 @@ api.post('/app/versions', async (c) => {
 });
 
 api.post('/app/rollback', async (c) => {
-    console.log('API: /app/rollback hit');
     try {
         const { name, versionId } = await c.req.json();
         const { rollback, getCurrentVersion } = await import('./commands/version');
@@ -713,7 +821,6 @@ api.post('/app/rollback', async (c) => {
 
 // Deploy history endpoint (parity with CLI `deploy history`)
 api.get('/deploy/history/:appName', async (c) => {
-    console.log('API: /deploy/history hit');
     try {
         const appName = c.req.param('appName');
         const { getDeploymentHistory } = await import('./commands/deploy');
@@ -728,7 +835,6 @@ api.get('/deploy/history/:appName', async (c) => {
 
 // Health check endpoint (parity with CLI `deploy health`)
 api.post('/deploy/health', async (c) => {
-    console.log('API: /deploy/health hit');
     try {
         const { method, target, timeout = 30 } = await c.req.json();
         const { runHealthCheck } = await import('./commands/deploy');
@@ -748,7 +854,6 @@ api.post('/deploy/health', async (c) => {
 
 // Deploy routes
 api.post('/deploy/trigger', async (c) => {
-    console.log('API: /deploy/trigger hit');
     try {
         const { deployApp } = await import('./commands/deploy');
         const options = await c.req.json();
@@ -761,7 +866,6 @@ api.post('/deploy/trigger', async (c) => {
 });
 
 api.post('/deploy/rollback', async (c) => {
-    console.log('API: /deploy/rollback hit');
     try {
         const { rollbackApp } = await import('./commands/deploy');
         const { appName, commitHash } = await c.req.json();
@@ -774,7 +878,6 @@ api.post('/deploy/rollback', async (c) => {
 });
 
 api.post('/deploy/history', async (c) => {
-    console.log('API: /deploy/history hit');
     try {
         const { getDeploymentHistory } = await import('./commands/deploy');
         const { appName } = await c.req.json();
@@ -787,7 +890,6 @@ api.post('/deploy/history', async (c) => {
 });
 
 api.post('/deploy/health', async (c) => {
-    console.log('API: /deploy/health hit');
     try {
         const { runHealthCheck } = await import('./commands/deploy');
         const { method, target, timeout } = await c.req.json();
@@ -801,8 +903,9 @@ api.post('/deploy/health', async (c) => {
 
 // GitHub routes
 api.get('/github/status', async (c) => {
-    console.log('API: /github/status hit');
     try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
         const { getConnectionStatus } = await import('./commands/github');
         const status = await getConnectionStatus();
         return c.json(apiResponse(true, status.connected ? 'Connected' : 'Not connected', status));
@@ -813,8 +916,9 @@ api.get('/github/status', async (c) => {
 });
 
 api.get('/github/auth-url', async (c) => {
-    console.log('API: /github/auth-url hit');
     try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
         const { getGitHubConfig, getAuthUrl } = await import('./commands/github');
         const config = await getGitHubConfig();
 
@@ -827,7 +931,7 @@ api.get('/github/auth-url', async (c) => {
         const protocol = c.req.header('x-forwarded-proto') || 'http';
         const callbackUrl = `${protocol}://${host}/api/github/callback`;
 
-        const authUrl = getAuthUrl(config.clientId, callbackUrl);
+        const authUrl = getAuthUrl(config.clientId, callbackUrl, 'connect');
         return c.json(apiResponse(true, 'Auth URL generated', { authUrl, callbackUrl }));
     } catch (error: any) {
         console.error('API: /github/auth-url error:', error);
@@ -835,37 +939,95 @@ api.get('/github/auth-url', async (c) => {
     }
 });
 
+api.get('/auth/github', async (c) => {
+    try {
+        const { getGitHubConfig, getAuthUrl } = await import('./commands/github');
+        const { getSystemConfig } = await import('./config');
+        const config = await getGitHubConfig();
+        const systemConfig = await getSystemConfig();
+
+        if (!config.clientId) {
+            return c.redirect('/login?error=github_not_configured');
+        }
+
+        const githubAdminId = systemConfig.manager?.auth?.github_admin_id;
+        if (!githubAdminId) {
+            return c.redirect('/login?error=github_admin_not_set');
+        }
+
+        const host = c.req.header('host') || 'localhost:41788';
+        const protocol = c.req.header('x-forwarded-proto') || 'http';
+        const callbackUrl = `${protocol}://${host}/api/github/callback`;
+
+        const authUrl = getAuthUrl(config.clientId, callbackUrl, 'login');
+        return c.redirect(authUrl);
+    } catch (error: any) {
+        console.error('API: /auth/github error:', error);
+        return c.redirect('/login?error=github_auth_failed');
+    }
+});
+
 api.get('/github/callback', async (c) => {
-    console.log('API: /github/callback hit');
+    let isLoginFlow = false;
     try {
         const code = c.req.query('code');
         const error = c.req.query('error');
+        const state = c.req.query('state') || '';
+        isLoginFlow = state.startsWith('login_');
 
         if (error) {
             // Redirect to UI with error
-            return c.redirect(`/github?error=${encodeURIComponent(error)}`);
+            return c.redirect(isLoginFlow ? `/login?error=${encodeURIComponent(error)}` : `/github?error=${encodeURIComponent(error)}`);
         }
 
         if (!code) {
-            return c.redirect('/github?error=no_code');
+            return c.redirect(isLoginFlow ? '/login?error=no_code' : '/github?error=no_code');
         }
 
-        const { getGitHubConfig, exchangeCodeForToken, getGitHubUser, saveGitHubConfig } = await import('./commands/github');
+        const { getGitHubConfig, exchangeCodeForToken, getGitHubUser, saveGitHubConfig, saveGitHubAdminIdentity } = await import('./commands/github');
         const config = await getGitHubConfig();
 
         if (!config.clientId || !config.clientSecret) {
-            return c.redirect('/github?error=config_missing');
+            return c.redirect(isLoginFlow ? '/login?error=config_missing' : '/github?error=config_missing');
         }
 
         // Exchange code for token
         const tokenData = await exchangeCodeForToken(config.clientId, config.clientSecret, code);
 
         if (tokenData.error || !tokenData.accessToken) {
-            return c.redirect(`/github?error=${encodeURIComponent(tokenData.error || 'token_exchange_failed')}`);
+            return c.redirect(isLoginFlow ? `/login?error=${encodeURIComponent(tokenData.error || 'token_exchange_failed')}` : `/github?error=${encodeURIComponent(tokenData.error || 'token_exchange_failed')}`);
         }
 
         // Get user profile
         const userProfile = await getGitHubUser(tokenData.accessToken);
+
+        if (isLoginFlow) {
+            const { getSystemConfig } = await import('./config');
+            const { generateToken } = await import('./commands/auth');
+            const systemConfig = await getSystemConfig();
+            const githubAdminId = systemConfig.manager?.auth?.github_admin_id;
+
+            if (!githubAdminId) {
+                return c.redirect('/login?error=github_admin_not_set');
+            }
+
+            if (String(userProfile.id) !== String(githubAdminId)) {
+                return c.redirect('/login?error=github_not_allowed');
+            }
+
+            await saveGitHubConfig({
+                ...config,
+                accessToken: tokenData.accessToken,
+                username: userProfile.login,
+                connectedAt: new Date().toISOString()
+            });
+
+            const { token } = await generateToken(`github:${userProfile.id}`);
+            const cookieOpts = 'Path=/; HttpOnly; SameSite=Strict; Max-Age=86400';
+            c.header('Set-Cookie', `okastr8_session=${token}; ${cookieOpts}`);
+
+            return c.redirect('/');
+        }
 
         // Save config with new token
         await saveGitHubConfig({
@@ -875,17 +1037,19 @@ api.get('/github/callback', async (c) => {
             connectedAt: new Date().toISOString()
         });
 
+        await saveGitHubAdminIdentity(userProfile.id, userProfile.login);
         console.log(`GitHub connected for user: ${userProfile.login}`);
         return c.redirect(`/github?connected=true&user=${userProfile.login}`);
     } catch (error: any) {
         console.error('API: /github/callback error:', error);
-        return c.redirect(`/github?error=${encodeURIComponent(error.message)}`);
+        return c.redirect(isLoginFlow ? `/login?error=${encodeURIComponent(error.message)}` : `/github?error=${encodeURIComponent(error.message)}`);
     }
 });
 
 api.get('/github/repos', async (c) => {
-    console.log('API: /github/repos hit');
     try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
         const { getGitHubConfig, listRepos } = await import('./commands/github');
         const config = await getGitHubConfig();
 
@@ -903,8 +1067,9 @@ api.get('/github/repos', async (c) => {
 
 // Setup SSH deploy key for autonomous deploys
 api.post('/github/setup-deploy-key', async (c) => {
-    console.log('API: /github/setup-deploy-key hit');
     try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
         const { getGitHubConfig, hasOkastr8DeployKey, createSSHKey } = await import('./commands/github');
         const { runCommand } = await import('./utils/command');
         const { existsSync } = await import('fs');
@@ -963,7 +1128,7 @@ api.post('/github/setup-deploy-key', async (c) => {
         // Configure Git to use SSH for GitHub
         await runCommand('git', ['config', '--global', 'url.git@github.com:.insteadOf', 'https://github.com/']);
 
-        return c.json(apiResponse(true, 'Deploy key configured successfully! ✨', { publicKey }));
+        return c.json(apiResponse(true, 'Deploy key configured successfully!', { publicKey }));
     } catch (error: any) {
         console.error('API: /github/setup-deploy-key error:', error);
         return c.json(apiResponse(false, error.message || 'Internal Server Error'));
@@ -972,6 +1137,8 @@ api.post('/github/setup-deploy-key', async (c) => {
 
 api.post('/github/branches', async (c) => {
     try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
         const { getGitHubConfig, listBranches } = await import('./commands/github');
         const config = await getGitHubConfig();
         if (!config.accessToken) return c.json(apiResponse(false, 'Not connected'));
@@ -987,6 +1154,8 @@ api.post('/github/branches', async (c) => {
 
 api.post('/github/check-config', async (c) => {
     try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
         const { getGitHubConfig, checkRepoConfig } = await import('./commands/github');
         const config = await getGitHubConfig();
         if (!config.accessToken) return c.json(apiResponse(false, 'Not connected'));
@@ -1002,6 +1171,8 @@ api.post('/github/check-config', async (c) => {
 
 api.post('/github/inspect-config', async (c) => {
     try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
         const { getGitHubConfig, inspectRepoConfig } = await import('./commands/github');
         const config = await getGitHubConfig();
         if (!config.accessToken) return c.json(apiResponse(false, 'Not connected'));
@@ -1017,8 +1188,9 @@ api.post('/github/inspect-config', async (c) => {
 
 // Check if deploying to a different branch than originally configured
 api.post('/github/check-branch-change', async (c) => {
-    console.log('API: /github/check-branch-change hit');
     try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
         const { getAppMetadata } = await import('./commands/app');
         const { repoFullName, branch, appName } = await c.req.json();
 
@@ -1032,22 +1204,25 @@ api.post('/github/check-branch-change', async (c) => {
         try {
             const metadata = await getAppMetadata(derivedAppName);
 
-            // App exists - check branch
-            if (metadata.gitBranch && metadata.gitBranch !== branch) {
+            const webhookBranch = metadata.webhookBranch || metadata.gitBranch;
+            // App exists - check branch vs webhook branch
+            if (webhookBranch && webhookBranch !== branch) {
                 return c.json(apiResponse(true, 'Branch change detected', {
                     exists: true,
                     branchChanged: true,
-                    currentBranch: metadata.gitBranch,
+                    currentBranch: webhookBranch,
                     requestedBranch: branch,
                     appName: derivedAppName,
-                    warning: `This app is currently deployed from "${metadata.gitBranch}". You selected "${branch}". Webhooks will only trigger for the new branch.`
+                    webhookBranch: webhookBranch,
+                    warning: `This app's webhook branch is "${webhookBranch}". You selected "${branch}". Auto-deploy will keep using "${webhookBranch}" unless you change it in the app settings.`
                 }));
             }
 
             return c.json(apiResponse(true, 'No branch change', {
                 exists: true,
                 branchChanged: false,
-                currentBranch: metadata.gitBranch,
+                currentBranch: webhookBranch || metadata.gitBranch,
+                webhookBranch: webhookBranch,
                 appName: derivedAppName
             }));
         } catch {
@@ -1063,8 +1238,9 @@ api.post('/github/check-branch-change', async (c) => {
 
 
 api.post('/github/prepare-deploy', async (c) => {
-    console.log('API: /github/prepare-deploy hit');
     try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
         const { prepareRepoImport } = await import('./commands/github');
         const { startDeploymentStream, endDeploymentStream, streamLog } = await import('./utils/deploymentLogger');
         const { randomBytes } = await import('crypto');
@@ -1080,7 +1256,7 @@ api.post('/github/prepare-deploy', async (c) => {
         try {
             const result = await prepareRepoImport(options, deploymentId);
 
-            streamLog(deploymentId, `✅ Preparation ${result.success ? 'succeeded' : 'failed'}: ${result.message}`);
+            streamLog(deploymentId, `Preparation ${result.success ? 'succeeded' : 'failed'}: ${result.message}`);
             setTimeout(() => endDeploymentStream(deploymentId), 500);
 
             if (result.success) {
@@ -1096,7 +1272,7 @@ api.post('/github/prepare-deploy', async (c) => {
                 return c.json(apiResponse(false, result.message));
             }
         } catch (e: any) {
-            streamLog(deploymentId, `❌ Error: ${e.message}`);
+            streamLog(deploymentId, `Error: ${e.message}`);
             setTimeout(() => endDeploymentStream(deploymentId), 500);
             throw e;
         }
@@ -1108,8 +1284,9 @@ api.post('/github/prepare-deploy', async (c) => {
 });
 
 api.post('/github/finalize-deploy', async (c) => {
-    console.log('API: /github/finalize-deploy hit');
     try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
         const { finalizeRepoImport } = await import('./commands/github');
         const { startDeploymentStream, endDeploymentStream, streamLog } = await import('./utils/deploymentLogger');
         const { randomBytes } = await import('crypto');
@@ -1123,11 +1300,11 @@ api.post('/github/finalize-deploy', async (c) => {
         // Run finalize async
         finalizeRepoImport(appName, versionId, config, deploymentId)
             .then((result) => {
-                streamLog(deploymentId, `✅ Deployment ${result.success ? 'succeeded' : 'failed'}: ${result.message}`);
+                streamLog(deploymentId, `Deployment ${result.success ? 'succeeded' : 'failed'}: ${result.message}`);
                 setTimeout(() => endDeploymentStream(deploymentId), 1000);
             })
             .catch((error) => {
-                streamLog(deploymentId, `❌ Deployment error: ${error.message}`);
+                streamLog(deploymentId, `Deployment error: ${error.message}`);
                 setTimeout(() => endDeploymentStream(deploymentId), 1000);
             });
 
@@ -1142,8 +1319,9 @@ api.post('/github/finalize-deploy', async (c) => {
 });
 
 api.post('/github/deploy', async (c) => {
-    console.log('API: /github/deploy hit');
     try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
         const { prepareRepoImport, finalizeRepoImport } = await import('./commands/github');
         const { startDeploymentStream, endDeploymentStream, streamLog } = await import('./utils/deploymentLogger');
         const { randomBytes } = await import('crypto');
@@ -1156,24 +1334,24 @@ api.post('/github/deploy', async (c) => {
         try {
             const prep = await prepareRepoImport({ repoFullName, branch }, deploymentId);
             if (!prep.success || !prep.appName || !prep.versionId) {
-                streamLog(deploymentId, `❌ Prepare failed: ${prep.message}`);
+                streamLog(deploymentId, `Prepare failed: ${prep.message}`);
                 setTimeout(() => endDeploymentStream(deploymentId), 500);
                 return c.json(apiResponse(false, prep.message));
             }
 
             finalizeRepoImport(prep.appName, prep.versionId, config, deploymentId)
                 .then((result) => {
-                    streamLog(deploymentId, `✅ Deployment ${result.success ? 'succeeded' : 'failed'}: ${result.message}`);
+                    streamLog(deploymentId, `Deployment ${result.success ? 'succeeded' : 'failed'}: ${result.message}`);
                     setTimeout(() => endDeploymentStream(deploymentId), 1000);
                 })
                 .catch((error) => {
-                    streamLog(deploymentId, `❌ Deployment error: ${error.message}`);
+                    streamLog(deploymentId, `Deployment error: ${error.message}`);
                     setTimeout(() => endDeploymentStream(deploymentId), 1000);
                 });
 
             return c.json(apiResponse(true, 'Deployment started', { deploymentId }));
         } catch (e: any) {
-            streamLog(deploymentId, `❌ Error: ${e.message}`);
+            streamLog(deploymentId, `Error: ${e.message}`);
             setTimeout(() => endDeploymentStream(deploymentId), 500);
             throw e;
         }
@@ -1185,8 +1363,9 @@ api.post('/github/deploy', async (c) => {
 
 // Legacy import (kept for backward compatibility, wrapped)
 api.post('/github/import', async (c) => {
-    console.log('API: /github/import hit');
     try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
         const { importRepo } = await import('./commands/github');
         const { startDeploymentStream, endDeploymentStream, streamLog } = await import('./utils/deploymentLogger');
         const { randomBytes } = await import('crypto');
@@ -1202,11 +1381,11 @@ api.post('/github/import', async (c) => {
         // Run deployment asynchronously
         importRepo(options, deploymentId)
             .then((result) => {
-                streamLog(deploymentId, `✅ Deployment ${result.success ? 'succeeded' : 'failed'}: ${result.message}`);
+                streamLog(deploymentId, `Deployment ${result.success ? 'succeeded' : 'failed'}: ${result.message}`);
                 setTimeout(() => endDeploymentStream(deploymentId), 1000);
             })
             .catch((error) => {
-                streamLog(deploymentId, `❌ Deployment error: ${error.message}`);
+                streamLog(deploymentId, `Deployment error: ${error.message}`);
                 setTimeout(() => endDeploymentStream(deploymentId), 1000);
             });
 
@@ -1223,6 +1402,8 @@ api.post('/github/import', async (c) => {
 
 // GitHub Deployment Log Stream (SSE)
 api.get('/github/deploy-stream/:deploymentId', async (c) => {
+    const adminCheck = await enforceAdmin(c);
+    if (adminCheck) return adminCheck;
     const deploymentId = c.req.param('deploymentId');
     console.log(`[SSE] Client connecting to deployment stream: ${deploymentId}`);
 
@@ -1313,9 +1494,10 @@ api.get('/github/deploy-stream/:deploymentId', async (c) => {
 // Cancel a running deployment
 api.post('/github/cancel-deployment/:deploymentId', async (c) => {
     const deploymentId = c.req.param('deploymentId');
-    console.log(`API: /github/cancel-deployment hit for: ${deploymentId}`);
 
     try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
         const { cancelDeployment, endDeploymentStream } = await import('./utils/deploymentLogger');
 
         const cancelled = cancelDeployment(deploymentId);
@@ -1334,8 +1516,9 @@ api.post('/github/cancel-deployment/:deploymentId', async (c) => {
 });
 
 api.post('/github/disconnect', async (c) => {
-    console.log('API: /github/disconnect hit');
     try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
         const { disconnectGitHub } = await import('./commands/github');
         await disconnectGitHub();
         return c.json(apiResponse(true, 'GitHub disconnected'));
@@ -1355,11 +1538,27 @@ api.post('/github/webhook', async (c) => {
         const secret = config.manager?.github?.webhook_secret;
 
         if (!secret) {
+            void writeUnifiedEntry({
+                timestamp: new Date().toISOString(),
+                level: 'error',
+                source: 'webhook',
+                service: 'github-webhook',
+                message: 'Webhook secret not configured',
+                action: 'webhook-rejected',
+            });
             return c.text('Webhook secret not configured', 500);
         }
 
         const signature = c.req.header('X-Hub-Signature-256');
         if (!signature) {
+            void writeUnifiedEntry({
+                timestamp: new Date().toISOString(),
+                level: 'warn',
+                source: 'webhook',
+                service: 'github-webhook',
+                message: 'Signature missing',
+                action: 'webhook-rejected',
+            });
             return c.text('Signature missing', 401);
         }
 
@@ -1374,6 +1573,14 @@ api.post('/github/webhook', async (c) => {
 
         if (sigBuffer.length !== digestBuffer.length || !timingSafeEqual(sigBuffer, digestBuffer)) {
             console.error('Webhook signature mismatch');
+            void writeUnifiedEntry({
+                timestamp: new Date().toISOString(),
+                level: 'warn',
+                source: 'webhook',
+                service: 'github-webhook',
+                message: 'Webhook signature mismatch',
+                action: 'webhook-rejected',
+            });
             return c.text('Invalid signature', 401);
         }
 
@@ -1382,13 +1589,31 @@ api.post('/github/webhook', async (c) => {
         // Only handle push events for now
         const githubEvent = c.req.header('X-GitHub-Event');
         if (githubEvent !== 'push') {
+            void writeUnifiedEntry({
+                timestamp: new Date().toISOString(),
+                level: 'info',
+                source: 'webhook',
+                service: 'github-webhook',
+                message: `Ignored non-push event: ${githubEvent}`,
+                action: 'webhook-ignored',
+            });
             return c.json({ ignored: true, message: 'Not a push event' });
         }
 
         const repoUrl = event.repository?.clone_url;
         const repoName = event.repository?.full_name;
 
-        if (!repoUrl) return c.json({ ignored: true, message: 'No repository info' });
+        if (!repoUrl) {
+            void writeUnifiedEntry({
+                timestamp: new Date().toISOString(),
+                level: 'warn',
+                source: 'webhook',
+                service: 'github-webhook',
+                message: 'No repository info in webhook payload',
+                action: 'webhook-ignored',
+            });
+            return c.json({ ignored: true, message: 'No repository info' });
+        }
 
         // Look for matching app
         // Apps store `gitRepo`. We match against that.
@@ -1404,35 +1629,101 @@ api.post('/github/webhook', async (c) => {
         if (targetApp) {
             // Check Auto-Deploy Flag
             if (targetApp.webhookAutoDeploy === false) {
-                console.log(`⚠️ Auto-deploy disabled for ${targetApp.name}. Ignoring webhook.`);
+                void writeUnifiedEntry({
+                    timestamp: new Date().toISOString(),
+                    level: 'info',
+                    source: 'webhook',
+                    service: 'github-webhook',
+                    message: `Auto-deploy disabled for ${targetApp.name}`,
+                    action: 'webhook-ignored',
+                    app: { name: targetApp.name, repo: targetApp.gitRepo, branch: targetApp.gitBranch },
+                });
                 return c.json({ ignored: true, message: 'Auto-deploy disabled for this app' });
             }
 
-            console.log(`Webhook trigger: Auto-deploying ${targetApp.name}...`);
+            void writeUnifiedEntry({
+                timestamp: new Date().toISOString(),
+                level: 'info',
+                source: 'webhook',
+                service: 'github-webhook',
+                message: `Auto-deploy triggered for ${targetApp.name}`,
+                action: 'webhook-trigger',
+                app: { name: targetApp.name, repo: targetApp.gitRepo, branch: targetApp.gitBranch },
+            });
 
             // Check branch if possible
-            if (targetApp.gitBranch && event.ref) {
+            const webhookBranch = targetApp.webhookBranch || targetApp.gitBranch;
+            if (webhookBranch && event.ref) {
                 const pushRef = event.ref; // e.g., "refs/heads/main"
-                const appRef = `refs/heads/${targetApp.gitBranch}`;
-                if (!pushRef.endsWith(targetApp.gitBranch)) {
-                    console.log(`Webhook ignored: Push to ${pushRef} does not match app branch ${targetApp.gitBranch}`);
-                    return c.json({ ignored: true, message: `Branch mismatch: ${pushRef} != ${targetApp.gitBranch}` });
+                const appRef = `refs/heads/${webhookBranch}`;
+                if (!pushRef.endsWith(webhookBranch)) {
+                    void writeUnifiedEntry({
+                        timestamp: new Date().toISOString(),
+                        level: 'info',
+                        source: 'webhook',
+                        service: 'github-webhook',
+                        message: `Branch mismatch: ${pushRef} != ${webhookBranch}`,
+                        action: 'webhook-ignored',
+                        app: { name: targetApp.name, repo: targetApp.gitRepo, branch: webhookBranch },
+                        data: { pushRef },
+                    });
+                    return c.json({ ignored: true, message: `Branch mismatch: ${pushRef} != ${webhookBranch}` });
                 }
             }
 
             // Trigger Update (async)
             updateApp(targetApp.name)
-                .then(res => console.log(`✅ Auto-deploy ${targetApp.name} complete:`, res.message))
-                .catch(err => console.error(`❌ Auto-deploy ${targetApp.name} failed:`, err));
+                .then(() => {
+                    void writeUnifiedEntry({
+                        timestamp: new Date().toISOString(),
+                        level: 'info',
+                        source: 'webhook',
+                        service: 'github-webhook',
+                        message: `Auto-deploy ${targetApp.name} complete`,
+                        action: 'webhook-deploy-success',
+                        app: { name: targetApp.name, repo: targetApp.gitRepo, branch: targetApp.gitBranch },
+                    });
+                })
+                .catch(err => {
+                    void writeUnifiedEntry({
+                        timestamp: new Date().toISOString(),
+                        level: 'error',
+                        source: 'webhook',
+                        service: 'github-webhook',
+                        message: `Auto-deploy ${targetApp.name} failed`,
+                        action: 'webhook-deploy-failed',
+                        app: { name: targetApp.name, repo: targetApp.gitRepo, branch: targetApp.gitBranch },
+                        error: err instanceof Error ? { name: err.name, message: err.message, stack: err.stack } : { message: String(err) },
+                    });
+                });
 
             return c.json({ success: true, app: targetApp.name, message: 'Deployment triggered' });
         }
 
-        console.log(`Webhook ignored: No app found matching ${repoName}`);
+        void writeUnifiedEntry({
+            timestamp: new Date().toISOString(),
+            level: 'info',
+            source: 'webhook',
+            service: 'github-webhook',
+            message: `No app found for ${repoName}`,
+            action: 'webhook-ignored',
+            data: { repoName },
+        });
         return c.json({ ignored: true, message: `No app found for ${repoName}` });
 
     } catch (error: any) {
         console.error('API: /github/webhook error:', error);
+        if (error instanceof Error) {
+            void writeUnifiedEntry({
+                timestamp: new Date().toISOString(),
+                level: 'error',
+                source: 'webhook',
+                service: 'github-webhook',
+                message: 'Webhook handler error',
+                action: 'webhook-error',
+                error: { name: error.name, message: error.message, stack: error.stack },
+            });
+        }
         return c.text(error.message, 500);
     }
 });
@@ -1454,23 +1745,39 @@ api.post('/auth/verify', async (c) => {
             isLoginApprovalRequired,
             isTrustedUser,
             createPendingApproval,
-            isCurrentUserAdmin,
-            getAdminUser
+            isUserAdmin
         } = await import('./commands/auth');
 
         const result = await validateToken(token);
 
         if (!result.valid) {
+            void writeUnifiedEntry({
+                timestamp: new Date().toISOString(),
+                level: 'warn',
+                source: 'auth',
+                service: 'auth',
+                message: 'Authentication failed',
+                action: 'auth-failed',
+                data: { reason: result.error || 'Invalid token' },
+            });
             return c.json(apiResponse(false, result.error || 'Invalid token'), 401);
         }
 
         // Check if login approval is needed
         const needsApproval = await isLoginApprovalRequired();
-        const isAdmin = result.userId === (await getAdminUser()); // Basic check
+        const isAdmin = await isUserAdmin(result.userId || '');
         const isTrusted = await isTrustedUser(result.userId || '');
 
         if (needsApproval && !isAdmin && !isTrusted) {
-            console.log(`Login approval required for ${result.userId}`);
+            void writeUnifiedEntry({
+                timestamp: new Date().toISOString(),
+                level: 'info',
+                source: 'auth',
+                service: 'auth',
+                message: 'Login approval required',
+                action: 'auth-approval-required',
+                user: result.userId ? { id: result.userId } : undefined,
+            });
 
             // Create pending approval
             const approval = await createPendingApproval(result.userId!, token);
@@ -1494,6 +1801,15 @@ api.post('/auth/verify', async (c) => {
         const cookieOpts = 'Path=/; HttpOnly; SameSite=Strict; Max-Age=86400';
         c.header('Set-Cookie', `okastr8_session=${token}; ${cookieOpts}`);
 
+        void writeUnifiedEntry({
+            timestamp: new Date().toISOString(),
+            level: 'info',
+            source: 'auth',
+            service: 'auth',
+            message: 'Authenticated',
+            action: 'auth-success',
+            user: result.userId ? { id: result.userId } : undefined,
+        });
         return c.json(apiResponse(true, 'Authenticated', {
             userId: result.userId
         }));
@@ -1593,6 +1909,18 @@ api.post('/services/restart-all', async (c) => {
     const { controlAllServices } = await import('./commands/system');
     await controlAllServices('restart');
     return c.json(apiResponse(true, 'Initiated restart sequence for all services'));
+});
+
+// Manual test endpoint for resource alerts (dev use)
+api.post('/system/alerts/test', async (c) => {
+    try {
+        const { triggerResourceAlertTest } = await import('./services/monitor');
+        await triggerResourceAlertTest();
+        return c.json(apiResponse(true, 'Resource alert test triggered'));
+    } catch (error: any) {
+        console.error('API /system/alerts/test error:', error);
+        return c.json(apiResponse(false, error.message || 'Failed to trigger resource alert test'), 500);
+    }
 });
 // ================ Tunnel Controls ================
 

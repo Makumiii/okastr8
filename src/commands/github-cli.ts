@@ -14,8 +14,19 @@ import {
     hasOkastr8DeployKey,
     createSSHKey,
 } from "./github";
+import { isCurrentUserAdmin, getAdminUser } from "./auth";
 
 const SSH_KEY_PATH = join(homedir(), ".ssh", "okastr8_deploy_key");
+
+async function requireAdminCli(): Promise<void> {
+    const isAdmin = await isCurrentUserAdmin();
+    if (!isAdmin) {
+        const adminUser = await getAdminUser();
+        console.error(` Only the admin user (${adminUser}) can use GitHub commands.`);
+        console.error(`   Current user: ${process.env.SUDO_USER || process.env.USER}`);
+        process.exit(1);
+    }
+}
 
 export function addGitHubCommands(program: Command) {
     const github = program
@@ -28,19 +39,20 @@ export function addGitHubCommands(program: Command) {
         .description("Check GitHub connection status")
         .action(async () => {
             try {
+                await requireAdminCli();
                 const status = await getConnectionStatus();
                 if (status.connected) {
-                    console.log(`✅ Connected to GitHub as: ${status.username}`);
+                    console.log(` Connected to GitHub as: ${status.username}`);
                     console.log(`   Connected at: ${status.connectedAt}`);
 
                     // Check deploy key
                     const config = await getGitHubConfig();
                     if (config.accessToken) {
                         const hasKey = await hasOkastr8DeployKey(config.accessToken);
-                        console.log(`   Deploy key: ${hasKey ? '✅ Configured' : '❌ Not configured'}`);
+                        console.log(`   Deploy key: ${hasKey ? ' Configured' : ' Not configured'}`);
                     }
                 } else {
-                    console.log("❌ Not connected to GitHub");
+                    console.log("Not connected to GitHub");
                     console.log("   Use the web UI to connect via OAuth, or configure manually.");
                 }
             } catch (error: any) {
@@ -55,9 +67,10 @@ export function addGitHubCommands(program: Command) {
         .description("Connect to GitHub via OAuth (opens browser)")
         .action(async () => {
             try {
+                await requireAdminCli();
                 const config = await getGitHubConfig();
                 if (!config.clientId || !config.clientSecret) {
-                    console.error("❌ GitHub OAuth not configured.");
+                    console.error("GitHub OAuth not configured.");
                     console.error("   Add to system.yaml:");
                     console.error("     manager:");
                     console.error("       github:");
@@ -78,7 +91,7 @@ export function addGitHubCommands(program: Command) {
                 const callbackUrl = `http://localhost:41788/api/github/callback`;
 
                 const { getAuthUrl } = await import('./github');
-                const authUrl = getAuthUrl(config.clientId, callbackUrl);
+                const authUrl = getAuthUrl(config.clientId, callbackUrl, 'connect');
 
                 console.log("\nOpen this URL in your browser:\n");
                 console.log(`   ${authUrl}\n`);
@@ -100,14 +113,14 @@ export function addGitHubCommands(program: Command) {
                 for (let i = 0; i < maxAttempts; i++) {
                     const newStatus = await getConnectionStatus();
                     if (newStatus.connected) {
-                        console.log(`\n✅ Connected to GitHub as: ${newStatus.username}`);
+                        console.log(`\n Connected to GitHub as: ${newStatus.username}`);
                         return;
                     }
                     process.stdout.write('.');
                     await new Promise(r => setTimeout(r, 2000));
                 }
 
-                console.log("\n❌ Timed out waiting for authorization.");
+                console.log("\n Timed out waiting for authorization.");
                 process.exit(1);
 
             } catch (error: any) {
@@ -123,9 +136,10 @@ export function addGitHubCommands(program: Command) {
         .option("--plain", "Plain list output (no interactive mode)")
         .action(async (options) => {
             try {
+                await requireAdminCli();
                 const config = await getGitHubConfig();
                 if (!config.accessToken) {
-                    console.error("❌ Not connected to GitHub. Run 'okastr8 github connect' first.");
+                    console.error("Not connected to GitHub. Run 'okastr8 github connect' first.");
                     process.exit(1);
                 }
 
@@ -159,7 +173,7 @@ export function addGitHubCommands(program: Command) {
                     for (const repo of repos) {
                         const privacyIcon = repo.private ? "[PRIVATE]" : "[PUBLIC]";
                         const deployed = deployedRepos.get(repo.full_name.toLowerCase());
-                        const status = deployed ? ` [✅ deployed: ${deployed.appName}@${deployed.branch}]` : '';
+                        const status = deployed ? ` [ deployed: ${deployed.appName}@${deployed.branch}]` : '';
                         console.log(`${privacyIcon} ${repo.full_name}${status}`);
                     }
                     return;
@@ -172,7 +186,7 @@ export function addGitHubCommands(program: Command) {
                 const choices = repos.map((repo: any) => {
                     const deployed = deployedRepos.get(repo.full_name.toLowerCase());
                     if (deployed) {
-                        return `✅ ${repo.full_name} [${deployed.appName}@${deployed.branch}]`;
+                        return ` ${repo.full_name} [${deployed.appName}@${deployed.branch}]`;
                     }
                     return `   ${repo.full_name}`;
                 });
@@ -180,14 +194,14 @@ export function addGitHubCommands(program: Command) {
                 const response = await Enquirer.prompt({
                     type: 'autocomplete',
                     name: 'repo',
-                    message: `Select a repository (${repos.length} total, ✅ = deployed):`,
+                    message: `Select a repository (${repos.length} total,  = deployed):`,
                     limit: 10,
                     choices: choices,
                 } as any);
 
                 // Extract repo name from selection (remove status prefix)
                 const selectedRaw = (response as any).repo;
-                const repoName = selectedRaw.replace(/^[✅\s]+/, '').split(' [')[0];
+                const repoName = selectedRaw.replace(/^[\s]+/, '').split(' [')[0];
                 const repo = repos.find((r: any) => r.full_name === repoName);
 
                 if (!repo) return;
@@ -254,7 +268,7 @@ export function addGitHubCommands(program: Command) {
 
                     // Branch change warning
                     if (deployed && branch !== deployed.branch) {
-                        console.log(`\n⚠️  WARNING: Changing branch from '${deployed.branch}' to '${branch}'`);
+                        console.log(`\nWarning: Changing branch from '${deployed.branch}' to '${branch}'`);
                         const confirmResponse = await Enquirer.prompt({
                             type: 'confirm',
                             name: 'confirm',
@@ -309,9 +323,9 @@ export function addGitHubCommands(program: Command) {
                                 const [k, ...v] = line.split('=');
                                 if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
                             });
-                            console.log(`   ✅ Loaded ${Object.keys(env).length} variables from ${filePath}`);
+                            console.log(`    Loaded ${Object.keys(env).length} variables from ${filePath}`);
                         } else {
-                            console.error(`   ❌ File not found: ${filePath}`);
+                            console.error(`    File not found: ${filePath}`);
                         }
                     } else if ((envOption as any).choice === 'Manual entry (key=value)') {
                         console.log('   Enter variables (empty key to finish):');
@@ -346,9 +360,9 @@ export function addGitHubCommands(program: Command) {
                     });
 
                     if (result.success) {
-                        console.log(`\n✅ ${result.message}`);
+                        console.log(`\n ${result.message}`);
                     } else {
-                        console.error(`\n❌ ${result.message}`);
+                        console.error(`\n ${result.message}`);
                     }
                 }
 
@@ -373,9 +387,10 @@ export function addGitHubCommands(program: Command) {
         .option("--no-webhook", "Don't setup webhook for auto-deploys")
         .action(async (repo, options) => {
             try {
+                await requireAdminCli();
                 const config = await getGitHubConfig();
                 if (!config.accessToken) {
-                    console.error("❌ Not connected to GitHub. Use web UI to connect first.");
+                    console.error("Not connected to GitHub. Use web UI to connect first.");
                     process.exit(1);
                 }
 
@@ -393,7 +408,7 @@ export function addGitHubCommands(program: Command) {
                             if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
                         });
                     } else {
-                        console.error(`❌ Env file not found: ${options.envFile}`);
+                        console.error(` Env file not found: ${options.envFile}`);
                         process.exit(1);
                     }
                 }
@@ -416,12 +431,12 @@ export function addGitHubCommands(program: Command) {
                 });
 
                 if (result.success) {
-                    console.log(`\n✅ ${result.message}`);
+                    console.log(`\n ${result.message}`);
                     if (result.appName) {
                         console.log(`   App name: ${result.appName}`);
                     }
                 } else {
-                    console.error(`\n❌ ${result.message}`);
+                    console.error(`\n ${result.message}`);
                     process.exit(1);
                 }
             } catch (error: any) {
@@ -436,6 +451,7 @@ export function addGitHubCommands(program: Command) {
         .description("Disconnect from GitHub")
         .action(async () => {
             try {
+                await requireAdminCli();
                 // Ask for confirmation
                 const readline = await import("readline");
                 const rl = readline.createInterface({
@@ -454,7 +470,7 @@ export function addGitHubCommands(program: Command) {
                 }
 
                 await disconnectGitHub();
-                console.log("✅ Disconnected from GitHub");
+                console.log("Disconnected from GitHub");
             } catch (error: any) {
                 console.error("Error disconnecting:", error.message);
                 process.exit(1);
@@ -467,9 +483,10 @@ export function addGitHubCommands(program: Command) {
         .description("Setup SSH deploy key for passwordless cloning")
         .action(async () => {
             try {
+                await requireAdminCli();
                 const config = await getGitHubConfig();
                 if (!config.accessToken) {
-                    console.error("❌ Not connected to GitHub. Use web UI to connect first.");
+                    console.error("Not connected to GitHub. Use web UI to connect first.");
                     process.exit(1);
                 }
 
@@ -500,14 +517,14 @@ export function addGitHubCommands(program: Command) {
                         console.error(`Failed to generate key: ${genResult.stderr}`);
                         process.exit(1);
                     }
-                    console.log("✅ SSH key generated");
+                    console.log("SSH key generated");
                 }
 
                 // Read public key
                 const publicKey = (await readFile(pubKeyPath, "utf-8")).trim();
 
                 // Push to GitHub
-                console.log("☁️ Adding key to GitHub...");
+                console.log("Adding key to GitHub...");
                 const hostname = (await runCommand("hostname", [])).stdout.trim();
                 const keyTitle = `Okastr8 Deploy Key (${hostname})`;
 
@@ -521,7 +538,7 @@ export function addGitHubCommands(program: Command) {
                 console.log("Configuring Git to use SSH...");
                 await runCommand("git", ["config", "--global", "url.git@github.com:.insteadOf", "https://github.com/"]);
 
-                console.log("\n✅ Deploy key configured successfully!");
+                console.log("\n Deploy key configured successfully!");
                 console.log("   All GitHub clones will now use SSH automatically.");
             } catch (error: any) {
                 console.error("Error setting up key:", error.message);

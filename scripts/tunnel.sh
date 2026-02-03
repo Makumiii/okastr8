@@ -5,7 +5,7 @@ set -eou pipefail
 # Handles existing ngrok sessions gracefully
 
 CONFIG_FILE="$HOME/.okastr8/config.json"
-DEFAULT_PORT=8788
+DEFAULT_PORT=41788
 DEFAULT_PROTO="http"
 
 PORT="${1:-$DEFAULT_PORT}"

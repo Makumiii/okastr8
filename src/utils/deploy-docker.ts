@@ -66,7 +66,7 @@ async function waitForHealth(
 
         if (!status.running) {
             if (status.status === 'exited' || status.status === 'dead') {
-                log(`❌ Container ${containerName} exited unexpectedly`);
+                log(`Container ${containerName} exited unexpectedly`);
                 return false;
             }
             // If starting, keep waiting
@@ -77,11 +77,11 @@ async function waitForHealth(
         // but if the container is running, the app is likely working.
         if (status.running) {
             if (status.health === "healthy") {
-                log(`✅ Container ${containerName} is healthy`);
+                log(`Container ${containerName} is healthy`);
             } else if (status.health === "unhealthy") {
-                log(`⚠️  Container ${containerName} running but HEALTHCHECK failed (this is often OK)`);
+                log(`Warning: Container ${containerName} running but HEALTHCHECK failed (this is often OK)`);
             } else {
-                log(`✅ Container ${containerName} is running`);
+                log(`Container ${containerName} is running`);
             }
             return true;
         }
@@ -89,7 +89,7 @@ async function waitForHealth(
         await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
     }
 
-    log(`⚠️  Health check timeout for ${containerName} after ${maxWaitSeconds}s`);
+    log(`Warning: Health check timeout for ${containerName} after ${maxWaitSeconds}s`);
     return false;
 }
 /**

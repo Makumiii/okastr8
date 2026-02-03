@@ -135,7 +135,7 @@ export function cancelDeployment(deploymentId: string): boolean {
     const stream = deploymentStreams.get(deploymentId);
     if (stream) {
         stream.cancelled = true;
-        streamLog(deploymentId, '❌ Deployment cancelled by user');
+        streamLog(deploymentId, 'Deployment cancelled by user');
         console.log(`[DeploymentLogger] Deployment cancelled: ${deploymentId}`);
         return true;
     }

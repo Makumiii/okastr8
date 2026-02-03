@@ -148,11 +148,11 @@ export function addSetupCommands(program: Command) {
             console.log(result.stdout || result.stderr);
 
             if (result.exitCode === 0) {
-                console.log("\n✅ Sudoers configured successfully!");
+                console.log("\n Sudoers configured successfully!");
                 console.log("   Okastr8 and Docker can now run system commands without password prompts.");
                 console.log("   Try running a deployment now—it should be fast and seamless.");
             } else {
-                console.error("\n❌ Sudoers configuration failed.");
+                console.error("\n Sudoers configuration failed.");
                 process.exit(result.exitCode || 1);
             }
         });
@@ -161,7 +161,7 @@ export function addSetupCommands(program: Command) {
         .command("user")
         .description("Interactively create a new non-root user with sudo and docker access")
         .action(async () => {
-            console.log("👤 New User Setup\n");
+            console.log("New User Setup\n");
 
             try {
                 const response = await prompt([
@@ -190,11 +190,11 @@ export function addSetupCommands(program: Command) {
                 console.log(result.stdout || result.stderr);
 
                 if (result.exitCode === 0) {
-                    console.log("\n✅ User created successfully!");
+                    console.log("\n User created successfully!");
                     console.log(`   You can now switch to the new user: su - ${response.username}`);
                     console.log("   From there, you can run 'okastr8 setup full' to complete the installation.");
                 } else {
-                    console.error("\n❌ Failed to create user.");
+                    console.error("\n Failed to create user.");
                     process.exit(1);
                 }
             } catch (e) {

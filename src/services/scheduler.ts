@@ -1,12 +1,20 @@
 
 import { loadAuthData, saveAuthData } from '../commands/auth';
 import { sendAdminEmail } from './email';
+import { writeUnifiedEntry } from '../utils/structured-logger';
 
 const CHECK_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 const ALERT_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours
 
 export function startScheduler() {
-    console.log('⏰ Expiry alert scheduler started');
+    void writeUnifiedEntry({
+        timestamp: new Date().toISOString(),
+        level: 'info',
+        source: 'scheduler',
+        service: 'expiry-scheduler',
+        message: 'Expiry alert scheduler started',
+        action: 'scheduler-start',
+    });
 
     // Run immediately
     checkExpiringTokens();
@@ -46,12 +54,35 @@ async function checkExpiringTokens() {
         }
 
         if (expiringTokens.length > 0) {
-            console.log(`⏰ Found ${expiringTokens.length} tokens expiring soon`);
+            void writeUnifiedEntry({
+                timestamp: new Date().toISOString(),
+                level: 'warn',
+                source: 'scheduler',
+                service: 'expiry-scheduler',
+                message: `Found ${expiringTokens.length} tokens expiring soon`,
+                action: 'token-expiry-alert',
+                data: { count: expiringTokens.length },
+            });
             await sendExpiryAlert(expiringTokens);
         }
 
     } catch (error) {
         console.error('Scheduler error:', error);
+        if (error instanceof Error) {
+            void writeUnifiedEntry({
+                timestamp: new Date().toISOString(),
+                level: 'error',
+                source: 'scheduler',
+                service: 'expiry-scheduler',
+                message: 'Scheduler error',
+                action: 'scheduler-error',
+                error: {
+                    name: error.name,
+                    message: error.message,
+                    stack: error.stack,
+                },
+            });
+        }
     }
 }
 
@@ -64,7 +95,7 @@ async function sendExpiryAlert(users: { userId: string; expiresInMinutes: number
 <!DOCTYPE html>
 <html>
 <body style="font-family: sans-serif; color: #333;">
-    <h2 style="color: #D97706;">⚠️ Access Expiring Soon</h2>
+    <h2 style="color: #D97706;">Warning: Access Expiring Soon</h2>
     <p>The following users have access tokens that will expire in less than 2 hours:</p>
     <ul>
         ${userList}
@@ -82,4 +113,13 @@ ${users.map(u => `okastr8 access renew ${u.userId}`).join('\n')}
 </html>`;
 
     await sendAdminEmail('Alert: Access Tokens Expiring Soon', html);
+    void writeUnifiedEntry({
+        timestamp: new Date().toISOString(),
+        level: 'info',
+        source: 'scheduler',
+        service: 'expiry-scheduler',
+        message: 'Sent expiry alert email',
+        action: 'email-sent',
+        data: { count: users.length },
+    });
 }

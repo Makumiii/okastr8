@@ -22,7 +22,7 @@ export interface LogEntry {
     traceId?: string;
     spanId?: string;
     parentId?: string;
-    user?: string;
+    user?: string | { id?: string; email?: string };
     app?: {
         name?: string;
         repo?: string;
@@ -60,6 +60,13 @@ const DEFAULT_MAX_BYTES = 10 * 1024 * 1024; // 10MB
 const DEFAULT_MAX_BACKUPS = 3;
 const GLOBAL_FLAG = Symbol.for("okastr8.console.logger.installed");
 const UNIFIED_LOG_PATH = join(homedir(), ".okastr8", "logs", "unified.log");
+const SENSITIVE_KEY_RE = /(token|secret|password|api[_-]?key|client[_-]?secret|authorization|cookie|access[_-]?token|refresh[_-]?token|private[_-]?key|ssh[_-]?key)/i;
+const ENV_KEY_RE = /(env|environment|envvars|environmentvars)/i;
+const JWT_RE = /eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g;
+const GITHUB_TOKEN_RE = /(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g;
+const OKASTR8_SESSION_RE = /okastr8_session=([^;\s]+)/gi;
+const TOKEN_VALUE_RE = /(token|access[_-]?token|refresh[_-]?token|api[_-]?key|client[_-]?secret|secret|password|authorization|cookie)\s*[:=]\s*([^\s,]+)/gi;
+const PRIVATE_KEY_RE = /-----BEGIN [A-Z ]+-----[\s\S]+?-----END [A-Z ]+-----/g;
 
 function resolveLogPath(filePath: string): string {
     if (filePath.startsWith("~")) {
@@ -92,6 +99,79 @@ function formatMessage(args: unknown[]): string {
             }
         })
         .join(" ");
+}
+
+function redactString(value: string): string {
+    let redacted = value;
+    redacted = redacted.replace(PRIVATE_KEY_RE, "[REDACTED_PRIVATE_KEY]");
+    redacted = redacted.replace(JWT_RE, "[REDACTED_TOKEN]");
+    redacted = redacted.replace(GITHUB_TOKEN_RE, "[REDACTED_TOKEN]");
+    redacted = redacted.replace(OKASTR8_SESSION_RE, "okastr8_session=[REDACTED]");
+    redacted = redacted.replace(TOKEN_VALUE_RE, (_match, key) => `${key}=[REDACTED]`);
+    return redacted;
+}
+
+function sanitizeValue(value: unknown, key?: string, depth: number = 0, seen: WeakSet<object> = new WeakSet()): unknown {
+    if (depth > 6) return "[REDACTED]";
+    if (value === null || value === undefined) return value;
+
+    if (typeof value === "string") {
+        if (key && (SENSITIVE_KEY_RE.test(key) || ENV_KEY_RE.test(key))) {
+            return "[REDACTED]";
+        }
+        return redactString(value);
+    }
+
+    if (typeof value === "number" || typeof value === "boolean") return value;
+
+    if (Array.isArray(value)) {
+        return value.map((item) => sanitizeValue(item, key, depth + 1, seen));
+    }
+
+    if (typeof value === "object") {
+        const obj = value as Record<string, unknown>;
+        if (seen.has(obj)) return "[REDACTED]";
+        seen.add(obj);
+
+        if (key && ENV_KEY_RE.test(key)) {
+            return { keys: Object.keys(obj) };
+        }
+
+        const output: Record<string, unknown> = {};
+        for (const [childKey, childValue] of Object.entries(obj)) {
+            if (SENSITIVE_KEY_RE.test(childKey)) {
+                output[childKey] = "[REDACTED]";
+                continue;
+            }
+            if (ENV_KEY_RE.test(childKey)) {
+                output[childKey] = typeof childValue === "object" && childValue
+                    ? { keys: Object.keys(childValue as Record<string, unknown>) }
+                    : "[REDACTED]";
+                continue;
+            }
+            output[childKey] = sanitizeValue(childValue, childKey, depth + 1, seen);
+        }
+        return output;
+    }
+
+    return "[REDACTED]";
+}
+
+function sanitizeEntry(entry: LogEntry): LogEntry {
+    return {
+        ...entry,
+        message: redactString(entry.message),
+        user: sanitizeValue(entry.user) as LogEntry["user"],
+        request: sanitizeValue(entry.request) as LogEntry["request"],
+        data: sanitizeValue(entry.data) as LogEntry["data"],
+        error: entry.error
+            ? {
+                ...entry.error,
+                message: entry.error.message ? redactString(entry.error.message) : entry.error.message,
+                stack: entry.error.stack ? redactString(entry.error.stack) : entry.error.stack,
+            }
+            : entry.error,
+    };
 }
 
 async function rotateIfNeeded(
@@ -132,7 +212,7 @@ async function writeLogLine(
     const resolved = resolveLogPath(filePath);
     await mkdir(dirname(resolved), { recursive: true });
 
-    const line = `${JSON.stringify(entry)}\n`;
+    const line = `${JSON.stringify(sanitizeEntry(entry))}\n`;
     await rotateIfNeeded(resolved, maxBytes, maxBackups, Buffer.byteLength(line));
     await appendFile(resolved, line, "utf-8");
 }
@@ -167,6 +247,39 @@ export function createFileLogger(options: FileLoggerOptions) {
         fatal: (message: string, data?: LogEntry["data"], err?: LogEntry["error"]) =>
             write("fatal", message, data, err),
     };
+}
+
+export async function readUnifiedEntries(maxBackups: number = DEFAULT_MAX_BACKUPS): Promise<LogEntry[]> {
+    const resolved = resolveLogPath(UNIFIED_LOG_PATH);
+    const paths: string[] = [resolved];
+    for (let i = 1; i <= maxBackups; i += 1) {
+        paths.push(`${resolved}.${i}`);
+    }
+
+    const entries: LogEntry[] = [];
+    for (const path of paths) {
+        if (!existsSync(path)) continue;
+        try {
+            const content = await (await import("fs/promises")).readFile(path, "utf-8");
+            if (!content.trim()) continue;
+            const parsed = content
+                .trim()
+                .split("\n")
+                .map((line) => {
+                    try {
+                        return JSON.parse(line) as LogEntry;
+                    } catch {
+                        return null;
+                    }
+                })
+                .filter((entry): entry is LogEntry => !!entry);
+            entries.push(...parsed);
+        } catch {
+            continue;
+        }
+    }
+
+    return entries;
 }
 
 export async function writeUnifiedEntry(

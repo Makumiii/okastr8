@@ -47,7 +47,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     const useTaskProgress = !onProgress;
 
     const step = (key: string, message: string) => {
-        if (deploymentId) streamLog(deploymentId, `👉 ${message}`);
+        if (deploymentId) streamLog(deploymentId, message);
         if (useTaskProgress) {
             task.step(key, message);
         }
@@ -63,7 +63,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     };
 
     const fail = (message: string) => {
-        if (deploymentId) streamLog(deploymentId, `❌ ${message}`);
+        if (deploymentId) streamLog(deploymentId, message);
         if (useTaskProgress) {
             task.fail(message);
         } else if (onProgress) {
@@ -72,7 +72,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     };
 
     const success = (message: string) => {
-        if (deploymentId) streamLog(deploymentId, `✅ ${message}`);
+        if (deploymentId) streamLog(deploymentId, message);
         if (useTaskProgress) {
             task.success(message);
         } else if (onProgress) {
@@ -100,9 +100,15 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
         const configContent = await readFile(configPath, 'utf-8');
         const rawConfig = load(configContent) as any;
 
+        const normalizedBuildSteps = Array.isArray(rawConfig.build)
+            ? rawConfig.build.map((step: unknown) => String(step).trim()).filter((step: string) => step)
+            : typeof rawConfig.build === "string"
+              ? rawConfig.build.split("\n").map((step: string) => step.trim()).filter((step: string) => step)
+              : [];
+
         config = {
             runtime: rawConfig.runtime,
-            buildSteps: rawConfig.build || [],
+            buildSteps: normalizedBuildSteps,
             startCommand: rawConfig.start || '',
             port: rawConfig.port || 3000,
             domain: rawConfig.domain,
@@ -177,7 +183,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
 
     // 3. Deploy with Docker
     step("deploy", "Deploying with Docker...");
-    log(`💡 Tip: Apps must bind to 0.0.0.0 (not localhost) to be accessible. We inject HOST=0.0.0.0 automatically.`);
+    log("Tip: Apps must bind to 0.0.0.0 (not localhost) to be accessible. We inject HOST=0.0.0.0 automatically.");
     const { deployWithDocker } = await import("../utils/deploy-docker.ts");
     const deployResult = await deployWithDocker(options, config);
 
@@ -203,6 +209,11 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     const { writeFile: fsWriteFile } = await import("fs/promises");
     const user = process.env.USER || "root";
 
+    const gitRepoFinal = gitRepo || existingMetadata.gitRepo || existingMetadata.repo;
+    const gitBranchFinal = gitBranch || existingMetadata.gitBranch || existingMetadata.branch;
+    const webhookBranch =
+        existingMetadata.webhookBranch ||
+        gitBranchFinal;
     await fsWriteFile(
         metadataPath,
         JSON.stringify(
@@ -214,11 +225,13 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
                 user: user,
                 port: config.port,
                 domain: config.domain,
-                gitRepo,
-                gitBranch,
+                gitRepo: gitRepoFinal,
+                gitBranch: gitBranchFinal,
+                webhookBranch,
                 buildSteps: config.buildSteps,
                 database: config.database,
                 cache: config.cache,
+                webhookAutoDeploy: existingMetadata.webhookAutoDeploy ?? true,
                 createdAt: existingMetadata.createdAt || new Date().toISOString(),
                 deploymentType: "docker",
                 versions: existingMetadata.versions || [],

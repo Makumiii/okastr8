@@ -27,7 +27,7 @@ export function addAuthCommands(program: Command): void {
                 const isAdmin = await isCurrentUserAdmin();
                 if (!isAdmin) {
                     const adminUser = await getAdminUser();
-                    console.error(`❌ Only the admin user (${adminUser}) can generate tokens.`);
+                    console.error(` Only the admin user (${adminUser}) can generate tokens.`);
                     console.error(`   Current user: ${process.env.SUDO_USER || process.env.USER}`);
                     process.exit(1);
                 }
@@ -42,7 +42,7 @@ export function addAuthCommands(program: Command): void {
                 console.log('\nUse this token to log in to the okastr8 UI');
                 console.log('   Paste it in the login page to get access.\n');
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -55,7 +55,7 @@ export function addAuthCommands(program: Command): void {
             try {
                 const isAdmin = await isCurrentUserAdmin();
                 if (!isAdmin) {
-                    console.error('❌ Only admin can list tokens');
+                    console.error('Only admin can list tokens');
                     process.exit(1);
                 }
 
@@ -79,7 +79,7 @@ export function addAuthCommands(program: Command): void {
                 }
                 console.log('');
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -92,7 +92,7 @@ export function addAuthCommands(program: Command): void {
             try {
                 const isAdmin = await isCurrentUserAdmin();
                 if (!isAdmin) {
-                    console.error('❌ Only admin can revoke tokens');
+                    console.error('Only admin can revoke tokens');
                     process.exit(1);
                 }
 
@@ -101,18 +101,18 @@ export function addAuthCommands(program: Command): void {
                 const match = tokens.find(t => t.id.startsWith(tokenId));
 
                 if (!match) {
-                    console.error(`❌ Token not found: ${tokenId}`);
+                    console.error(` Token not found: ${tokenId}`);
                     process.exit(1);
                 }
 
                 const success = await revokeToken(match.id);
                 if (success) {
-                    console.log(`✅ Token revoked: ${match.id.slice(0, 12)}...`);
+                    console.log(` Token revoked: ${match.id.slice(0, 12)}...`);
                 } else {
-                    console.error('❌ Failed to revoke token');
+                    console.error('Failed to revoke token');
                 }
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -125,7 +125,7 @@ export function addAuthCommands(program: Command): void {
             try {
                 const isAdmin = await isCurrentUserAdmin();
                 if (!isAdmin) {
-                    console.error('❌ Only admin can test email');
+                    console.error('Only admin can test email');
                     process.exit(1);
                 }
 
@@ -134,14 +134,14 @@ export function addAuthCommands(program: Command): void {
                 const result = await testEmailConfig();
 
                 if (result.success) {
-                    console.log('✅ Test email sent successfully!');
+                    console.log('Test email sent successfully!');
                     console.log('   Check your inbox for the confirmation.');
                 } else {
-                    console.error(`❌ Failed to send: ${result.error}`);
+                    console.error(` Failed to send: ${result.error}`);
                     console.error('   Make sure your system.yaml has the notifications.brevo section configured.');
                 }
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -154,7 +154,7 @@ export function addAuthCommands(program: Command): void {
             try {
                 const isAdmin = await isCurrentUserAdmin();
                 if (!isAdmin) {
-                    console.error('❌ Only admin can view pending approvals');
+                    console.error('Only admin can view pending approvals');
                     process.exit(1);
                 }
 
@@ -182,7 +182,7 @@ export function addAuthCommands(program: Command): void {
                 console.log('\nTo approve: okastr8 auth approve <id>');
                 console.log('To reject:  okastr8 auth reject <id>\n');
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -195,7 +195,7 @@ export function addAuthCommands(program: Command): void {
             try {
                 const isAdmin = await isCurrentUserAdmin();
                 if (!isAdmin) {
-                    console.error('❌ Only admin can approve requests');
+                    console.error('Only admin can approve requests');
                     process.exit(1);
                 }
 
@@ -203,14 +203,14 @@ export function addAuthCommands(program: Command): void {
                 const result = await approveRequest(requestId);
 
                 if (result.success) {
-                    console.log(`✅ Approved login for: ${result.userId}`);
+                    console.log(` Approved login for: ${result.userId}`);
                     console.log('   They should now have access to the dashboard.');
                 } else {
-                    console.error(`❌ ${result.error}`);
+                    console.error(` ${result.error}`);
                     process.exit(1);
                 }
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -223,7 +223,7 @@ export function addAuthCommands(program: Command): void {
             try {
                 const isAdmin = await isCurrentUserAdmin();
                 if (!isAdmin) {
-                    console.error('❌ Only admin can reject requests');
+                    console.error('Only admin can reject requests');
                     process.exit(1);
                 }
 
@@ -231,13 +231,13 @@ export function addAuthCommands(program: Command): void {
                 const result = await rejectRequest(requestId);
 
                 if (result.success) {
-                    console.log(`❌ Rejected login for: ${result.userId}`);
+                    console.log(` Rejected login for: ${result.userId}`);
                 } else {
-                    console.error(`❌ ${result.error}`);
+                    console.error(` ${result.error}`);
                     process.exit(1);
                 }
             } catch (error: any) {
-                console.error(`❌ Error: ${error.message}`);
+                console.error(` Error: ${error.message}`);
                 process.exit(1);
             }
         });

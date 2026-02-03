@@ -75,10 +75,16 @@ export async function deployApp(options: DeployOptions) {
             try {
                 const metadata = await getAppMetadata(appName);
                 if (metadata.gitBranch && metadata.gitBranch !== branch) {
-                    console.log(`\n⚠️  WARNING: Branch change detected!`);
+                    console.log(`\nWarning: Branch change detected!`);
                     console.log(`   Current branch: ${metadata.gitBranch}`);
                     console.log(`   Requested branch: ${branch}`);
-                    console.log(`   Webhooks will only trigger for the new branch.\n`);
+                    const webhookBranch = metadata.webhookBranch || metadata.gitBranch;
+                    if (webhookBranch && webhookBranch !== branch) {
+                        console.log(`   Auto-deploy will keep using: ${webhookBranch}`);
+                        console.log(`   You can change this in the app settings or via CLI.\n`);
+                    } else {
+                        console.log(`   Auto-deploy will follow this branch.\n`);
+                    }
 
                     // Ask for confirmation
                     const readline = await import('readline');
@@ -114,7 +120,7 @@ export async function deployApp(options: DeployOptions) {
         const { sendDeploymentAlertEmail } = await import('../services/email');
 
         if (result.success) {
-            console.log(`\n✅ ${result.message}`);
+            console.log(`\n${result.message}`);
             // Send Success Alert
             const releaseId = (result as any).data?.releaseId || 'unknown';
             await sendDeploymentAlertEmail(appName, 'success', `Deployment to ${branch || 'default branch'} successful.\nRelease ID: ${releaseId}`);
@@ -124,17 +130,17 @@ export async function deployApp(options: DeployOptions) {
                 const { genCaddyFile } = await import('../utils/genCaddyFile');
                 await genCaddyFile();
             } catch (err: any) {
-                console.error(`⚠️ Failed to update Caddy routing: ${err.message}`);
+                console.error(`Warning: Failed to update Caddy routing: ${err.message}`);
             }
         } else {
-            console.error(`\n❌ ${result.message}`);
+            console.error(`\n${result.message}`);
             // Send Failure Alert
             await sendDeploymentAlertEmail(appName, 'failed', result.message);
         }
 
         return result;
     } catch (error: any) {
-        console.error(`❌ Deployment failed: ${error.message}`);
+        console.error(`Deployment failed: ${error.message}`);
 
         // Send Failure Alert
         try {
@@ -230,10 +236,10 @@ export async function rollbackApp(appName: string, commitHash?: string) {
             throw new Error(`Service restart failed: ${restartResult.stderr}`);
         }
 
-        console.log(`✅ Rolled back ${appName} to ${commitHash}`);
+        console.log(` Rolled back ${appName} to ${commitHash}`);
         return { success: true, message: `Rolled back to ${commitHash}` };
     } catch (error: any) {
-        console.error(`❌ Rollback failed: ${error.message}`);
+        console.error(` Rollback failed: ${error.message}`);
         return { success: false, message: error.message };
     }
 }
@@ -295,7 +301,7 @@ export function addDeployCommands(program: Command) {
                         if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
                     });
                 } else {
-                    console.error(`❌ Env file not found: ${options.envFile}`);
+                    console.error(` Env file not found: ${options.envFile}`);
                     process.exit(1);
                 }
             }

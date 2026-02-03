@@ -63,15 +63,15 @@ export async function statusService(service_name: string) {
 
     const isActive = await runCommand('sudo', ['systemctl', 'is-active', '--quiet', service_name]);
     if (isActive.exitCode === 0) {
-        return { exitCode: 0, stdout: `✅ ${service_name} is running\n`, stderr: "" };
+        return { exitCode: 0, stdout: `Service ${service_name} is running\n`, stderr: "" };
     }
 
     const isFailed = await runCommand('sudo', ['systemctl', 'is-failed', '--quiet', service_name]);
     if (isFailed.exitCode === 0) { // is-failed returns 0 if failed
-        return { exitCode: 2, stdout: `❌ ${service_name} has failed\n`, stderr: "" };
+        return { exitCode: 2, stdout: `Service ${service_name} has failed\n`, stderr: "" };
     }
 
-    return { exitCode: 3, stdout: `⏹️  ${service_name} is stopped\n`, stderr: "" };
+    return { exitCode: 3, stdout: `Service ${service_name} is stopped\n`, stderr: "" };
 }
 
 export async function logsService(service_name: string) {
