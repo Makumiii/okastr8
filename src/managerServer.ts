@@ -1,7 +1,6 @@
 import { Hono } from 'hono';
 import { serveStatic } from 'hono/bun';
 import api from './api';
-import { startScheduler } from './services/scheduler';
 import { startResourceMonitor } from './services/monitor';
 import { installConsoleLogger, logPaths } from './utils/structured-logger';
 
@@ -16,7 +15,6 @@ installConsoleLogger({
 });
 
 // Start background services
-startScheduler();
 startResourceMonitor();
 
 // Mount the API

@@ -18,7 +18,7 @@ Okastr8 (pronounced "orchestrate") is a self-hosted Platform-as-a-Service that b
 - **⚡ Powerful CLI**: Automate everything from deployments to server hardening.
 - **🔄 Git-based Deploys**: Connect GitHub repositories, setup webhooks, and auto-deploy on push.
 - **🐳 Containerized Deployments**: All applications are deployed as isolated Docker containers for consistency and security.
-- **🔒 Zero-Trust Security**: Token-based authentication, role-based access, and SSH hardening.
+- **🔒 Secure Access**: GitHub OAuth login and SSH hardening.
 - **📊 Real-time Metrics**: Monitor CPU, RAM, and Disk usage per app and system-wide.
 
 ---
@@ -112,7 +112,7 @@ Run the connection command on your server:
 ```bash
 okastr8 github connect
 ```
-This will generate a link to authenticate. Since you are on a headless server, open the link in your local browser. Once approved, the server automatically receives the token.
+This will generate a link to authenticate. Since you are on a headless server, open the link in your local browser. Once approved, the server automatically receives the token and binds the GitHub account as the dashboard admin.
 
 ### Step 3: Webhooks
 With the tunnel URL configured in `system.yaml`, Okastr8 automatically registers the correct webhook URL (`https://.../api/github/webhook`) when you import repositories.
@@ -122,12 +122,7 @@ With the tunnel URL configured in `system.yaml`, Okastr8 automatically registers
 ## 🛠️ Usage
 
 ### 1. Authenticate
-To access the dashboard, you need a login token. Generate one via the CLI:
-
-```bash
-okastr8 auth token
-# Output: Copy the token and paste it into the dashboard login screen.
-```
+Sign in to the dashboard with GitHub OAuth (admin account bound during `okastr8 github connect`).
 
 ### 2. Connect GitHub
 Enable seamless deployments by connecting your GitHub account:

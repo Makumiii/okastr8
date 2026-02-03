@@ -96,14 +96,11 @@ api.use('*', async (c, next) => {
 
 // Routes that don't require authentication
 const PUBLIC_ROUTES = [
-    'POST:/auth/verify',
     'POST:/auth/logout',
     'GET:/auth/me',
     'GET:/auth/github',
     'POST:/github/webhook', // Webhook has its own HMAC verification
     'GET:/github/callback',  // OAuth callback - no auth yet!
-    // Dynamic routes handled in middleware, but explicitly allowing this pattern not possible here easily
-    // We will check for /auth/approval/ prefix in middleware
 ];
 
 api.use('*', async (c, next) => {
@@ -111,8 +108,8 @@ api.use('*', async (c, next) => {
     const path = c.req.path.replace('/api', ''); // Remove /api prefix
     const routeKey = `${method}:${path}`;
 
-    // Skip auth for public routes or approval status polling
-    if (PUBLIC_ROUTES.some(r => routeKey === r) || path === '/github/webhook' || path.startsWith('/auth/approval/')) {
+    // Skip auth for public routes
+    if (PUBLIC_ROUTES.some(r => routeKey === r) || path === '/github/webhook') {
         return next();
     }
 
@@ -1730,121 +1727,6 @@ api.post('/github/webhook', async (c) => {
 
 // ============ Auth Endpoints ============
 
-// Verify token and set session cookie
-api.post('/auth/verify', async (c) => {
-    try {
-        const body = await c.req.json();
-        const { token } = body;
-
-        if (!token) {
-            return c.json(apiResponse(false, 'Token is required'), 400);
-        }
-
-        const {
-            validateToken,
-            isLoginApprovalRequired,
-            isTrustedUser,
-            createPendingApproval,
-            isUserAdmin
-        } = await import('./commands/auth');
-
-        const result = await validateToken(token);
-
-        if (!result.valid) {
-            void writeUnifiedEntry({
-                timestamp: new Date().toISOString(),
-                level: 'warn',
-                source: 'auth',
-                service: 'auth',
-                message: 'Authentication failed',
-                action: 'auth-failed',
-                data: { reason: result.error || 'Invalid token' },
-            });
-            return c.json(apiResponse(false, result.error || 'Invalid token'), 401);
-        }
-
-        // Check if login approval is needed
-        const needsApproval = await isLoginApprovalRequired();
-        const isAdmin = await isUserAdmin(result.userId || '');
-        const isTrusted = await isTrustedUser(result.userId || '');
-
-        if (needsApproval && !isAdmin && !isTrusted) {
-            void writeUnifiedEntry({
-                timestamp: new Date().toISOString(),
-                level: 'info',
-                source: 'auth',
-                service: 'auth',
-                message: 'Login approval required',
-                action: 'auth-approval-required',
-                user: result.userId ? { id: result.userId } : undefined,
-            });
-
-            // Create pending approval
-            const approval = await createPendingApproval(result.userId!, token);
-
-            // Send email to admin
-            const { sendLoginApprovalEmail } = await import('./services/email');
-            await sendLoginApprovalEmail(
-                result.userId!,
-                approval.id,
-                new Date(approval.requestedAt).toLocaleString()
-            );
-
-            return c.json(apiResponse(true, 'Approval required', {
-                pendingApproval: true,
-                requestId: approval.id,
-                userId: result.userId
-            }));
-        }
-
-        // Set session cookie (httpOnly for security)
-        const cookieOpts = 'Path=/; HttpOnly; SameSite=Strict; Max-Age=86400';
-        c.header('Set-Cookie', `okastr8_session=${token}; ${cookieOpts}`);
-
-        void writeUnifiedEntry({
-            timestamp: new Date().toISOString(),
-            level: 'info',
-            source: 'auth',
-            service: 'auth',
-            message: 'Authenticated',
-            action: 'auth-success',
-            user: result.userId ? { id: result.userId } : undefined,
-        });
-        return c.json(apiResponse(true, 'Authenticated', {
-            userId: result.userId
-        }));
-    } catch (error: any) {
-        console.error('API /auth/verify error:', error);
-        return c.json(apiResponse(false, error.message), 500);
-    }
-});
-
-// Check approval status
-api.get('/auth/approval/:id', async (c) => {
-    try {
-        const requestId = c.req.param('id');
-        const { checkApprovalStatus } = await import('./commands/auth');
-
-        const result = await checkApprovalStatus(requestId);
-
-        if (!result.found) {
-            return c.json(apiResponse(false, 'Request not found'), 404);
-        }
-
-        if (result.status === 'approved' && result.token) {
-            // Set session cookie
-            const cookieOpts = 'Path=/; HttpOnly; SameSite=Strict; Max-Age=86400';
-            c.header('Set-Cookie', `okastr8_session=${result.token}; ${cookieOpts}`);
-
-            return c.json(apiResponse(true, 'Approved', { status: 'approved' }));
-        }
-
-        return c.json(apiResponse(true, 'Status check', { status: result.status }));
-    } catch (error: any) {
-        return c.json(apiResponse(false, error.message), 500);
-    }
-});
-
 // Get current session info
 api.get('/auth/me', async (c) => {
     try {
@@ -1882,13 +1764,6 @@ api.get('/auth/me', async (c) => {
 api.post('/auth/logout', async (c) => {
     c.header('Set-Cookie', 'okastr8_session=; Path=/; HttpOnly; Max-Age=0');
     return c.json(apiResponse(true, 'Logged out'));
-});
-
-// Revoke all tokens (Emergency)
-api.post('/auth/revoke-all', async (c) => {
-    const { revokeAllTokens } = await import('./commands/auth');
-    const count = await revokeAllTokens();
-    return c.json(apiResponse(true, `Revoked ${count} tokens. All sessions invalidated.`));
 });
 
 // ================ Global Service Controls ================
@@ -1953,75 +1828,6 @@ api.post('/tunnel/uninstall', async (c) => {
         const { uninstallTunnel } = await import('./commands/tunnel');
         const result = await uninstallTunnel();
         return c.json(apiResponse(result.success, result.message));
-    } catch (error: any) {
-        return c.json(apiResponse(false, error.message));
-    }
-});
-
-// ================ Access User Management ================
-
-api.get('/access/list', async (c) => {
-    try {
-        const { listUsers } = await import('./commands/auth');
-        const users = await listUsers();
-        // Hide tokens if present in basic list, return safe view
-        const safeUsers = users.map(u => ({
-            email: u.email,
-            createdAt: u.createdAt,
-            createdBy: u.createdBy
-        }));
-        return c.json(apiResponse(true, 'Access Users', { users: safeUsers }));
-    } catch (error: any) {
-        return c.json(apiResponse(false, error.message));
-    }
-});
-
-api.get('/access/tokens', async (c) => {
-    try {
-        const { listTokens } = await import('./commands/auth');
-        const tokens = await listTokens();
-        const tokenList = tokens.map(t => ({
-            userId: t.userId,
-            tokenId: t.id,
-            expiresAt: t.expiresAt
-        }));
-        return c.json(apiResponse(true, 'Active Tokens', { tokens: tokenList }));
-    } catch (error: any) {
-        return c.json(apiResponse(false, error.message));
-    }
-});
-
-api.post('/access/revoke-token', async (c) => {
-    try {
-        const { revokeToken } = await import('./commands/auth');
-        const { tokenId } = await c.req.json();
-        const success = await revokeToken(tokenId);
-        return c.json(apiResponse(success, success ? 'Token revoked' : 'Token not found'));
-    } catch (error: any) {
-        return c.json(apiResponse(false, error.message));
-    }
-});
-
-// Revoke all tokens for a user (wrapper around removing user basically, or filtering listTokens)
-api.post('/access/revoke-user', async (c) => {
-    try {
-        const { listTokens, revokeToken } = await import('./commands/auth');
-        const { email } = await c.req.json();
-
-        const allTokens = await listTokens();
-        const userTokens = allTokens.filter(t => t.userId === email);
-
-        if (userTokens.length === 0) {
-            return c.json(apiResponse(false, 'No active tokens found for user'));
-        }
-
-        let count = 0;
-        for (const t of userTokens) {
-            await revokeToken(t.id);
-            count++;
-        }
-
-        return c.json(apiResponse(true, `Revoked ${count} tokens for ${email}`));
     } catch (error: any) {
         return c.json(apiResponse(false, error.message));
     }

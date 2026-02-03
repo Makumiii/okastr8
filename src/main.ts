@@ -8,8 +8,6 @@ import { addAppCommands } from './commands/app';
 import { addDeployCommands } from './commands/deploy';
 import { addGitHubCommands } from './commands/github-cli';
 import { addMetricsCommands } from './commands/metrics-cli';
-import { addAuthCommands } from './commands/auth-cli';
-import { addAccessUserCommands } from './commands/user-cli';
 import { addTunnelCommands } from './commands/tunnel';
 import { installConsoleLogger, logPaths } from './utils/structured-logger';
 
@@ -36,8 +34,6 @@ addAppCommands(program);
 addDeployCommands(program);
 addGitHubCommands(program);
 addMetricsCommands(program);
-addAuthCommands(program);        // Token management
-addAccessUserCommands(program);  // Access user management
 addTunnelCommands(program);
 
 import { addSystemCommands } from './commands/system';

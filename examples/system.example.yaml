@@ -21,7 +21,6 @@ manager:
     # <--- MANUAL CONFIG REQUIRED: Create OAuth App in GitHub Developer Settings
     client_id: "ENTER_YOUR_CLIENT_ID_HERE"         # e.g., Ov23...
     client_secret: "ENTER_YOUR_CLIENT_SECRET_HERE" # e.g., a623...
-    # Access token is auto-filled after login (Do not edit)
     access_token: ""
     username: ""
 
@@ -108,12 +107,6 @@ notifications:
       cpu_threshold: 90
       ram_threshold: 85
       disk_threshold: 90
-
-# Security settings
-security:
-  require_login_approval: true   # Admin must approve every login
-  approval_timeout: 300          # 5 minutes to approve
-  trusted_users: []              # Users who skip approval (emails)
 
 # Runtime environments (auto-detected via 'okastr8 env scan')
 environments:
