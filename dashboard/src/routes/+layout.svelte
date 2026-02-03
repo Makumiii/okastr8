@@ -5,7 +5,7 @@
 	import { page } from "$app/stores";
 	import { onMount } from "svelte";
 	import { browser } from "$app/environment";
-	import { Menu } from "lucide-svelte";
+import { Menu, PanelLeft } from "lucide-svelte";
 	import { getNavLabel } from "$lib/nav";
 
 	let { children } = $props();
@@ -13,6 +13,7 @@
 	let isAuthenticated = $state(false);
 	let isLoading = $state(true);
 	let isSidebarOpen = $state(false);
+	let isSidebarCollapsed = $state(false);
 
 	const publicRoutes = ["/login"];
 
@@ -25,6 +26,11 @@
 			isLoading = false;
 			return;
 		}
+
+		try {
+			const stored = localStorage.getItem("okastr8.sidebarCollapsed");
+			if (stored === "true") isSidebarCollapsed = true;
+		} catch {}
 
 		// Check auth status
 		try {
@@ -58,6 +64,18 @@
 	});
 
 	const pageTitle = $derived(getNavLabel($page.url.pathname));
+
+	function toggleSidebarCollapse() {
+		isSidebarCollapsed = !isSidebarCollapsed;
+		if (browser) {
+			try {
+				localStorage.setItem(
+					"okastr8.sidebarCollapsed",
+					String(isSidebarCollapsed),
+				);
+			} catch {}
+		}
+	}
 </script>
 
 {#if isLoading}
@@ -82,8 +100,8 @@
 				onclick={() => (isSidebarOpen = false)}
 			></button>
 		{/if}
-		<Sidebar isMobileOpen={isSidebarOpen} />
-		<div class="lg:pl-72">
+		<Sidebar isMobileOpen={isSidebarOpen} isCollapsed={isSidebarCollapsed} />
+		<div class={isSidebarCollapsed ? "lg:pl-20" : "lg:pl-72"}>
 			<header
 				class="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--bg-page)] backdrop-blur"
 			>
@@ -95,6 +113,13 @@
 							onclick={() => (isSidebarOpen = true)}
 						>
 							<Menu size={18} />
+						</button>
+						<button
+							class="hidden h-10 w-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] text-[var(--text-primary)] hover:bg-[var(--surface-dark)] lg:inline-flex"
+							aria-label="Toggle sidebar"
+							onclick={toggleSidebarCollapse}
+						>
+							<PanelLeft size={18} />
 						</button>
 						<div>
 							<div class="text-xs uppercase tracking-wide text-[var(--text-muted)]">

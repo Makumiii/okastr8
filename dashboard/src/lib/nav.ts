@@ -4,6 +4,7 @@ import {
     Box,
     ChartLine,
     Inbox,
+    FileText,
 } from "lucide-svelte";
 
 export interface NavItem {
@@ -18,6 +19,7 @@ export const navItems: NavItem[] = [
     { href: "/apps", label: "Apps", icon: Box },
     { href: "/metrics", label: "Metrics", icon: ChartLine },
     { href: "/activity", label: "Activity", icon: Inbox },
+    { href: "/logs", label: "Logs", icon: FileText },
 ];
 
 export function getNavLabel(pathname: string): string {

@@ -31,7 +31,9 @@
     interface AppMeta {
         name: string;
         gitRepo?: string;
+        repo?: string;
         gitBranch?: string;
+        webhookBranch?: string;
         port?: number;
         domain?: string;
         runtime?: string;
@@ -52,6 +54,10 @@
         type: "app" | "version";
         versionId?: number;
     } | null>(null);
+    let branches = $state<string[]>([]);
+    let webhookBranch = $state<string>("");
+    let webhookBranchSaving = $state(false);
+    let webhookBranchMessage = $state("");
 
     // ... existing onMount and loadData ...
     onMount(async () => {
@@ -102,6 +108,13 @@
                 meta =
                     statusResult.data.apps.find((a) => a.name === appName) ||
                     null;
+                if (meta?.webhookBranch || meta?.gitBranch) {
+                    webhookBranch = meta.webhookBranch || meta.gitBranch || "";
+                }
+                const repoUrl = meta?.gitRepo || meta?.repo;
+                if (repoUrl) {
+                    await loadBranches(repoUrl);
+                }
             }
         } catch (e) {
             console.error("Failed to load app list:", e);
@@ -109,6 +122,46 @@
         }
 
         isLoading = false;
+    }
+
+    function extractRepoFullName(repoUrl?: string) {
+        if (!repoUrl) return "";
+        if (!repoUrl.includes("://") && !repoUrl.includes("git@") && repoUrl.includes("/")) {
+            return repoUrl;
+        }
+        const httpsMatch = repoUrl.match(/github\.com\/(.+?)(?:\.git)?$/);
+        if (httpsMatch?.[1]) return httpsMatch[1];
+        const sshMatch = repoUrl.match(/github\.com[:/](.+?)(?:\.git)?$/);
+        if (sshMatch?.[1]) return sshMatch[1];
+        return "";
+    }
+
+    async function loadBranches(repoUrl: string) {
+        const repoFullName = extractRepoFullName(repoUrl);
+        if (!repoFullName) return;
+        const result = await post<{ branches: string[] }>("/github/branches", {
+            repoFullName,
+        });
+        if (result.success && result.data?.branches) {
+            branches = result.data.branches;
+        }
+    }
+
+    async function saveWebhookBranch() {
+        if (!webhookBranch || !meta?.name) return;
+        webhookBranchSaving = true;
+        webhookBranchMessage = "";
+        const result = await post("/app/webhook-branch", {
+            name: meta.name,
+            branch: webhookBranch,
+        });
+        if (result.success) {
+            webhookBranchMessage = "Webhook branch updated.";
+            await loadData();
+        } else {
+            webhookBranchMessage = result.message || "Failed to update webhook branch.";
+        }
+        webhookBranchSaving = false;
     }
 
     async function controlApp(action: "start" | "stop" | "restart") {
@@ -256,6 +309,65 @@
                 </Button>
             </div>
         </Card>
+
+        {#if branches.length > 0}
+            <Card class="space-y-4">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <h2 class="text-lg font-semibold text-[var(--text-primary)]">
+                            Webhook Branch
+                        </h2>
+                        <p class="text-sm text-[var(--text-secondary)]">
+                            Auto-deploy listens to this branch on push.
+                        </p>
+                    </div>
+                    {#if meta?.webhookAutoDeploy === false}
+                        <Badge variant="warning">Auto-deploy disabled</Badge>
+                    {/if}
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-[1fr_auto] items-end">
+                    <div class="space-y-2">
+                        <label
+                            for="webhook-branch-select"
+                            class="text-sm font-medium text-[var(--text-secondary)]"
+                        >
+                            Branch
+                        </label>
+                        <select
+                            id="webhook-branch-select"
+                            bind:value={webhookBranch}
+                            class="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--primary)] focus:outline-none"
+                            disabled={webhookBranchSaving}
+                        >
+                            {#each branches as branch}
+                                <option value={branch}>{branch}</option>
+                            {/each}
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onclick={saveWebhookBranch}
+                            disabled={webhookBranchSaving || !webhookBranch}
+                        >
+                            {webhookBranchSaving ? "Saving..." : "Save"}
+                        </Button>
+                    </div>
+                </div>
+                {#if webhookBranchMessage}
+                    <p class="text-xs text-[var(--text-secondary)]">
+                        {webhookBranchMessage}
+                    </p>
+                {/if}
+                {#if meta?.gitBranch && webhookBranch && meta.gitBranch !== webhookBranch}
+                    <p class="text-xs text-[var(--text-muted)]">
+                        Current deploy branch is {meta.gitBranch}. Auto-deploy will still follow {webhookBranch}.
+                    </p>
+                {/if}
+            </Card>
+        {/if}
 
         <!-- Releases -->
         <div>

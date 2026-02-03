@@ -161,17 +161,6 @@
                             </span>
                         </div>
                     </div>
-                    <div class="flex flex-wrap items-center gap-3 text-xs font-medium">
-                        <span class="rounded-full bg-[var(--surface-glass-muted)] px-3 py-1.5">
-                            {data.health.counts.info} Info
-                        </span>
-                        <span class="rounded-full bg-[var(--surface-glass-muted)] px-3 py-1.5">
-                            {data.health.counts.warning} Warnings
-                        </span>
-                        <span class="rounded-full bg-[var(--surface-glass-muted)] px-3 py-1.5">
-                            {data.health.counts.error} Errors
-                        </span>
-                    </div>
                 </div>
                 <div
                     class="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-[var(--accent-glow)] blur-3xl"
@@ -213,7 +202,7 @@
         </section>
 
         <!-- Stats Grid -->
-        <section class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <section class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <!-- Services -->
             <Card>
                 <div class="flex items-start justify-between">
@@ -283,21 +272,6 @@
                 </p>
             </Card>
 
-            <!-- System Load -->
-            <Card>
-                <div class="flex items-start justify-between">
-                    <span class="text-sm text-[var(--text-secondary)]"
-                        >System Load</span
-                    >
-                    <Activity size={20} class="text-[var(--warning)]" />
-                </div>
-                <div class="mt-3 text-3xl font-bold text-[var(--text-primary)]">
-                    {data.health.counts.info + data.health.counts.warning}
-                </div>
-                <p class="mt-1 text-sm text-[var(--text-secondary)]">
-                    Active processes
-                </p>
-            </Card>
         </section>
 
         <section class="grid gap-6 lg:grid-cols-12">

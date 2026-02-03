@@ -26,7 +26,6 @@
     let branches = $state<string[]>([]);
     let selectedBranch = $state("");
     let hasConfig = $state<boolean | null>(null);
-    let webhookEnabled = $state(true);
     type EnvEntry = { id: number; key: string; value: string };
     let envEntries = $state<EnvEntry[]>([{ id: 1, key: "", value: "" }]);
     let nextEnvId = $state(2);
@@ -51,6 +50,8 @@
     let deployStrategy = $state<DeployStrategy>("yaml");
     let dockerPort = $state<number>(3000);
     let dockerDomain = $state<string>("");
+    let branchWarning = $state<string>("");
+    let webhookBranchLabel = $state<string>("");
     const hasDockerStrategy = $derived(
         preparedHasUserDocker || preparedHasUserCompose,
     );
@@ -94,11 +95,30 @@
             deployStrategy = prefersDocker ? "docker" : "yaml";
             dockerPort = result.data.config?.port ?? 3000;
             dockerDomain = result.data.config?.domain ?? "";
+            await checkBranchWarning();
             deployState = "idle";
         } else {
             hasConfig = false;
             deployState = "idle";
             toasts.error(result.message || "Failed to inspect config");
+        }
+    }
+
+    async function checkBranchWarning() {
+        branchWarning = "";
+        webhookBranchLabel = "";
+        if (!selectedBranch) return;
+        const result = await post<any>("/github/check-branch-change", {
+            repoFullName,
+            branch: selectedBranch,
+        });
+        if (result.success && result.data) {
+            if (result.data.warning) {
+                branchWarning = result.data.warning;
+            }
+            if (result.data.webhookBranch) {
+                webhookBranchLabel = result.data.webhookBranch;
+            }
         }
     }
 
@@ -378,11 +398,18 @@
 
                 <!-- Branch -->
                 <div class="mt-4">
-                    <label
-                        for="branch-select"
-                        class="mb-2 block text-sm font-medium text-[var(--text-primary)]"
-                        >Branch</label
-                    >
+                    <div class="mb-2 flex items-center justify-between gap-3">
+                        <label
+                            for="branch-select"
+                            class="block text-sm font-medium text-[var(--text-primary)]"
+                            >Branch</label
+                        >
+                        {#if webhookBranchLabel}
+                            <Badge variant="outline" class="text-xs">
+                                Webhook branch: {webhookBranchLabel}
+                            </Badge>
+                        {/if}
+                    </div>
                     <select
                         id="branch-select"
                         bind:value={selectedBranch}
@@ -398,6 +425,11 @@
                             >
                         {/each}
                     </select>
+                    {#if branchWarning}
+                        <div class="mt-3 rounded-[var(--radius-md)] border border-[var(--warning)]/30 bg-[var(--warning)]/10 px-3 py-2 text-xs text-[var(--text-secondary)]">
+                            {branchWarning}
+                        </div>
+                    {/if}
                 </div>
 
                 <!-- Config Status -->
@@ -417,20 +449,6 @@
                 </div>
 
                 <!-- Webhook -->
-                <div class="mt-4">
-                    <label class="flex items-center gap-3">
-                        <input
-                            type="checkbox"
-                            bind:checked={webhookEnabled}
-                            disabled={deployState === "loading" || deployState === "deploying"}
-                            class="h-4 w-4 rounded border-[var(--border)] text-[var(--primary-strong)] focus:ring-[var(--primary)]"
-                        />
-                        <span class="text-sm text-[var(--text-primary)]"
-                            >Enable auto-deploy on push</span
-                        >
-                    </label>
-                </div>
-
                 <!-- Strategy -->
                 <div class="mt-6 border-t border-[var(--border)] pt-6">
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

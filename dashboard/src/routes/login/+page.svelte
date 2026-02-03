@@ -9,6 +9,20 @@
     let pendingApproval = $state(false);
     let requestId = $state("");
 
+    const errorMessages: Record<string, string> = {
+        github_admin_not_set:
+            "GitHub admin not set. Run okastr8 github connect on the server first.",
+        github_not_allowed: "Your GitHub account isn't allowed to access this dashboard.",
+        github_not_configured:
+            "GitHub OAuth is not configured. Add client_id/client_secret to system.yaml.",
+        github_auth_failed: "GitHub authentication failed. Try again.",
+        no_code: "GitHub authentication failed. Try again.",
+        config_missing:
+            "GitHub OAuth is missing configuration. Add client_id/client_secret to system.yaml.",
+        token_exchange_failed:
+            "GitHub authentication failed to exchange token. Try again.",
+    };
+
     async function handleLogin() {
         if (!token.trim()) {
             error = "Please enter your API token";
@@ -47,6 +61,10 @@
         }
     }
 
+    function handleGitHubLogin() {
+        window.location.href = "/api/auth/github";
+    }
+
     async function pollForApproval() {
         const interval = setInterval(async () => {
             try {
@@ -72,6 +90,14 @@
             handleLogin();
         }
     }
+
+    onMount(() => {
+        const params = new URLSearchParams(window.location.search);
+        const errorParam = params.get("error");
+        if (errorParam && !error) {
+            error = errorMessages[errorParam] || "Authentication failed";
+        }
+    });
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-[var(--bg-page)]">
@@ -106,6 +132,20 @@
             {:else}
                 <!-- Login Form -->
                 <div class="w-full space-y-4">
+                    <Button
+                        onclick={handleGitHubLogin}
+                        variant="outline"
+                        class="w-full"
+                    >
+                        Sign in with GitHub
+                    </Button>
+
+                    <div class="flex items-center gap-3 text-xs text-[var(--text-muted)]">
+                        <div class="h-px flex-1 bg-[var(--border)]"></div>
+                        <span>or</span>
+                        <div class="h-px flex-1 bg-[var(--border)]"></div>
+                    </div>
+
                     <div>
                         <label
                             for="token"
@@ -149,7 +189,7 @@
 
                 <p class="text-center text-xs text-[var(--text-muted)]">
                     Generate tokens with <code class="font-mono"
-                        >okastr8 auth create</code
+                        >okastr8 auth token</code
                     >
                 </p>
             {/if}

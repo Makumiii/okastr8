@@ -106,7 +106,7 @@
     let runtime = $state<string>("custom");
     let port = $state<number>(3000);
     let startCommand = $state<string>("");
-    let buildSteps = $state<string>("");
+    let buildSteps = $state<string[]>([]);
     let domain = $state<string>("");
     let isSubmitting = $state(false);
     let prevDbType = $state<string>("");
@@ -129,12 +129,18 @@
         port = configData.port ?? 3000;
         startCommand = configData.startCommand ?? "";
 
-        const buildStepsList = Array.isArray(configData.buildSteps)
+        const rawBuildSteps = Array.isArray(configData.buildSteps)
             ? configData.buildSteps
             : Array.isArray(configData.build)
               ? configData.build
-              : [];
-        buildSteps = buildStepsList.join("\n");
+              : typeof configData.buildSteps === "string"
+                ? configData.buildSteps.split("\n")
+                : typeof configData.build === "string"
+                  ? configData.build.split("\n")
+                  : [];
+        buildSteps = rawBuildSteps
+            .map((step: string) => String(step).trim())
+            .filter((step: string) => step);
 
         domain = configData.domain ?? "";
     });
@@ -191,11 +197,25 @@
             runtime,
             port: Number(port),
             startCommand,
-            buildSteps: buildSteps.split("\n").filter((s: string) => s.trim()),
+            buildSteps: buildSteps.map((s) => s.trim()).filter((s) => s),
             domain,
             database,
             cache,
         };
+    }
+
+    function addBuildStep() {
+        buildSteps = [...buildSteps, ""];
+    }
+
+    function updateBuildStep(index: number, value: string) {
+        const next = [...buildSteps];
+        next[index] = value;
+        buildSteps = next;
+    }
+
+    function removeBuildStep(index: number) {
+        buildSteps = buildSteps.filter((_, i) => i !== index);
     }
 
     function handleSubmit() {
@@ -382,16 +402,49 @@
                 <label
                     class="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2"
                 >
-                    <Terminal class="w-4 h-4" /> Build Command (Optional)
+                    <Terminal class="w-4 h-4" /> Build Steps (Optional)
                 </label>
-                <textarea
-                    bind:value={buildSteps}
-                    rows="2"
-                    class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-3 py-2 text-[var(--text-primary)] focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] transition-colors font-mono text-sm"
-                    placeholder="npm install&#10;npm run build"
-                    disabled={isDisabled}
-                ></textarea>
-                <p class="text-xs text-[var(--text-muted)]">One command per line</p>
+                <div class="space-y-3 rounded-md border border-[var(--border)] bg-[var(--bg-card)] p-3">
+                    {#if buildSteps.length === 0}
+                        <p class="text-xs text-[var(--text-muted)]">
+                            No build steps added yet. Add steps to run in order.
+                        </p>
+                    {:else}
+                        <div class="space-y-2">
+                            {#each buildSteps as step, index (index)}
+                                <div class="flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        class="flex-1 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)] font-mono focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
+                                        placeholder={index === 0 ? "npm install" : "npm run build"}
+                                        value={step}
+                                        oninput={(event) => updateBuildStep(index, (event.currentTarget as HTMLInputElement).value)}
+                                        disabled={isDisabled}
+                                    />
+                                    <button
+                                        type="button"
+                                        class="rounded-[var(--radius-md)] border border-[var(--border)] px-2.5 py-2 text-xs text-[var(--text-secondary)] hover:text-[var(--error)]"
+                                        onclick={() => removeBuildStep(index)}
+                                        disabled={isDisabled}
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            {/each}
+                        </div>
+                    {/if}
+                    <div class="flex items-center justify-between text-xs text-[var(--text-muted)]">
+                        <span>Runs in order from top to bottom.</span>
+                        <button
+                            type="button"
+                            class="font-medium text-[var(--primary-strong)] hover:underline"
+                            onclick={addBuildStep}
+                            disabled={isDisabled}
+                        >
+                            + Add step
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <div class="space-y-2">

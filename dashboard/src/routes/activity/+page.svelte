@@ -222,7 +222,7 @@
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
                     on:click={() => setFilter("resource")}
                 >
-                    System
+                    Resources
                 </button>
             </div>
         </div>
@@ -324,6 +324,12 @@
                                             ? "Hide Logs"
                                             : "View Build Logs"}
                                     </button>
+                                    <a
+                                        href={`/logs?traceId=${item.data.id || item.id}`}
+                                        class="ml-3 inline-flex items-center gap-1 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                                    >
+                                        <Activity size={12} /> View in Logs
+                                    </a>
                                 </div>
                             {/if}
                         </div>
