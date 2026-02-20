@@ -8,6 +8,8 @@ export type LogSource =
     | "manager"
     | "cli"
     | "api"
+    | "auth"
+    | "email"
     | "webhook"
     | "scheduler"
     | "deploy"
@@ -60,12 +62,14 @@ const DEFAULT_MAX_BYTES = 10 * 1024 * 1024; // 10MB
 const DEFAULT_MAX_BACKUPS = 3;
 const GLOBAL_FLAG = Symbol.for("okastr8.console.logger.installed");
 const UNIFIED_LOG_PATH = join(homedir(), ".okastr8", "logs", "unified.log");
-const SENSITIVE_KEY_RE = /(token|secret|password|api[_-]?key|client[_-]?secret|authorization|cookie|access[_-]?token|refresh[_-]?token|private[_-]?key|ssh[_-]?key)/i;
+const SENSITIVE_KEY_RE =
+    /(token|secret|password|api[_-]?key|client[_-]?secret|authorization|cookie|access[_-]?token|refresh[_-]?token|private[_-]?key|ssh[_-]?key)/i;
 const ENV_KEY_RE = /(env|environment|envvars|environmentvars)/i;
 const JWT_RE = /eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g;
 const GITHUB_TOKEN_RE = /(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})/g;
 const OKASTR8_SESSION_RE = /okastr8_session=([^;\s]+)/gi;
-const TOKEN_VALUE_RE = /(token|access[_-]?token|refresh[_-]?token|api[_-]?key|client[_-]?secret|secret|password|authorization|cookie)\s*[:=]\s*([^\s,]+)/gi;
+const TOKEN_VALUE_RE =
+    /(token|access[_-]?token|refresh[_-]?token|api[_-]?key|client[_-]?secret|secret|password|authorization|cookie)\s*[:=]\s*([^\s,]+)/gi;
 const PRIVATE_KEY_RE = /-----BEGIN [A-Z ]+-----[\s\S]+?-----END [A-Z ]+-----/g;
 
 function resolveLogPath(filePath: string): string {
@@ -111,7 +115,12 @@ function redactString(value: string): string {
     return redacted;
 }
 
-function sanitizeValue(value: unknown, key?: string, depth: number = 0, seen: WeakSet<object> = new WeakSet()): unknown {
+function sanitizeValue(
+    value: unknown,
+    key?: string,
+    depth: number = 0,
+    seen: WeakSet<object> = new WeakSet()
+): unknown {
     if (depth > 6) return "[REDACTED]";
     if (value === null || value === undefined) return value;
 
@@ -144,9 +153,10 @@ function sanitizeValue(value: unknown, key?: string, depth: number = 0, seen: We
                 continue;
             }
             if (ENV_KEY_RE.test(childKey)) {
-                output[childKey] = typeof childValue === "object" && childValue
-                    ? { keys: Object.keys(childValue as Record<string, unknown>) }
-                    : "[REDACTED]";
+                output[childKey] =
+                    typeof childValue === "object" && childValue
+                        ? { keys: Object.keys(childValue as Record<string, unknown>) }
+                        : "[REDACTED]";
                 continue;
             }
             output[childKey] = sanitizeValue(childValue, childKey, depth + 1, seen);
@@ -166,10 +176,12 @@ function sanitizeEntry(entry: LogEntry): LogEntry {
         data: sanitizeValue(entry.data) as LogEntry["data"],
         error: entry.error
             ? {
-                ...entry.error,
-                message: entry.error.message ? redactString(entry.error.message) : entry.error.message,
-                stack: entry.error.stack ? redactString(entry.error.stack) : entry.error.stack,
-            }
+                  ...entry.error,
+                  message: entry.error.message
+                      ? redactString(entry.error.message)
+                      : entry.error.message,
+                  stack: entry.error.stack ? redactString(entry.error.stack) : entry.error.stack,
+              }
             : entry.error,
     };
 }
@@ -178,7 +190,7 @@ async function rotateIfNeeded(
     filePath: string,
     maxBytes: number,
     maxBackups: number,
-    nextBytes: number,
+    nextBytes: number
 ) {
     if (!existsSync(filePath)) return;
     const current = await stat(filePath);
@@ -207,7 +219,7 @@ async function writeLogLine(
     filePath: string,
     entry: LogEntry,
     maxBytes: number,
-    maxBackups: number,
+    maxBackups: number
 ) {
     const resolved = resolveLogPath(filePath);
     await mkdir(dirname(resolved), { recursive: true });
@@ -224,7 +236,12 @@ export function createFileLogger(options: FileLoggerOptions) {
     const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
     const maxBackups = options.maxBackups ?? DEFAULT_MAX_BACKUPS;
 
-    const write = (level: LogLevel, message: string, data?: LogEntry["data"], error?: LogEntry["error"]) => {
+    const write = (
+        level: LogLevel,
+        message: string,
+        data?: LogEntry["data"],
+        error?: LogEntry["error"]
+    ) => {
         const entry: LogEntry = {
             timestamp: new Date().toISOString(),
             level,
@@ -249,7 +266,9 @@ export function createFileLogger(options: FileLoggerOptions) {
     };
 }
 
-export async function readUnifiedEntries(maxBackups: number = DEFAULT_MAX_BACKUPS): Promise<LogEntry[]> {
+export async function readUnifiedEntries(
+    maxBackups: number = DEFAULT_MAX_BACKUPS
+): Promise<LogEntry[]> {
     const resolved = resolveLogPath(UNIFIED_LOG_PATH);
     const paths: string[] = [resolved];
     for (let i = 1; i <= maxBackups; i += 1) {
@@ -285,7 +304,7 @@ export async function readUnifiedEntries(maxBackups: number = DEFAULT_MAX_BACKUP
 export async function writeUnifiedEntry(
     entry: LogEntry,
     maxBytes: number = DEFAULT_MAX_BYTES,
-    maxBackups: number = DEFAULT_MAX_BACKUPS,
+    maxBackups: number = DEFAULT_MAX_BACKUPS
 ) {
     const payload: LogEntry = {
         ...entry,
@@ -310,12 +329,12 @@ export function installConsoleLogger(options: FileLoggerOptions) {
     };
 
     console.log = (...args: unknown[]) => {
-        logger.info(formatMessage(args), undefined, extractError(args));
+        logger.info(formatMessage(args), undefined);
         original.log(...args);
     };
 
     console.info = (...args: unknown[]) => {
-        logger.info(formatMessage(args), undefined, extractError(args));
+        logger.info(formatMessage(args), undefined);
         original.info(...args);
     };
 

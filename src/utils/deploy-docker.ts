@@ -19,7 +19,7 @@ import {
     composeDown,
     checkDockerInstalled,
     checkComposeInstalled,
-    getProjectContainers
+    getProjectContainers,
 } from "../commands/docker";
 import { OKASTR8_HOME } from "../config";
 import { importEnvFile } from "./env-manager";
@@ -65,7 +65,7 @@ async function waitForHealth(
         const status = await containerStatus(containerName);
 
         if (!status.running) {
-            if (status.status === 'exited' || status.status === 'dead') {
+            if (status.status === "exited" || status.status === "dead") {
                 log(`Container ${containerName} exited unexpectedly`);
                 return false;
             }
@@ -79,7 +79,9 @@ async function waitForHealth(
             if (status.health === "healthy") {
                 log(`Container ${containerName} is healthy`);
             } else if (status.health === "unhealthy") {
-                log(`Warning: Container ${containerName} running but HEALTHCHECK failed (this is often OK)`);
+                log(
+                    `Warning: Container ${containerName} running but HEALTHCHECK failed (this is often OK)`
+                );
             } else {
                 log(`Container ${containerName} is running`);
             }
@@ -129,8 +131,8 @@ export async function deployWithDocker(
     log("Ensuring clean slate for deployment...");
 
     // A. Clean up Docker Resources - direct container
-    await stopContainer(appName).catch(() => { });
-    await removeContainer(appName).catch(() => { });
+    await stopContainer(appName).catch(() => {});
+    await removeContainer(appName).catch(() => {});
 
     // B. Clean up Compose services - check multiple possible locations/names
     const currentDir = join(APPS_DIR, appName, "current");
@@ -142,7 +144,7 @@ export async function deployWithDocker(
     for (const composePath of composeFiles) {
         if (existsSync(composePath)) {
             log("Stopping existing Compose services...");
-            await composeDown(composePath, appName).catch(() => { });
+            await composeDown(composePath, appName).catch(() => {});
             break; // Only need to stop once
         }
     }
@@ -152,8 +154,8 @@ export async function deployWithDocker(
     if (projectContainers.length > 0) {
         log(`Stopping ${projectContainers.length} compose project container(s)...`);
         for (const container of projectContainers) {
-            await stopContainer(container.name).catch(() => { });
-            await removeContainer(container.name).catch(() => { });
+            await stopContainer(container.name).catch(() => {});
+            await removeContainer(container.name).catch(() => {});
         }
     }
 
@@ -167,14 +169,7 @@ export async function deployWithDocker(
     log(`Docker strategy: ${strategy}`);
 
     if (strategy === "user-compose" || strategy === "auto-compose") {
-        return await deployWithCompose(
-            appName,
-            releasePath,
-            config,
-            strategy,
-            envFilePath,
-            log
-        );
+        return await deployWithCompose(appName, releasePath, config, strategy, envFilePath, log);
     } else {
         return await deployWithDockerfile(
             appName,
@@ -215,20 +210,20 @@ async function deployWithCompose(
         if (envFilePath) {
             try {
                 log("   Injecting environment variables via override file...");
-                const composeContent = await readFile(composePath, 'utf-8');
+                const composeContent = await readFile(composePath, "utf-8");
                 const composeYaml = yaml.load(composeContent) as any;
 
                 if (composeYaml && composeYaml.services) {
                     const services = Object.keys(composeYaml.services);
                     const override = {
-                        version: composeYaml.version || '3.8',
-                        services: {} as any
+                        version: composeYaml.version || "3.8",
+                        services: {} as any,
                     };
 
                     // Inject env_file into all services
                     for (const service of services) {
                         override.services[service] = {
-                            env_file: [envFilePath]
+                            env_file: [envFilePath],
                         };
                     }
 
@@ -265,33 +260,38 @@ async function deployWithCompose(
     // Note: To properly support overrides, we should update `composeUp` in future to accept string[].
 
     // For now, proceed with single file deployment
-    const upResult = await composeUp(overridePath ? [composePath, overridePath] : composePath, appName);
+    const upResult = await composeUp(
+        overridePath ? [composePath, overridePath] : composePath,
+        appName
+    );
 
     if (!upResult.success) {
         return {
             success: false,
             message: upResult.message,
-            config
+            config,
         };
     }
 
     // Wait for health check logic - implied by compose or explicit check
     // Compose usually handles its own health if configured, but we can double check
     const containers = await getProjectContainers(appName);
-    const healthy = containers.every(c => c.status.startsWith('Up') || c.status.includes('running'));
+    const healthy = containers.every(
+        (c) => c.status.startsWith("Up") || c.status.includes("running")
+    );
 
     if (!healthy) {
         return {
             success: false,
             message: "One or more services failed to start",
-            config
+            config,
         };
     }
 
     return {
         success: true,
         message: "Docker Compose deployment successful",
-        config
+        config,
     };
 }
 
@@ -332,7 +332,7 @@ async function deployWithDockerfile(
 
     // Run new container
     log("Starting new container...");
-    const runResult = await runContainer(appName, tag, config.port!, envFilePath);
+    const runResult = await runContainer(appName, tag, config.port!, undefined, envFilePath);
 
     if (!runResult.success) {
         return {
