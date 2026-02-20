@@ -6,6 +6,7 @@ import { homedir } from "os";
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { existsSync } from "fs";
 import type { DeploymentRecord, DeploysMetadata } from "../types";
+import { resolveDeployStrategy } from "../utils/deploy-strategy";
 
 // Get the directory of this file (works in Bun and Node ESM)
 const __filename = fileURLToPath(import.meta.url);
@@ -210,6 +211,15 @@ export async function rollbackApp(appName: string, commitHash?: string) {
     console.log(`⏪ Rolling back ${appName}...`);
 
     try {
+        const { getAppMetadata } = await import("./app");
+        const metadata = await getAppMetadata(appName);
+        const strategy = resolveDeployStrategy(metadata);
+
+        if (strategy === "image") {
+            const { rollbackImageApp } = await import("./deploy-image");
+            return await rollbackImageApp(appName, commitHash);
+        }
+
         // If no hash provided, get from last successful deployment
         if (!commitHash) {
             const content = await readFile(DEPLOYMENT_FILE, "utf-8");
@@ -337,6 +347,9 @@ export function addDeployCommands(program: Command) {
             const result = await rollbackApp(app, options.commit);
             if (!result.success) {
                 process.exit(1);
+            }
+            if (result.message) {
+                console.log(result.message);
             }
         });
 

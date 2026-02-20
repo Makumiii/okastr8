@@ -118,8 +118,9 @@ export function cleanupOldStreams(): void {
     }
 }
 
-// Run cleanup every 10 minutes
-setInterval(cleanupOldStreams, 10 * 60 * 1000);
+// Run cleanup every 10 minutes without keeping short-lived CLI commands alive.
+const cleanupInterval = setInterval(cleanupOldStreams, 10 * 60 * 1000);
+cleanupInterval.unref();
 
 /**
  * Get active stream count (for debugging)

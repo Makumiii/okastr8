@@ -27,14 +27,14 @@ function getComposePath(): string {
  * Run a docker command with sudo for permission handling
  */
 async function dockerCommand(args: string[], cwd?: string) {
-    return runCommand("sudo", [getDockerPath(), ...args], cwd);
+    return runCommand("sudo", ["-n", getDockerPath(), ...args], cwd);
 }
 
 /**
  * Run a docker-compose command with sudo for permission handling
  */
 async function composeCommand(args: string[], cwd?: string) {
-    return runCommand("sudo", [getComposePath(), ...args], cwd);
+    return runCommand("sudo", ["-n", getComposePath(), ...args], cwd);
 }
 
 /**
@@ -75,6 +75,104 @@ export async function buildImage(
     }
 }
 
+export async function imageExists(image: string): Promise<boolean> {
+    try {
+        const result = await dockerCommand(["image", "inspect", image]);
+        return result.exitCode === 0;
+    } catch {
+        return false;
+    }
+}
+
+export async function pullImage(image: string): Promise<{ success: boolean; message: string }> {
+    try {
+        const result = await dockerCommand(["pull", image]);
+        if (result.exitCode !== 0) {
+            return {
+                success: false,
+                message: `Failed to pull image: ${result.stderr || result.stdout}`,
+            };
+        }
+        return {
+            success: true,
+            message: `Pulled image ${image}`,
+        };
+    } catch (error: any) {
+        return {
+            success: false,
+            message: `Pull error: ${error.message}`,
+        };
+    }
+}
+
+export async function dockerLogin(
+    server: string,
+    username: string,
+    passwordOrToken: string
+): Promise<{ success: boolean; message: string }> {
+    try {
+        const result = await runCommand(
+            "sudo",
+            ["-n", getDockerPath(), "login", server, "-u", username, "--password-stdin"],
+            undefined,
+            passwordOrToken
+        );
+
+        if (result.exitCode !== 0) {
+            return {
+                success: false,
+                message: `Docker login failed for ${server}: ${result.stderr || result.stdout}`,
+            };
+        }
+        return {
+            success: true,
+            message: `Authenticated to ${server}`,
+        };
+    } catch (error: any) {
+        return {
+            success: false,
+            message: `Docker login error: ${error.message}`,
+        };
+    }
+}
+
+export async function dockerLogout(server: string): Promise<{ success: boolean; message: string }> {
+    try {
+        const result = await dockerCommand(["logout", server]);
+        if (result.exitCode !== 0) {
+            return {
+                success: false,
+                message: `Docker logout failed for ${server}: ${result.stderr || result.stdout}`,
+            };
+        }
+        return {
+            success: true,
+            message: `Logged out from ${server}`,
+        };
+    } catch (error: any) {
+        return {
+            success: false,
+            message: `Docker logout error: ${error.message}`,
+        };
+    }
+}
+
+export async function inspectImageDigest(image: string): Promise<string | undefined> {
+    try {
+        const result = await dockerCommand([
+            "inspect",
+            "--format",
+            "{{index .RepoDigests 0}}",
+            image,
+        ]);
+        if (result.exitCode !== 0) return undefined;
+        const digest = result.stdout.trim();
+        return digest && digest !== "<no value>" ? digest : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
 /**
  * Run a Docker container
  */
@@ -82,6 +180,7 @@ export async function runContainer(
     appName: string,
     image: string,
     port: number,
+    containerPort: number = port,
     envFilePath?: string
 ): Promise<{ success: boolean; message: string }> {
     try {
@@ -93,7 +192,7 @@ export async function runContainer(
             "--name",
             containerName,
             "-p",
-            `${port}:${port}`,
+            `${port}:${containerPort}`,
             "--restart",
             "unless-stopped",
             // Inject HOST=0.0.0.0 so dev servers (Vite, CRA, Next.js, etc.)
@@ -289,24 +388,37 @@ export async function containerStatus(
     containerName: string
 ): Promise<{ running: boolean; status: string; health?: string }> {
     try {
-        const result = await dockerCommand([
+        const stateResult = await dockerCommand([
             "inspect",
             "--format",
-            "{{.State.Status}}|{{.State.Health.Status}}",
+            "{{.State.Status}}",
             containerName,
         ]);
 
-        if (result.exitCode !== 0) {
+        if (stateResult.exitCode !== 0) {
             return {
                 running: false,
                 status: "not found",
             };
         }
 
-        const parts = result.stdout.trim().split("|");
-        const status = parts[0] || "unknown";
-        const healthRaw = parts[1] || "";
-        const health = healthRaw && healthRaw !== "<no value>" ? healthRaw : undefined;
+        const status = stateResult.stdout.trim() || "unknown";
+        let health: string | undefined;
+
+        // Health is optional in Docker metadata. Query separately and tolerate missing health object.
+        const healthResult = await dockerCommand([
+            "inspect",
+            "--format",
+            "{{if .State.Health}}{{.State.Health.Status}}{{end}}",
+            containerName,
+        ]);
+
+        if (healthResult.exitCode === 0) {
+            const healthRaw = healthResult.stdout.trim();
+            if (healthRaw) {
+                health = healthRaw;
+            }
+        }
 
         return {
             running: status === "running",

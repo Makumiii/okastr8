@@ -9,6 +9,7 @@ import { addDeployCommands } from './commands/deploy';
 import { addGitHubCommands } from './commands/github-cli';
 import { addMetricsCommands } from './commands/metrics-cli';
 import { addTunnelCommands } from './commands/tunnel';
+import { addRegistryCommands } from './commands/registry';
 import { installConsoleLogger, logPaths } from './utils/structured-logger';
 
 const program = new Command();
@@ -35,6 +36,7 @@ addDeployCommands(program);
 addGitHubCommands(program);
 addMetricsCommands(program);
 addTunnelCommands(program);
+addRegistryCommands(program);
 
 import { addSystemCommands } from './commands/system';
 addSystemCommands(program);      // Global service & nuke (Must be last)

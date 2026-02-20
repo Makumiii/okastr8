@@ -16,6 +16,7 @@ import { startDeploymentStream, streamLog } from "../utils/deploymentLogger.ts";
 const APPS_DIR = join(OKASTR8_HOME, "apps");
 
 import type { DeployConfig, DeployFromPathOptions, DeployResult } from "../types";
+import { resolveDeployStrategy } from "../utils/deploy-strategy";
 
 /**
  * Deploy from an existing path (used for both fresh deploys and rollbacks)
@@ -234,6 +235,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
                 webhookAutoDeploy: existingMetadata.webhookAutoDeploy ?? true,
                 createdAt: existingMetadata.createdAt || new Date().toISOString(),
                 deploymentType: "docker",
+                deployStrategy: resolveDeployStrategy(existingMetadata),
                 versions: existingMetadata.versions || [],
                 currentVersionId: versionId,
             },

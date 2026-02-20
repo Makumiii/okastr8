@@ -27,6 +27,8 @@ const PROJECT_ROOT = join(__dirname, "..", "..");
 // Activity Logging
 import { randomUUID } from "crypto";
 import { logActivity } from "../utils/activity";
+import { resolveDeployStrategy, type DeployStrategy } from "../utils/deploy-strategy";
+import { resolveRegistryServer } from "../utils/registry-image";
 
 // App directory structure
 import { OKASTR8_HOME } from "../config";
@@ -39,6 +41,7 @@ export interface AppConfig {
     workingDirectory: string;
     user: string;
     port?: number;
+    containerPort?: number;
     domain?: string;
     gitRepo?: string;
     gitBranch?: string;
@@ -49,6 +52,13 @@ export interface AppConfig {
     database?: string;
     cache?: string;
     deploymentType?: "docker" | "systemd"; // Backwards compat or new default
+    deployStrategy?: DeployStrategy;
+    imageRef?: string;
+    pullPolicy?: "always" | "if-not-present";
+    imageDigest?: string;
+    registryCredentialId?: string;
+    registryServer?: string;
+    registryProvider?: "ghcr" | "dockerhub" | "ecr" | "generic";
 }
 
 // Ensure the app directory structure exists
@@ -81,10 +91,13 @@ export async function createApp(config: AppConfig) {
             ...config,
             createdAt: new Date().toISOString(),
             deploymentType: "docker", // Default to docker now
+            deployStrategy: config.deployStrategy || "git",
             repoDir,
             logsDir,
             versions: [],
             currentVersionId: null,
+            imageReleases: [],
+            currentImageReleaseId: null,
             webhookAutoDeploy: config.webhookAutoDeploy ?? true,
             webhookBranch: config.webhookBranch || config.gitBranch
         };
@@ -297,6 +310,16 @@ export async function updateApp(appName: string, env?: Record<string, string>) {
 
     try {
         const metadata = await getAppMetadata(appName);
+        const deployStrategy = resolveDeployStrategy(metadata);
+
+        if (deployStrategy === "image") {
+            const { updateAppFromImage } = await import("./deploy-image");
+            return await updateAppFromImage({
+                appName,
+                metadata,
+                env,
+            });
+        }
 
         if (!metadata.gitRepo) {
             throw new Error("Not a git-linked application (missing gitRepo)");
@@ -415,6 +438,33 @@ export async function updateApp(appName: string, env?: Record<string, string>) {
     }
 }
 
+async function parseEnvFromOptions(options: any): Promise<Record<string, string>> {
+    const env: Record<string, string> = {};
+
+    if (options.envFile) {
+        if (existsSync(options.envFile)) {
+            const content = await readFile(options.envFile, 'utf-8');
+            content.split('\n').forEach(line => {
+                line = line.trim();
+                if (!line || line.startsWith('#')) return;
+                const [k, ...v] = line.split('=');
+                if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+            });
+        } else {
+            throw new Error(`Env file not found: ${options.envFile}`);
+        }
+    }
+
+    if (options.env) {
+        options.env.forEach((pair: string) => {
+            const [k, ...v] = pair.split('=');
+            if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+        });
+    }
+
+    return env;
+}
+
 export async function setAppWebhookAutoDeploy(appName: string, enabled: boolean) {
     const appDir = join(APPS_DIR, appName);
     const metadataPath = join(appDir, "app.json");
@@ -468,31 +518,7 @@ export function addAppCommands(program: Command) {
         .action(async (name: string, execStart: string, options: any) => {
             console.log(`Creating app '${name}'...`);
             try {
-                let env: Record<string, string> = {};
-
-                // Parse --env-file
-                if (options.envFile) {
-                    if (existsSync(options.envFile)) {
-                        const content = await readFile(options.envFile, 'utf-8');
-                        content.split('\n').forEach(line => {
-                            line = line.trim();
-                            if (!line || line.startsWith('#')) return;
-                            const [k, ...v] = line.split('=');
-                            if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
-                        });
-                    } else {
-                        console.error(` Env file not found: ${options.envFile}`);
-                        process.exit(1);
-                    }
-                }
-
-                // Parse --env flags
-                if (options.env) {
-                    options.env.forEach((pair: string) => {
-                        const [k, ...v] = pair.split('=');
-                        if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
-                    });
-                }
+                const env = await parseEnvFromOptions(options);
 
                 // Save env vars if present
                 if (Object.keys(env).length > 0) {
@@ -517,6 +543,60 @@ export function addAppCommands(program: Command) {
                 console.log(`App created at ${result.appDir}`);
             } catch (error: any) {
                 console.error(`Failed to create app:`, error.message);
+                process.exit(1);
+            }
+        });
+
+    app
+        .command("create-image")
+        .description("Create an application deployed directly from a container image")
+        .argument("<name>", "Application name")
+        .argument("<image_ref>", "Container image reference (e.g., traefik/whoami:latest)")
+        .option("-d, --description <desc>", "Service description", "Okastr8 image app")
+        .option("-u, --user <user>", "User to run as", process.env.USER || "root")
+        .option("-p, --port <port>", "Application port", "8080")
+        .option("--container-port <port>", "Container internal port (default: same as --port)")
+        .option("--domain <domain>", "Domain for Caddy reverse proxy")
+        .option("--pull-policy <policy>", "Image pull policy: always or if-not-present", "always")
+        .option("--registry-credential <id>", "Registry credential id from `okastr8 registry add`")
+        .option("--registry-server <server>", "Registry server override (e.g., ghcr.io)")
+        .option("--registry-provider <provider>", "Registry provider: ghcr|dockerhub|ecr|generic", "ghcr")
+        .option("--env <vars...>", "Environment variables (KEY=VALUE)")
+        .option("--env-file <path>", "Path to .env file")
+        .action(async (name: string, imageRef: string, options: any) => {
+            console.log(`Creating image app '${name}'...`);
+            try {
+                const env = await parseEnvFromOptions(options);
+                const pullPolicy = options.pullPolicy === "if-not-present" ? "if-not-present" : "always";
+                const registryServer = options.registryServer || resolveRegistryServer(imageRef);
+
+                if (Object.keys(env).length > 0) {
+                    const { saveEnvVars } = await import('../utils/env-manager');
+                    await saveEnvVars(name, env);
+                }
+
+                const result = await createApp({
+                    name,
+                    description: options.description,
+                    execStart: "docker run",
+                    workingDirectory: "",
+                    user: options.user,
+                    port: options.port ? parseInt(options.port, 10) : 8080,
+                    containerPort: options.containerPort ? parseInt(options.containerPort, 10) : (options.port ? parseInt(options.port, 10) : 8080),
+                    domain: options.domain,
+                    deployStrategy: "image",
+                    imageRef,
+                    pullPolicy,
+                    registryCredentialId: options.registryCredential,
+                    registryServer,
+                    registryProvider: options.registryProvider,
+                    webhookAutoDeploy: false,
+                });
+
+                console.log(result.message);
+                console.log(`Image app created at ${result.appDir}`);
+            } catch (error: any) {
+                console.error(`Failed to create image app:`, error.message);
                 process.exit(1);
             }
         });
