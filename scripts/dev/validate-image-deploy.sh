@@ -11,6 +11,23 @@ PRIVATE_EXPECTED=3
 PRIVATE_RAN=0
 PRIVATE_SKIPPED=()
 
+wait_for_http() {
+  local url="$1"
+  local attempts="${2:-15}"
+  local sleep_seconds="${3:-1}"
+  local i
+
+  for ((i = 1; i <= attempts; i++)); do
+    if curl -fsS "$url" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep "$sleep_seconds"
+  done
+
+  echo "FAIL: endpoint did not become ready: ${url}" >&2
+  return 1
+}
+
 cleanup() {
   set +e
   "${CLI_CMD[@]}" app delete "$PUBLIC_APP" >/dev/null 2>&1 || true
@@ -36,8 +53,7 @@ echo "[2/5] Deploying public image app"
 "${CLI_CMD[@]}" deploy trigger "$PUBLIC_APP"
 
 echo "[3/5] Verifying public app responds"
-sleep 2
-curl -fsS "http://127.0.0.1:${PUBLIC_PORT}" >/dev/null
+wait_for_http "http://127.0.0.1:${PUBLIC_PORT}" 20 1
 
 echo "[4/5] Rolling back by explicit image target"
 "${CLI_CMD[@]}" deploy rollback "$PUBLIC_APP" --target "nginx:1.27-alpine" >/dev/null
@@ -80,8 +96,7 @@ if [[ -n "${GHCR_USER:-}" && -n "${GHCR_TOKEN:-}" && -n "${GHCR_IMAGE:-}" ]]; th
     --registry-credential phase7-ghcr \
     --release-retention 3 >/dev/null
   "${CLI_CMD[@]}" deploy trigger "$PRIVATE_APP"
-  sleep 2
-  curl -fsS "http://127.0.0.1:${PRIVATE_PORT}" >/dev/null
+  wait_for_http "http://127.0.0.1:${PRIVATE_PORT}" 20 1
   echo "PASS: GHCR private validation"
 else
   PRIVATE_SKIPPED+=("GHCR (set GHCR_USER, GHCR_TOKEN, GHCR_IMAGE)")
@@ -101,8 +116,7 @@ if [[ -n "${DOCKERHUB_USER:-}" && -n "${DOCKERHUB_TOKEN:-}" && -n "${DOCKERHUB_I
     --registry-credential phase7-dockerhub \
     --release-retention 3 >/dev/null
   "${CLI_CMD[@]}" deploy trigger "$PRIVATE_APP"
-  sleep 2
-  curl -fsS "http://127.0.0.1:${PRIVATE_PORT}" >/dev/null
+  wait_for_http "http://127.0.0.1:${PRIVATE_PORT}" 20 1
   echo "PASS: DockerHub private validation"
 else
   PRIVATE_SKIPPED+=("DockerHub (set DOCKERHUB_USER, DOCKERHUB_TOKEN, DOCKERHUB_IMAGE)")
@@ -123,8 +137,7 @@ if [[ -n "${ECR_SERVER:-}" && -n "${ECR_USER:-}" && -n "${ECR_TOKEN:-}" && -n "$
     --registry-credential phase7-ecr \
     --release-retention 3 >/dev/null
   "${CLI_CMD[@]}" deploy trigger "$PRIVATE_APP"
-  sleep 2
-  curl -fsS "http://127.0.0.1:${PRIVATE_PORT}" >/dev/null
+  wait_for_http "http://127.0.0.1:${PRIVATE_PORT}" 20 1
   echo "PASS: ECR private validation"
 else
   PRIVATE_SKIPPED+=("ECR (set ECR_SERVER, ECR_USER, ECR_TOKEN, ECR_IMAGE)")
