@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'bun:test';
-import { selectImageRollbackTarget, type ImageReleaseRecord } from '../../src/commands/deploy-image';
+import {
+  pruneImageReleases,
+  selectImageRollbackTarget,
+  type ImageReleaseRecord,
+} from '../../src/commands/deploy-image';
 
 const releases: ImageReleaseRecord[] = [
   {
@@ -46,5 +50,33 @@ describe('selectImageRollbackTarget', () => {
   it('returns null for unknown target', () => {
     const target = selectImageRollbackTarget(releases, 'sha256:missing');
     expect(target).toBeNull();
+  });
+});
+
+describe('pruneImageReleases', () => {
+  it('keeps all releases when below retention', () => {
+    const result = pruneImageReleases(releases, 5);
+    expect(result).toHaveLength(2);
+    expect(result[0]?.id).toBe(1);
+    expect(result[1]?.id).toBe(2);
+  });
+
+  it('prunes oldest releases when exceeding retention', () => {
+    const more: ImageReleaseRecord[] = [
+      ...releases,
+      {
+        id: 3,
+        deployedAt: '2026-02-20T10:10:00.000Z',
+        imageRef: 'nginx:1.28-alpine',
+        imageDigest: 'sha256:newest',
+        containerPort: 80,
+        hostPort: 18080,
+        pullPolicy: 'always',
+      },
+    ];
+    const result = pruneImageReleases(more, 2);
+    expect(result).toHaveLength(2);
+    expect(result[0]?.id).toBe(2);
+    expect(result[1]?.id).toBe(3);
   });
 });

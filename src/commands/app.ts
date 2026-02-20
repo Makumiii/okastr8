@@ -59,6 +59,7 @@ export interface AppConfig {
     registryCredentialId?: string;
     registryServer?: string;
     registryProvider?: "ghcr" | "dockerhub" | "ecr" | "generic";
+    imageReleaseRetention?: number;
 }
 
 // Ensure the app directory structure exists
@@ -561,6 +562,7 @@ export function addAppCommands(program: Command) {
         .option("--registry-credential <id>", "Registry credential id from `okastr8 registry add`")
         .option("--registry-server <server>", "Registry server override (e.g., ghcr.io)")
         .option("--registry-provider <provider>", "Registry provider: ghcr|dockerhub|ecr|generic", "ghcr")
+        .option("--release-retention <count>", "Number of image releases to keep in history", "50")
         .option("--env <vars...>", "Environment variables (KEY=VALUE)")
         .option("--env-file <path>", "Path to .env file")
         .action(async (name: string, imageRef: string, options: any) => {
@@ -569,6 +571,10 @@ export function addAppCommands(program: Command) {
                 const env = await parseEnvFromOptions(options);
                 const pullPolicy = options.pullPolicy === "if-not-present" ? "if-not-present" : "always";
                 const registryServer = options.registryServer || resolveRegistryServer(imageRef);
+                const imageReleaseRetention = parseInt(options.releaseRetention, 10);
+                if (Number.isNaN(imageReleaseRetention) || imageReleaseRetention <= 0) {
+                    throw new Error("--release-retention must be a positive integer");
+                }
 
                 if (Object.keys(env).length > 0) {
                     const { saveEnvVars } = await import('../utils/env-manager');
@@ -590,6 +596,7 @@ export function addAppCommands(program: Command) {
                     registryCredentialId: options.registryCredential,
                     registryServer,
                     registryProvider: options.registryProvider,
+                    imageReleaseRetention,
                     webhookAutoDeploy: false,
                 });
 

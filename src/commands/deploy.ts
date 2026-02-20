@@ -343,8 +343,13 @@ export function addDeployCommands(program: Command) {
         .description("Rollback an app to a previous version")
         .argument("<app>", "Application name")
         .option("-c, --commit <hash>", "Specific commit hash to rollback to")
+        .option("-t, --target <target>", "Image rollback target (release id, image ref, or digest)")
         .action(async (app, options) => {
-            const result = await rollbackApp(app, options.commit);
+            if (options.commit && options.target) {
+                console.error("Use either --commit (git) or --target (image), not both.");
+                process.exit(1);
+            }
+            const result = await rollbackApp(app, options.target || options.commit);
             if (!result.success) {
                 process.exit(1);
             }

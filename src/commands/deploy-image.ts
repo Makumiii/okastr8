@@ -41,6 +41,19 @@ export interface ImageReleaseRecord {
     registryProvider?: "ghcr" | "dockerhub" | "ecr" | "generic";
 }
 
+export function pruneImageReleases(
+    releases: ImageReleaseRecord[],
+    retention?: number
+): ImageReleaseRecord[] {
+    if (!retention || retention <= 0) {
+        return releases;
+    }
+    if (releases.length <= retention) {
+        return releases;
+    }
+    return releases.slice(releases.length - retention);
+}
+
 export function selectImageRollbackTarget(
     releases: ImageReleaseRecord[],
     target?: string
@@ -177,6 +190,10 @@ export async function updateAppFromImage(options: ImageDeployOptions): Promise<{
             registryProvider: metadata.registryProvider || current.registryProvider,
         };
 
+        const retention = Number(current.imageReleaseRetention || metadata.imageReleaseRetention || 50);
+        const allReleases = [...releases, releaseRecord];
+        const prunedReleases = pruneImageReleases(allReleases, retention);
+
         current.deployStrategy = "image";
         current.imageRef = metadata.imageRef;
         current.imageDigest = imageDigest;
@@ -185,8 +202,9 @@ export async function updateAppFromImage(options: ImageDeployOptions): Promise<{
         current.registryServer = registryServer;
         current.registryProvider = metadata.registryProvider || current.registryProvider;
         current.containerPort = containerPort;
+        current.imageReleaseRetention = retention;
         current.lastDeployedAt = new Date().toISOString();
-        current.imageReleases = [...releases, releaseRecord];
+        current.imageReleases = prunedReleases;
         current.currentImageReleaseId = releaseRecord.id;
         await writeFile(metadataPath, JSON.stringify(current, null, 2));
 
