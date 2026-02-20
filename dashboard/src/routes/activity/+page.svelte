@@ -38,6 +38,8 @@
     let logContent: string | null = null;
     let isLoadingLog = false;
     let interval: any;
+    let activityAbort: AbortController | null = null;
+    let activityRequestId = 0;
 
     onMount(() => {
         loadActivity();
@@ -46,6 +48,7 @@
 
     onDestroy(() => {
         if (interval) clearInterval(interval);
+        if (activityAbort) activityAbort.abort();
     });
 
     async function loadActivity() {
@@ -54,22 +57,42 @@
                 ? `/activity/list?limit=100&date=${selectedDate}`
                 : `/activity/list?limit=100&type=${filter}&date=${selectedDate}`;
 
-        const res = await get<ActivityEntry[]>(url);
-        if (res.success && res.data) {
-            activities = res.data;
+        const requestId = ++activityRequestId;
+        if (activityAbort) activityAbort.abort();
+        const controller = new AbortController();
+        activityAbort = controller;
+
+        try {
+            const res = await get<ActivityEntry[]>(url, {
+                signal: controller.signal,
+            });
+            if (requestId !== activityRequestId) return;
+            if (res.success && res.data) {
+                activities = res.data;
+            }
+        } catch (err) {
+            if (err instanceof DOMException && err.name === "AbortError") {
+                return;
+            }
+            console.error("Failed to load activity:", err);
+        } finally {
+            if (requestId === activityRequestId) {
+                isLoading = false;
+            }
         }
-        isLoading = false;
     }
 
     function setFilter(f: ActivityType | "all") {
         filter = f;
         isLoading = true;
+        activities = [];
         loadActivity();
     }
 
     function setDate(date: string) {
         selectedDate = date;
         isLoading = true;
+        activities = [];
         loadActivity();
     }
 

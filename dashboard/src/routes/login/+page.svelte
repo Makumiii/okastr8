@@ -2,6 +2,8 @@
     import { Button } from "$lib/components/ui";
     import { Card } from "$lib/components/ui";
     import { onMount } from "svelte";
+    import Okastr8Logo from "$lib/components/Okastr8Logo.svelte";
+    import { Github } from "lucide-svelte";
 
     let isLoading = $state(false);
     let error = $state("");
@@ -40,11 +42,7 @@
         <div class="flex flex-col items-center gap-6">
             <!-- Logo -->
             <div class="flex items-center gap-3">
-                <img
-                    src="/logo.jpg"
-                    alt="Okastr8"
-                    class="h-16 w-auto rounded-xl"
-                />
+                <Okastr8Logo className="text-2xl" />
             </div>
 
             <div class="w-full space-y-4">
@@ -55,6 +53,7 @@
                         ></div>
                         Redirecting...
                     {:else}
+                        <Github size={16} />
                         Sign in with GitHub
                     {/if}
                 </Button>

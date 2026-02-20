@@ -3,6 +3,7 @@
     import { cn } from "$lib/utils";
     import { LogOut } from "lucide-svelte";
     import { navItems } from "$lib/nav";
+    import Okastr8Logo from "$lib/components/Okastr8Logo.svelte";
 
     let { isMobileOpen = false, isCollapsed = false } = $props<{
         isMobileOpen?: boolean;
@@ -30,17 +31,10 @@
                 isCollapsed ? "justify-center px-3" : "px-6",
             )}
         >
-            <img src="/logo.jpg" alt="Okastr8" class="h-10 w-auto rounded-lg" />
-            {#if !isCollapsed}
-                <div class="leading-tight">
-                    <div class="text-sm font-semibold text-[var(--text-primary)]">
-                        Okastr8
-                    </div>
-                    <div class="text-xs text-[var(--text-muted)]">
-                        Control Center
-                    </div>
-                </div>
-            {/if}
+            <Okastr8Logo
+                compact={isCollapsed}
+                className={isCollapsed ? "text-base" : "text-lg"}
+            />
         </div>
 
         <!-- Navigation -->
