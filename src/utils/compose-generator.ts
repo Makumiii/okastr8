@@ -20,19 +20,13 @@ export function generateCompose(
         app: {
             build: {
                 context: ".",
-                dockerfile: "Dockerfile.generated"
+                dockerfile: "Dockerfile.generated",
             },
             container_name: appName,
             ports: [`${config.port}:${config.port}`],
             restart: "unless-stopped",
             healthcheck: {
-                test: [
-                    "CMD",
-                    "wget",
-                    "--spider",
-                    "-q",
-                    `http://127.0.0.1:${config.port}/`,
-                ],
+                test: ["CMD", "wget", "--spider", "-q", `http://127.0.0.1:${config.port}/`],
                 interval: "10s",
                 timeout: "5s",
                 retries: 3,
@@ -298,7 +292,11 @@ function toYAML(obj: any, indent = 0): string {
         } else if (typeof value === "string") {
             // Quote strings if they contain special characters or look like numbers
             const looksLikeNumber = /^[\d.]+$/.test(value);
-            const needsQuotes = value.includes(":") || value.includes("#") || value.startsWith("$") || looksLikeNumber;
+            const needsQuotes =
+                value.includes(":") ||
+                value.includes("#") ||
+                value.startsWith("$") ||
+                looksLikeNumber;
             yaml += `${spaces}${key}: ${needsQuotes ? `"${value}"` : value}\n`;
         } else {
             yaml += `${spaces}${key}: ${value}\n`;

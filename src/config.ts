@@ -1,8 +1,8 @@
-import { join } from 'path';
-import { homedir } from 'os';
-import { readFile, writeFile, mkdir } from 'fs/promises';
-import { load, dump } from 'js-yaml';
-import { existsSync } from 'fs';
+import { join } from "path";
+import { homedir } from "os";
+import { readFile, writeFile, mkdir } from "fs/promises";
+import { load, dump } from "js-yaml";
+import { existsSync } from "fs";
 
 // Handle sudo: use original user's home directory, not /root
 function getHomeDir(): string {
@@ -13,11 +13,11 @@ function getHomeDir(): string {
     return homedir();
 }
 
-export const OKASTR8_HOME = join(getHomeDir(), '.okastr8');
-export const CONFIG_FILE = join(OKASTR8_HOME, 'system.yaml');
+export const OKASTR8_HOME = join(getHomeDir(), ".okastr8");
+export const CONFIG_FILE = join(OKASTR8_HOME, "system.yaml");
 
 // Types for the Unified Config
-export type RuntimeName = 'node' | 'python' | 'go' | 'bun' | 'deno';
+export type RuntimeName = "node" | "python" | "go" | "bun" | "deno";
 
 export interface RuntimeInfo {
     installed: boolean;
@@ -79,23 +79,35 @@ export interface SystemConfig {
             system?: {
                 enabled?: boolean;
                 interval?: string; // e.g. "5m"
-                rules?: Record<string, {
-                    threshold: number;
-                    duration?: string; // e.g. "5m"
-                }>;
+                rules?: Record<
+                    string,
+                    {
+                        threshold: number;
+                        duration?: string; // e.g. "5m"
+                    }
+                >;
             };
 
             apps?: {
                 enabled?: boolean;
                 interval?: string;
-                defaults?: Record<string, {
-                    threshold: number;
-                    duration?: string;
-                }>;
-                overrides?: Record<string, Record<string, {
-                    threshold: number;
-                    duration?: string;
-                }>>;
+                defaults?: Record<
+                    string,
+                    {
+                        threshold: number;
+                        duration?: string;
+                    }
+                >;
+                overrides?: Record<
+                    string,
+                    Record<
+                        string,
+                        {
+                            threshold: number;
+                            duration?: string;
+                        }
+                    >
+                >;
             };
 
             // Legacy (keep for backward compat until migration complete)
@@ -127,11 +139,11 @@ export async function loadSystemConfig(): Promise<SystemConfig> {
             configCache = {};
             return configCache;
         }
-        const content = await readFile(CONFIG_FILE, 'utf-8');
+        const content = await readFile(CONFIG_FILE, "utf-8");
         configCache = (load(content) as SystemConfig) || {};
         return configCache;
     } catch (error) {
-        console.error('Failed to load system.yaml:', error);
+        console.error("Failed to load system.yaml:", error);
         return {};
     }
 }
@@ -177,5 +189,5 @@ export async function saveSystemConfig(newConfig: Partial<SystemConfig>): Promis
     configCache = updatedConfig;
 
     const yamlContent = dump(updatedConfig, { indent: 2 });
-    await writeFile(CONFIG_FILE, yamlContent, 'utf-8');
+    await writeFile(CONFIG_FILE, yamlContent, "utf-8");
 }

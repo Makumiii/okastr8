@@ -14,34 +14,34 @@ function normalizeStartCommandForDocker(startCommand: string): string {
 
     // Vite: needs --host flag
     // Matches: vite, vite dev, vite serve, npx vite, npm run dev (when it's vite)
-    if (/\bvite\b/.test(cmd) && !cmd.includes('--host')) {
-        return cmd + ' --host';
+    if (/\bvite\b/.test(cmd) && !cmd.includes("--host")) {
+        return cmd + " --host";
     }
 
     // Next.js dev: needs -H 0.0.0.0
     // Matches: next dev, npx next dev
-    if (/\bnext\s+dev\b/.test(cmd) && !cmd.includes('-H ') && !cmd.includes('--hostname')) {
-        return cmd + ' -H 0.0.0.0';
+    if (/\bnext\s+dev\b/.test(cmd) && !cmd.includes("-H ") && !cmd.includes("--hostname")) {
+        return cmd + " -H 0.0.0.0";
     }
 
     // Webpack Dev Server: needs --host 0.0.0.0
-    if (/\bwebpack\s+serve\b/.test(cmd) && !cmd.includes('--host')) {
-        return cmd + ' --host 0.0.0.0';
+    if (/\bwebpack\s+serve\b/.test(cmd) && !cmd.includes("--host")) {
+        return cmd + " --host 0.0.0.0";
     }
 
     // Angular CLI (ng serve): needs --host 0.0.0.0
-    if (/\bng\s+serve\b/.test(cmd) && !cmd.includes('--host')) {
-        return cmd + ' --host 0.0.0.0';
+    if (/\bng\s+serve\b/.test(cmd) && !cmd.includes("--host")) {
+        return cmd + " --host 0.0.0.0";
     }
 
     // Nuxt dev: needs --host
-    if (/\bnuxt\s+dev\b/.test(cmd) && !cmd.includes('--host') && !cmd.includes('-H')) {
-        return cmd + ' --host';
+    if (/\bnuxt\s+dev\b/.test(cmd) && !cmd.includes("--host") && !cmd.includes("-H")) {
+        return cmd + " --host";
     }
 
     // Astro dev: needs --host
-    if (/\bastro\s+dev\b/.test(cmd) && !cmd.includes('--host')) {
-        return cmd + ' --host';
+    if (/\bastro\s+dev\b/.test(cmd) && !cmd.includes("--host")) {
+        return cmd + " --host";
     }
 
     // SvelteKit dev (vite-based, already covered by vite check above)
@@ -53,11 +53,11 @@ function normalizeStartCommandForDocker(startCommand: string): string {
  * Default versions for each runtime (LTS or stable)
  */
 const DEFAULT_VERSIONS: Record<string, string> = {
-    node: '22',      // Current LTS
-    python: '3.12',  // Latest stable
-    go: '1.22',      // Latest stable  
-    bun: '1',        // Latest 1.x
-    deno: '2',       // Latest stable
+    node: "22", // Current LTS
+    python: "3.12", // Latest stable
+    go: "1.22", // Latest stable
+    bun: "1", // Latest 1.x
+    deno: "2", // Latest stable
 };
 
 /**
@@ -65,8 +65,8 @@ const DEFAULT_VERSIONS: Record<string, string> = {
  * Returns { runtime, version }
  */
 function parseRuntime(runtimeSpec: string): { runtime: string; version: string } {
-    const [runtime = 'node', version] = runtimeSpec.toLowerCase().split(':');
-    const defaultVersion = DEFAULT_VERSIONS[runtime] || 'latest';
+    const [runtime = "node", version] = runtimeSpec.toLowerCase().split(":");
+    const defaultVersion = DEFAULT_VERSIONS[runtime] || "latest";
     return {
         runtime,
         version: version || defaultVersion,
@@ -77,22 +77,24 @@ function parseRuntime(runtimeSpec: string): { runtime: string; version: string }
  * Generate a Dockerfile based on the deployment config
  */
 export function generateDockerfile(config: DeployConfig): string {
-    const runtimeSpec = config.runtime || 'node';
+    const runtimeSpec = config.runtime || "node";
     const { runtime, version } = parseRuntime(runtimeSpec);
 
     switch (runtime) {
-        case 'node':
+        case "node":
             return generateNodeDockerfile(config, version);
-        case 'python':
+        case "python":
             return generatePythonDockerfile(config, version);
-        case 'go':
+        case "go":
             return generateGoDockerfile(config, version);
-        case 'bun':
+        case "bun":
             return generateBunDockerfile(config, version);
-        case 'deno':
+        case "deno":
             return generateDenoDockerfile(config, version);
         default:
-            throw new Error(`Unsupported runtime: ${runtime}. Supported: node, python, go, bun, deno`);
+            throw new Error(
+                `Unsupported runtime: ${runtime}. Supported: node, python, go, bun, deno`
+            );
     }
 }
 
@@ -113,7 +115,7 @@ RUN npm ci --production
 COPY . .
 
 # Run build steps if any
-${config.buildSteps.length > 0 ? `RUN ${config.buildSteps.join(' && ')}` : '# No build steps'}
+${config.buildSteps.length > 0 ? `RUN ${config.buildSteps.join(" && ")}` : "# No build steps"}
 
 # Expose port
 EXPOSE ${config.port}
@@ -123,7 +125,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
   CMD wget --spider -q http://127.0.0.1:${config.port}/ || exit 1
 
 # Start application
-CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(' '))}
+CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(" "))}
 `;
 }
 
@@ -144,7 +146,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Run build steps if any
-${config.buildSteps.length > 0 ? `RUN ${config.buildSteps.join(' && ')}` : '# No build steps'}
+${config.buildSteps.length > 0 ? `RUN ${config.buildSteps.join(" && ")}` : "# No build steps"}
 
 # Expose port
 EXPOSE ${config.port}
@@ -154,7 +156,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
   CMD curl -f http://127.0.0.1:${config.port}/ || exit 1
 
 # Start application
-CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(' '))}
+CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(" "))}
 `;
 }
 
@@ -219,7 +221,7 @@ RUN bun install --production
 COPY . .
 
 # Run build steps if any
-${config.buildSteps.length > 0 ? `RUN ${config.buildSteps.join(' && ')}` : '# No build steps'}
+${config.buildSteps.length > 0 ? `RUN ${config.buildSteps.join(" && ")}` : "# No build steps"}
 
 # Expose port
 EXPOSE ${config.port}
@@ -229,7 +231,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
   CMD wget --spider -q http://127.0.0.1:${config.port}/ || exit 1
 
 # Start application
-CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(' '))}
+CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(" "))}
 `;
 }
 
@@ -240,7 +242,7 @@ function generateDenoDockerfile(config: DeployConfig, version: string): string {
     // Deno images often use denoland/deno:alpine or specific versions like denoland/deno:1.40.0
     // If version is 'alpine', we pass it through, otherwise we might want denoland/deno:version
     // Since default is '2', we probably want denoland/deno:2
-    // But existing code used denoland/deno:alpine. 
+    // But existing code used denoland/deno:alpine.
     // Let's assume user passes 'alpine' or a version number.
     // If version is numeric (e.g. "2"), we append it.
     // However, denoland/deno image tags are usually just the version (e.g. 1.39.0) or 'alpine'.
@@ -266,6 +268,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \\
   CMD wget --spider -q http://127.0.0.1:${config.port}/ || exit 1
 
 # Start application
-CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(' '))}
+CMD ${JSON.stringify(normalizeStartCommandForDocker(config.startCommand).split(" "))}
 `;
 }

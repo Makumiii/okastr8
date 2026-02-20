@@ -4,7 +4,7 @@
  * Usage: bun scripts/test-branches.ts owner/repo
  */
 
-import { getGitHubConfig, listBranches } from '../src/commands/github';
+import { getGitHubConfig, listBranches } from "../src/commands/github";
 
 const GITHUB_API = "https://api.github.com";
 
@@ -31,7 +31,7 @@ async function main() {
         console.log("\n--- Using listBranches function ---");
         const branches = await listBranches(config.accessToken, repoFullName);
         console.log(`Found ${branches.length} branches:`);
-        branches.forEach(b => console.log(`  - ${b}`));
+        branches.forEach((b) => console.log(`  - ${b}`));
     } catch (error) {
         console.error("Error from listBranches:", error);
     }
@@ -53,7 +53,7 @@ async function main() {
         const error = await response.text();
         console.error("Error:", error);
     } else {
-        const data = await response.json() as any[];
+        const data = (await response.json()) as any[];
         console.log(`Found ${data.length} branches via direct API:`);
         data.forEach((b: any) => console.log(`  - ${b.name}`));
     }

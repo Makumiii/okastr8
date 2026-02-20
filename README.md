@@ -26,10 +26,12 @@ Okastr8 (pronounced "orchestrate") is a self-hosted Platform-as-a-Service that b
 ## 📦 Installation (For Users)
 
 ### Requirements
+
 - A fresh or existing Linux server (Debian/Ubuntu recommended).
 - Root or sudo access.
 
 ### Quick Install
+
 Run the following command to install Okastr8. This script will install the Bun runtime, set up the necessary services, and configure your environment.
 
 ```bash
@@ -37,6 +39,7 @@ curl -fsSL https://raw.githubusercontent.com/Makumiii/okastr8/main/scripts/bash/
 ```
 
 **What this does:**
+
 1.  Installs **Bun** (if not already present).
 2.  Clones the repository to `~/okastr8`.
 3.  Installs dependencies.
@@ -44,6 +47,7 @@ curl -fsSL https://raw.githubusercontent.com/Makumiii/okastr8/main/scripts/bash/
 5.  Sets up the `okastr8` global CLI command.
 
 ### Post-Install Setup
+
 After installation, you can verify everything is running:
 
 ```bash
@@ -65,6 +69,7 @@ To access your dashboard remotely and enable GitHub auto-deployments (webhooks),
 👉 **[Read the Full Tunnel Setup Guide](./TUNNEL_SETUP.md)**
 
 **Quick Summary:**
+
 1.  **Get a Token**: Create a text tunnel in the Cloudflare Dashboard and copy the token.
 2.  **Setup Tunnel**: Run `okastr8 tunnel setup <your-token-here>`.
 3.  **Note your URL**: e.g., `https://okastr8.yourdomain.com`.
@@ -76,6 +81,7 @@ To access your dashboard remotely and enable GitHub auto-deployments (webhooks),
 Before connecting GitHub or expecting webhooks to work, you must manually configure a few secrets in `~/.okastr8/system.yaml`.
 
 Run:
+
 ```bash
 nano ~/.okastr8/system.yaml
 ```
@@ -84,14 +90,14 @@ Ensure it looks like this (fill in your real values):
 
 ```yaml
 manager:
-  github:
-    # Get these from GitHub -> Settings -> Developer Settings -> OAuth Apps
-    client_id: "YOUR_GITHUB_CLIENT_ID"
-    client_secret: "YOUR_GITHUB_CLIENT_SECRET"
+    github:
+        # Get these from GitHub -> Settings -> Developer Settings -> OAuth Apps
+        client_id: "YOUR_GITHUB_CLIENT_ID"
+        client_secret: "YOUR_GITHUB_CLIENT_SECRET"
 
 tunnel:
-  # The URL you configured in Cloudflare (must start with https://)
-  url: "https://okastr8.yourdomain.com"
+    # The URL you configured in Cloudflare (must start with https://)
+    url: "https://okastr8.yourdomain.com"
 ```
 
 > **Why is this manual?** For security and simplicity, we don't ask for these sensitive values during the auto-install. You have full control.
@@ -103,18 +109,22 @@ tunnel:
 Once your Tunnel is up and `system.yaml` is configured:
 
 ### Step 1: Create GitHub OAuth App
+
 1.  **Homepage URL**: Use your tunnel URL (e.g., `https://okastr8.yourdomain.com`).
 2.  **Callback URL**: Append `/api/github/callback` (e.g., `https://okastr8.yourdomain.com/api/github/callback`).
 
 ### Step 2: Connect
+
 Run the connection command on your server:
 
 ```bash
 okastr8 github connect
 ```
+
 This will generate a link to authenticate. Since you are on a headless server, open the link in your local browser. Once approved, the server automatically receives the token and binds the GitHub account as the dashboard admin.
 
 ### Step 3: Webhooks
+
 With the tunnel URL configured in `system.yaml`, Okastr8 automatically registers the correct webhook URL (`https://.../api/github/webhook`) when you import repositories.
 
 ---
@@ -122,20 +132,25 @@ With the tunnel URL configured in `system.yaml`, Okastr8 automatically registers
 ## 🛠️ Usage
 
 ### 1. Authenticate
+
 Sign in to the dashboard with GitHub OAuth (admin account bound during `okastr8 github connect`).
 
 ### 2. Connect GitHub
+
 Enable seamless deployments by connecting your GitHub account:
 
 ```bash
 okastr8 github connect
 ```
+
 Follow the OAuth flow to grant access to your repositories.
 
 ### 3. Deploy an App
+
 You can deploy apps directly from your GitHub repositories via the Dashboard or CLI.
 
 **Via CLI:**
+
 ```bash
 # Interactive repo selection
 okastr8 github repos
@@ -145,6 +160,7 @@ okastr8 deploy trigger my-awesome-app
 ```
 
 **Via Dashboard:**
+
 1.  Go to **Apps**.
 2.  Click **Import from GitHub**.
 3.  Select your repository and configure the port/domain.
@@ -158,8 +174,8 @@ To tell Okastr8 how to build and run your app (if not using Docker), add an `oka
 start: "npm start"
 port: 3000
 build:
-  - "npm install"
-  - "npm run build"
+    - "npm install"
+    - "npm run build"
 ```
 
 👉 **[See the Full Configuration Guide](./OKASTR8_YAML.md)** for all available options.
@@ -173,10 +189,12 @@ We welcome contributions! Okastr8 is built with **TypeScript**, **Bun**, **Hono*
 **Note for Contributors**: Do not run the `install.sh` script on your development machine if you intend to modify the code. That script is for end-users and installs to a specific system path. Instead, follow the manual setup steps below.
 
 ### 1. Prerequisite
+
 - [Bun Runtime](https://bun.sh) (latest)
 - Git
 
 ### 2. Clone & Install Dependencies
+
 ```bash
 # Clone the repository
 git clone https://github.com/Makumiii/okastr8.git
@@ -192,15 +210,18 @@ cd ..
 ```
 
 ### 3. Setup Config & Permissions
+
 Okastr8 relies on running certain system commands (like systemd, docker, or caddy) without password prompts. We include a helper to configure this for you safely (it creates a file in `/etc/sudoers.d/`).
 
 ```bash
 # Run the sudoers setup (required for fully functional CLI testing)
 sudo bun run src/main.ts setup sudoers
 ```
-*You only need to run this once.*
+
+_You only need to run this once._
 
 ### 4. Build the Dashboard
+
 The manager server serves the static UI files from the `public/` directory. You must build the dashboard first:
 
 ```bash
@@ -212,12 +233,15 @@ ls -d public
 ```
 
 ### 5. Running Locally
+
 You can now run the services directly from your source code.
 
 **Start the Manager Server (API + UI):**
+
 ```bash
 bun run src/managerServer.ts
 ```
+
 The server will start at `http://localhost:41788`.
 
 **Run CLI Commands:**
@@ -230,6 +254,7 @@ bun run src/main.ts deploy trigger my-test-app
 ```
 
 ### 6. Development Workflow
+
 - **Frontend Changes**: Edit files in `dashboard/src`. Run `npm run build` in `dashboard/` to update the static output, or run `npm run dev` in `dashboard/` for a separate HMR dev server (note: api calls might need proxy configuration if running separately).
 - **Backend/CLI Changes**: Edit files in `src/`. Bun runs TypeScript natively, so no build step is needed for testing backend logic.
 

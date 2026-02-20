@@ -2,125 +2,125 @@
 # Manages infrastructure setup, authentication, and external access.
 
 setup:
-  # Installer / Bootstrap settings
-  user:
-    username: deploy
-    # Password set during install or manually
-    distro: debian
-  ssh:
-    port: 2222
-  firewall:
-    allowed_ports: [80, 443, 2222]
+    # Installer / Bootstrap settings
+    user:
+        username: deploy
+        # Password set during install or manually
+        distro: debian
+    ssh:
+        port: 2222
+    firewall:
+        allowed_ports: [80, 443, 2222]
 
 manager:
-  # Runtime settings
-  port: 41788
-  api_key: "your-generated-secret-key"
-  
-  github:
-    # <--- MANUAL CONFIG REQUIRED: Create OAuth App in GitHub Developer Settings
-    client_id: "ENTER_YOUR_CLIENT_ID_HERE"         # e.g., Ov23...
-    client_secret: "ENTER_YOUR_CLIENT_SECRET_HERE" # e.g., a623...
-    access_token: ""
-    username: ""
+    # Runtime settings
+    port: 41788
+    api_key: "your-generated-secret-key"
+
+    github:
+        # <--- MANUAL CONFIG REQUIRED: Create OAuth App in GitHub Developer Settings
+        client_id: "ENTER_YOUR_CLIENT_ID_HERE" # e.g., Ov23...
+        client_secret: "ENTER_YOUR_CLIENT_SECRET_HERE" # e.g., a623...
+        access_token: ""
+        username: ""
 
 tunnel:
-  # Internal settings (Managed by 'okastr8 tunnel setup')
-  enabled: false
-  service: manager
-  port: 41788
-  auth_token: ""  # Filled by 'okastr8 tunnel setup'
+    # Internal settings (Managed by 'okastr8 tunnel setup')
+    enabled: false
+    service: manager
+    port: 41788
+    auth_token: "" # Filled by 'okastr8 tunnel setup'
 
-  # <--- MANUAL CONFIG REQUIRED: The public URL of your tunnel
-  url: "https://ENTER_YOUR_PUBLIC_TUNNEL_URL_HERE" # e.g. https://okastr8.yourdomain.com
+    # <--- MANUAL CONFIG REQUIRED: The public URL of your tunnel
+    url: "https://ENTER_YOUR_PUBLIC_TUNNEL_URL_HERE" # e.g. https://okastr8.yourdomain.com
 
 # Email notifications via Brevo
 notifications:
-  brevo:
-    # <--- MANUAL CONFIG REQUIRED (Optional)
-    api_key: "ENTER_YOUR_BREVO_API_KEY_HERE"
-    sender_email: "robot@yourdomain.com"
-    sender_name: "okastr8"
-    admin_email: "you@example.com"
-  
-  # What triggers notifications
-  alerts:
-    login_approval: true      # Email when someone requests access
-    deployment_failed: true   # Email on deploy failure
-    deployment_success: false # Email on successful deploy
-    service_down: true        # Email when service goes down
-    
-    # ========== NEW: Advanced System Metrics Alerting ==========
-    system:
-      enabled: true
-      interval: 5m            # Check interval
-      rules:
-        cpu_usage:
-          threshold: 90       # Alert if CPU > 90%
-          duration: 5m        # for 5 minutes
-        ram_usage:
-          threshold: 90
-          duration: 5m
-        swap_usage:
-          threshold: 20
-          duration: 5m
-        disk_usage:
-          threshold: 90
-          duration: 5m
-        load_per_core:
-          threshold: 1.5
-          duration: 5m
-    
-    # ========== NEW: Per-App Alerting ==========
-    apps:
-      enabled: true
-      interval: 5m
-      # Defaults apply to all apps
-      defaults:
-        cpu_usage:
-          threshold: 80
-          duration: 5m
-        memory_percent:
-          threshold: 80
-          duration: 5m
-        restart_count:
-          threshold: 3
-          duration: 10m
-        state_not_running:
-          threshold: 1
-          duration: 1m
-        healthcheck_failures:
-          threshold: 2
-          duration: 0m   # Immediate
-      # Override for specific critical apps
-      overrides:
-        "my-critical-api":
-          cpu_usage:
-            threshold: 50
-          memory_percent:
-            threshold: 70
-    
-    # Legacy (still supported for backwards compatibility)
-    resources:
-      enabled: false  # Superseded by 'system' above
-      interval: 5m
-      cpu_threshold: 90
-      ram_threshold: 85
-      disk_threshold: 90
+    brevo:
+        # <--- MANUAL CONFIG REQUIRED (Optional)
+        api_key: "ENTER_YOUR_BREVO_API_KEY_HERE"
+        sender_email: "robot@yourdomain.com"
+        sender_name: "okastr8"
+        admin_email: "you@example.com"
+
+    # What triggers notifications
+    alerts:
+        login_approval: true # Email when someone requests access
+        deployment_failed: true # Email on deploy failure
+        deployment_success: false # Email on successful deploy
+        service_down: true # Email when service goes down
+
+        # ========== NEW: Advanced System Metrics Alerting ==========
+        system:
+            enabled: true
+            interval: 5m # Check interval
+            rules:
+                cpu_usage:
+                    threshold: 90 # Alert if CPU > 90%
+                    duration: 5m # for 5 minutes
+                ram_usage:
+                    threshold: 90
+                    duration: 5m
+                swap_usage:
+                    threshold: 20
+                    duration: 5m
+                disk_usage:
+                    threshold: 90
+                    duration: 5m
+                load_per_core:
+                    threshold: 1.5
+                    duration: 5m
+
+        # ========== NEW: Per-App Alerting ==========
+        apps:
+            enabled: true
+            interval: 5m
+            # Defaults apply to all apps
+            defaults:
+                cpu_usage:
+                    threshold: 80
+                    duration: 5m
+                memory_percent:
+                    threshold: 80
+                    duration: 5m
+                restart_count:
+                    threshold: 3
+                    duration: 10m
+                state_not_running:
+                    threshold: 1
+                    duration: 1m
+                healthcheck_failures:
+                    threshold: 2
+                    duration: 0m # Immediate
+            # Override for specific critical apps
+            overrides:
+                "my-critical-api":
+                    cpu_usage:
+                        threshold: 50
+                    memory_percent:
+                        threshold: 70
+
+        # Legacy (still supported for backwards compatibility)
+        resources:
+            enabled: false # Superseded by 'system' above
+            interval: 5m
+            cpu_threshold: 90
+            ram_threshold: 85
+            disk_threshold: 90
 
 # Runtime environments (auto-detected via 'okastr8 env scan')
 environments:
-  node:
-    installed: true
-    version: "20.10.0"
-    path: "/usr/bin/node"
-  python:
-    installed: false
-  go:
-    installed: false
-  bun:
-    installed: true
-    version: "1.2.17"
-    path: "/usr/local/bin/bun"
-  deno:
-    installed: false
+    node:
+        installed: true
+        version: "20.10.0"
+        path: "/usr/bin/node"
+    python:
+        installed: false
+    go:
+        installed: false
+    bun:
+        installed: true
+        version: "1.2.17"
+        path: "/usr/local/bin/bun"
+    deno:
+        installed: false

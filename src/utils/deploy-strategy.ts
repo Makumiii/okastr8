@@ -14,4 +14,3 @@ export function resolveDeployStrategy(source: StrategySource): DeployStrategy {
     // Current apps are git-based unless explicitly marked otherwise.
     return "git";
 }
-

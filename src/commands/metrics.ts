@@ -3,9 +3,9 @@
  * Coordinates System and App metrics collection
  */
 
-import { getDetailedSystemMetrics, type SystemMetrics } from '../utils/systemMetrics';
-import { getAppMetrics, type AppMetrics } from '../utils/appMetrics';
-import { runCommand } from '../utils/command';
+import { getDetailedSystemMetrics, type SystemMetrics } from "../utils/systemMetrics";
+import { getAppMetrics, type AppMetrics } from "../utils/appMetrics";
+import { runCommand } from "../utils/command";
 
 // Interfaces match the new granular structure
 export interface MetricsResult {
@@ -22,7 +22,10 @@ interface RateState {
     errors5xx?: number;
 }
 let requestRates: Record<string, RateState> = {};
-let diskUsageCache: { data: Record<string, number>; timestamp: number } = { data: {}, timestamp: 0 };
+let diskUsageCache: { data: Record<string, number>; timestamp: number } = {
+    data: {},
+    timestamp: 0,
+};
 const DISK_CACHE_TTL = 60000; // 60s
 
 // Caddy Traffic Interface
@@ -45,7 +48,7 @@ export async function collectMetrics(): Promise<MetricsResult> {
         getDetailedSystemMetrics(),
         getCaddyMetrics(),
         getContainerDiskUsage(),
-        getAppList()
+        getAppList(),
     ]);
 
     // 2. Build App Metrics
@@ -75,13 +78,30 @@ export async function collectMetrics(): Promise<MetricsResult> {
             if (prev && now > prev.timestamp) {
                 const timeDelta = (now - prev.timestamp) / 1000;
                 if (timeDelta > 0) {
-                    metrics.traffic.requestsPerSec = Math.max(0, parseFloat(((currentTotal - prev.count) / timeDelta).toFixed(2)));
+                    metrics.traffic.requestsPerSec = Math.max(
+                        0,
+                        parseFloat(((currentTotal - prev.count) / timeDelta).toFixed(2))
+                    );
 
                     // Error Rates % = (delta_errors / delta_total) * 100
                     const totalDelta = currentTotal - prev.count;
                     if (totalDelta > 0) {
-                        metrics.traffic.errorRate4xx = Math.min(100, parseFloat(((errors4xx - (prev.errors4xx || 0)) / totalDelta * 100).toFixed(1)));
-                        metrics.traffic.errorRate5xx = Math.min(100, parseFloat(((errors5xx - (prev.errors5xx || 0)) / totalDelta * 100).toFixed(1)));
+                        metrics.traffic.errorRate4xx = Math.min(
+                            100,
+                            parseFloat(
+                                (((errors4xx - (prev.errors4xx || 0)) / totalDelta) * 100).toFixed(
+                                    1
+                                )
+                            )
+                        );
+                        metrics.traffic.errorRate5xx = Math.min(
+                            100,
+                            parseFloat(
+                                (((errors5xx - (prev.errors5xx || 0)) / totalDelta) * 100).toFixed(
+                                    1
+                                )
+                            )
+                        );
                     } else {
                         metrics.traffic.errorRate4xx = 0;
                         metrics.traffic.errorRate5xx = 0;
@@ -98,7 +118,7 @@ export async function collectMetrics(): Promise<MetricsResult> {
                 count: currentTotal,
                 timestamp: now,
                 errors4xx,
-                errors5xx
+                errors5xx,
             };
 
             // Latency (Approximated from Caddy metrics if available)
@@ -116,21 +136,21 @@ export async function collectMetrics(): Promise<MetricsResult> {
     return {
         system,
         apps: appMetrics,
-        timestamp
+        timestamp,
     };
 }
 
 /**
  * Get list of apps (name + domain)
  */
-async function getAppList(): Promise<{ name: string, domain?: string }[]> {
+async function getAppList(): Promise<{ name: string; domain?: string }[]> {
     try {
-        const { listApps } = await import('./app');
+        const { listApps } = await import("./app");
         const result = await listApps();
         if (result.success && Array.isArray(result.apps)) {
             return result.apps.map((a: any) => ({ name: a.name, domain: a.domain }));
         }
-    } catch { }
+    } catch {}
     return [];
 }
 
@@ -142,13 +162,15 @@ async function getCaddyMetrics(): Promise<TrafficMetrics> {
         totalRequests: 0,
         byDomain: {},
         errors4xxByDomain: {},
-        errors5xxByDomain: {}
+        errors5xxByDomain: {},
     };
 
     try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2000);
-        const response = await fetch('http://localhost:2019/metrics', { signal: controller.signal });
+        const response = await fetch("http://localhost:2019/metrics", {
+            signal: controller.signal,
+        });
         clearTimeout(timeoutId);
 
         if (!response.ok) return result;
@@ -158,7 +180,7 @@ async function getCaddyMetrics(): Promise<TrafficMetrics> {
         // caddy_http_requests_total{handler="reverse_proxy",server="srv0",service="srv0",host="example.com"} 100
         // caddy_http_response_status_count_total{code="200",handler="reverse_proxy",...host="example.com"} 95
 
-        // This is getting complex to parse via regex. 
+        // This is getting complex to parse via regex.
         // Simplified approach: just extract hosts and totals.
 
         // Match regexes
@@ -166,8 +188,8 @@ async function getCaddyMetrics(): Promise<TrafficMetrics> {
         const codeRegex = /code="([^"]+)"/;
         const valMatchRegex = /\}\s+([\d.e+-]+)/;
 
-        for (const line of text.split('\n')) {
-            if (line.startsWith('#') || !line.trim()) continue;
+        for (const line of text.split("\n")) {
+            if (line.startsWith("#") || !line.trim()) continue;
 
             const hostMatch = line.match(hostRegex);
             const valMatch = line.match(valMatchRegex);
@@ -180,26 +202,27 @@ async function getCaddyMetrics(): Promise<TrafficMetrics> {
             const val = parseFloat(valStr);
 
             // 1. Total Requests
-            if (line.startsWith('caddy_http_requests_total')) {
+            if (line.startsWith("caddy_http_requests_total")) {
                 result.byDomain[host] = (result.byDomain[host] || 0) + val;
                 result.totalRequests += val;
             }
 
             // 2. Response Status Codes (for error rates)
-            if (line.startsWith('caddy_http_response_status_count_total')) {
+            if (line.startsWith("caddy_http_response_status_count_total")) {
                 const codeMatch = line.match(codeRegex);
                 const code = codeMatch ? codeMatch[1] : undefined;
                 if (code) {
-                    if (code.startsWith('4')) {
-                        result.errors4xxByDomain[host] = (result.errors4xxByDomain[host] || 0) + val;
-                    } else if (code.startsWith('5')) {
-                        result.errors5xxByDomain[host] = (result.errors5xxByDomain[host] || 0) + val;
+                    if (code.startsWith("4")) {
+                        result.errors4xxByDomain[host] =
+                            (result.errors4xxByDomain[host] || 0) + val;
+                    } else if (code.startsWith("5")) {
+                        result.errors5xxByDomain[host] =
+                            (result.errors5xxByDomain[host] || 0) + val;
                     }
                 }
             }
         }
-
-    } catch { }
+    } catch {}
 
     return result;
 }
@@ -213,17 +236,24 @@ async function getContainerDiskUsage(): Promise<Record<string, number>> {
 
     const result: Record<string, number> = {};
     try {
-        const dfResult = await runCommand('sudo', ['docker', 'system', 'df', '-v']);
+        const dfResult = await runCommand("sudo", ["docker", "system", "df", "-v"]);
         if (dfResult.exitCode === 0 && dfResult.stdout) {
             // ... (Re-use previous parsing logic) ...
             // Simplified for brevity in this tool call, assume standard parsing
-            const lines = dfResult.stdout.split('\n');
+            const lines = dfResult.stdout.split("\n");
             let inContainers = false;
             for (const line of lines) {
-                if (line.includes('Containers space usage:')) { inContainers = true; continue; }
-                if (inContainers && (line.includes('Local Volumes') || line.includes('Build cache'))) break;
+                if (line.includes("Containers space usage:")) {
+                    inContainers = true;
+                    continue;
+                }
+                if (
+                    inContainers &&
+                    (line.includes("Local Volumes") || line.includes("Build cache"))
+                )
+                    break;
 
-                if (inContainers && line.trim() && !line.startsWith('CONTAINER')) {
+                if (inContainers && line.trim() && !line.startsWith("CONTAINER")) {
                     const parts = line.split(/\s{2,}/);
                     if (parts.length >= 6) {
                         const sizePart = parts[4];
@@ -238,7 +268,7 @@ async function getContainerDiskUsage(): Promise<Record<string, number>> {
                 }
             }
         }
-    } catch { }
+    } catch {}
 
     diskUsageCache = { data: result, timestamp: now };
     return result;
@@ -249,8 +279,8 @@ function parseSizeToBytes(sizeStr: string): number {
     if (!match || !match[1] || !match[2]) return 0;
     const value = parseFloat(match[1]);
     const unit = match[2].toUpperCase();
-    if (unit.startsWith('G')) return Math.round(value * 1024 * 1024 * 1024);
-    if (unit.startsWith('M')) return Math.round(value * 1024 * 1024);
-    if (unit.startsWith('K')) return Math.round(value * 1024);
+    if (unit.startsWith("G")) return Math.round(value * 1024 * 1024 * 1024);
+    if (unit.startsWith("M")) return Math.round(value * 1024 * 1024);
+    if (unit.startsWith("K")) return Math.round(value * 1024);
     return Math.round(value);
 }

@@ -40,10 +40,7 @@ export async function saveDeployment(
         entry.deploys.push(deployment);
         entry.lastSuccessfulDeploy = deployment;
 
-        await writeFile(
-            pathToDeployment,
-            JSON.stringify(existingDeployments, null, 2)
-        );
+        await writeFile(pathToDeployment, JSON.stringify(existingDeployments, null, 2));
         console.log(`Deployment saved to ${pathToDeployment}`);
     } catch (error) {
         console.error(`Error saving deployment:`, error);
@@ -104,9 +101,7 @@ export default async function autoRollbackDeployment(serviceId: string) {
             console.log(`No deployments found in ${pathToDeployment}`);
             return;
         }
-        const entry = existingDeployments.deployments.find(
-            (d) => d.serviceName === serviceId
-        );
+        const entry = existingDeployments.deployments.find((d) => d.serviceName === serviceId);
         if (!entry) {
             console.log(`No deployment found for service ${serviceId}`);
             return;

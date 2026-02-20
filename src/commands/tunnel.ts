@@ -20,7 +20,7 @@ async function isCloudflaredInstalled() {
 
 export async function installTunnel(token: string) {
     // 1. Install Binary if missing
-    if (!await isCloudflaredInstalled()) {
+    if (!(await isCloudflaredInstalled())) {
         console.log("Installing Cloudflared...");
         const installResult = await runCommand("bash", [SCRIPTS.install]);
         if (installResult.exitCode !== 0) {
@@ -42,8 +42,8 @@ export async function installTunnel(token: string) {
     await saveSystemConfig({
         tunnel: {
             enabled: true,
-            auth_token: token // Start of token usually "ey..."
-        }
+            auth_token: token, // Start of token usually "ey..."
+        },
     });
 
     return { success: true, message: "Tunnel installed and started successfully!" };
@@ -58,15 +58,15 @@ export async function uninstallTunnel() {
     await saveSystemConfig({
         tunnel: {
             enabled: false,
-            auth_token: undefined
-        }
+            auth_token: undefined,
+        },
     });
 
     return { success: true, message: "Tunnel service removed." };
 }
 
 export async function getTunnelStatus() {
-    if (!await isCloudflaredInstalled()) {
+    if (!(await isCloudflaredInstalled())) {
         return { installed: false, running: false };
     }
 
@@ -78,7 +78,7 @@ export async function getTunnelStatus() {
     return {
         installed: true,
         running,
-        configured: !!config.tunnel?.enabled
+        configured: !!config.tunnel?.enabled,
     };
 }
 
@@ -96,7 +96,9 @@ export function addTunnelCommands(program: Command) {
             try {
                 const result = await installTunnel(token);
                 console.log(result.message);
-                console.log("   Your dashboard should now be accessible at your configured domain.");
+                console.log(
+                    "   Your dashboard should now be accessible at your configured domain."
+                );
             } catch (error: any) {
                 console.error("Setup failed:", error.message);
                 process.exit(1);

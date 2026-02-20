@@ -16,11 +16,13 @@ okastr8 --help       # Show all commands
 ## App Management (`okastr8 app`)
 
 ### List all apps
+
 ```bash
 okastr8 app list
 ```
 
 ### Create an app
+
 ```bash
 okastr8 app create <name> <exec_start> [options]
 
@@ -38,6 +40,7 @@ okastr8 app create myapp "bun run start" -p 3000 --domain myapp.example.com
 ```
 
 ### Delete an app
+
 ```bash
 okastr8 app delete <name>
 
@@ -46,6 +49,7 @@ okastr8 app delete myapp
 ```
 
 ### App status
+
 ```bash
 okastr8 app status <name>
 
@@ -54,6 +58,7 @@ okastr8 app status myapp
 ```
 
 ### App logs
+
 ```bash
 okastr8 app logs <name> [options]
 
@@ -65,6 +70,7 @@ okastr8 app logs myapp -n 100
 ```
 
 ### Start/Stop/Restart
+
 ```bash
 okastr8 app start <name>
 okastr8 app stop <name>
@@ -72,6 +78,7 @@ okastr8 app restart <name>
 ```
 
 ### Webhook toggle
+
 ```bash
 okastr8 app webhook <name> [on|off]
 
@@ -86,6 +93,7 @@ okastr8 app webhook myapp off    # Disable auto-deploy
 ## Environment Variables (`okastr8 app env`)
 
 ### Set variables
+
 ```bash
 okastr8 app env set <appName> <key=value...>
 
@@ -94,11 +102,13 @@ okastr8 app env set myapp DATABASE_URL=postgres://... API_KEY=secret123
 ```
 
 ### List variables
+
 ```bash
 okastr8 app env list <appName>
 ```
 
 ### Import from .env file
+
 ```bash
 okastr8 app env import <appName> [options]
 
@@ -110,6 +120,7 @@ okastr8 app env import myapp -f .env.production
 ```
 
 ### Export to file
+
 ```bash
 okastr8 app env export <appName> [options]
 
@@ -121,6 +132,7 @@ okastr8 app env export myapp -o backup.env
 ```
 
 ### Unset variable
+
 ```bash
 okastr8 app env unset <appName> <key>
 
@@ -133,6 +145,7 @@ okastr8 app env unset myapp OLD_VAR
 ## Deployment (`okastr8 deploy`)
 
 ### Trigger deployment
+
 ```bash
 okastr8 deploy trigger <app> [options]
 
@@ -151,6 +164,7 @@ okastr8 deploy trigger myapp --skip-health
 ```
 
 ### Rollback
+
 ```bash
 okastr8 deploy rollback <app> [options]
 
@@ -163,11 +177,13 @@ okastr8 deploy rollback myapp -c abc1234
 ```
 
 ### View history
+
 ```bash
 okastr8 deploy history <app>
 ```
 
 ### Health check
+
 ```bash
 okastr8 deploy health <method> <target> [options]
 
@@ -186,16 +202,19 @@ okastr8 deploy health port 3000
 ## GitHub Integration (`okastr8 github`)
 
 ### Check connection
+
 ```bash
 okastr8 github status
 ```
 
 ### Connect via OAuth
+
 ```bash
 okastr8 github connect
 ```
 
 ### Browse repositories
+
 ```bash
 okastr8 github repos [options]
 
@@ -204,6 +223,7 @@ okastr8 github repos [options]
 ```
 
 ### Import repository
+
 ```bash
 okastr8 github import <repo> [options]
 
@@ -217,11 +237,13 @@ okastr8 github import owner/repo -b develop -p 8080
 ```
 
 ### Setup SSH deploy key
+
 ```bash
 okastr8 github setup-key
 ```
 
 ### Disconnect
+
 ```bash
 okastr8 github disconnect
 ```
@@ -231,11 +253,13 @@ okastr8 github disconnect
 ## Server Setup (`okastr8 setup`)
 
 ### Full setup
+
 ```bash
 okastr8 setup full
 ```
 
 ### SSH hardening
+
 ```bash
 okastr8 setup ssh-harden [options]
 
@@ -245,6 +269,7 @@ okastr8 setup ssh-harden [options]
 ```
 
 ### Change SSH port
+
 ```bash
 okastr8 setup ssh-port <port>
 
@@ -253,6 +278,7 @@ okastr8 setup ssh-port 2222
 ```
 
 ### Configure firewall
+
 ```bash
 okastr8 setup firewall [options]
 
@@ -261,11 +287,13 @@ okastr8 setup firewall [options]
 ```
 
 ### Setup fail2ban
+
 ```bash
 okastr8 setup fail2ban
 ```
 
 ### Fix sudo permissions
+
 ```bash
 okastr8 setup sudoers
 ```
@@ -279,6 +307,7 @@ Securely expose your instance to the internet for remote dashboard access and Gi
 See [TUNNEL_SETUP.md](./TUNNEL_SETUP.md) for a complete setup guide.
 
 ### Setup Tunnel
+
 ```bash
 okastr8 tunnel setup <token>
 
@@ -287,11 +316,13 @@ okastr8 tunnel setup eyJhIjoi...
 ```
 
 ### Check Status
+
 ```bash
 okastr8 tunnel status
 ```
 
 ### Uninstall Tunnel
+
 ```bash
 okastr8 tunnel uninstall
 ```
@@ -310,6 +341,7 @@ okastr8 metrics --once    # Single snapshot, then exit
 ## System Commands
 
 ### Global service controls
+
 ```bash
 okastr8 service start-all     # Start all apps
 okastr8 service stop-all      # Stop all apps
@@ -317,6 +349,7 @@ okastr8 service restart-all   # Restart all apps
 ```
 
 ### System level
+
 ```bash
 okastr8 system nuke        # ⚠️ DESTROY all apps and data
 okastr8 system uninstall   # Nuke + show uninstall instructions

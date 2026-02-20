@@ -16,7 +16,11 @@ function getDockerPath(): string {
  * Get absolute path to docker-compose binary to match sudoers NOPASSWD rules
  */
 function getComposePath(): string {
-    const paths = ["/usr/bin/docker-compose", "/usr/local/bin/docker-compose", "/usr/local/lib/docker/cli-plugins/docker-compose"];
+    const paths = [
+        "/usr/bin/docker-compose",
+        "/usr/local/bin/docker-compose",
+        "/usr/local/lib/docker/cli-plugins/docker-compose",
+    ];
     for (const p of paths) {
         if (existsSync(p)) return p;
     }
@@ -47,14 +51,7 @@ export async function buildImage(
     dockerfilePath: string = "Dockerfile"
 ): Promise<{ success: boolean; message: string }> {
     try {
-        const result = await dockerCommand([
-            "build",
-            "-t",
-            tag,
-            "-f",
-            dockerfilePath,
-            context,
-        ]);
+        const result = await dockerCommand(["build", "-t", tag, "-f", dockerfilePath, context]);
 
         if (result.exitCode !== 0) {
             return {
@@ -239,7 +236,7 @@ export async function composeUp(
 ): Promise<{ success: boolean; message: string }> {
     try {
         const paths = Array.isArray(composePaths) ? composePaths : [composePaths];
-        const fileArgs = paths.flatMap(p => ["-f", p]);
+        const fileArgs = paths.flatMap((p) => ["-f", p]);
 
         const result = await composeCommand(
             [...fileArgs, "-p", projectName, "up", "-d", "--build"],
@@ -436,17 +433,9 @@ export async function containerStatus(
 /**
  * Get container logs
  */
-export async function containerLogs(
-    containerName: string,
-    lines: number = 50
-): Promise<string> {
+export async function containerLogs(containerName: string, lines: number = 50): Promise<string> {
     try {
-        const result = await dockerCommand([
-            "logs",
-            "--tail",
-            lines.toString(),
-            containerName,
-        ]);
+        const result = await dockerCommand(["logs", "--tail", lines.toString(), containerName]);
 
         return result.stdout || result.stderr || "No logs available";
     } catch (error: any) {
@@ -474,7 +463,10 @@ export async function listContainers(): Promise<
             return [];
         }
 
-        const lines = result.stdout.trim().split("\n").filter((line) => line && line.includes("|"));
+        const lines = result.stdout
+            .trim()
+            .split("\n")
+            .filter((line) => line && line.includes("|"));
 
         return lines.map((line) => {
             const [name = "", status = "", state = "", ports = ""] = line.split("|");
@@ -505,7 +497,10 @@ export async function getProjectContainers(
             return [];
         }
 
-        const lines = result.stdout.trim().split("\n").filter((line) => line && line.includes("|"));
+        const lines = result.stdout
+            .trim()
+            .split("\n")
+            .filter((line) => line && line.includes("|"));
 
         return lines.map((line) => {
             const [name = "", status = "", healthRaw = ""] = line.split("|");

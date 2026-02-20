@@ -65,7 +65,7 @@ export async function getGitHubConfig(): Promise<GitHubConfig> {
         clientSecret: gh.client_secret,
         accessToken: gh.access_token,
         username: gh.username,
-        connectedAt: gh.connected_at
+        connectedAt: gh.connected_at,
     };
 }
 
@@ -77,9 +77,9 @@ export async function saveGitHubConfig(github: GitHubConfig): Promise<void> {
             github: {
                 access_token: github.accessToken,
                 username: github.username,
-                connected_at: github.connectedAt
-            }
-        }
+                connected_at: github.connectedAt,
+            },
+        },
     });
 }
 
@@ -127,7 +127,11 @@ export async function exchangeCodeForToken(
             }),
         });
 
-        const data = (await response.json()) as { error?: string; error_description?: string; access_token?: string };
+        const data = (await response.json()) as {
+            error?: string;
+            error_description?: string;
+            access_token?: string;
+        };
 
         if (data.error) {
             return { accessToken: "", error: data.error_description || data.error };
@@ -213,7 +217,10 @@ export async function createSSHKey(
         });
 
         if (!response.ok) {
-            const errorData = await response.json() as { message?: string; errors?: { message?: string }[] };
+            const errorData = (await response.json()) as {
+                message?: string;
+                errors?: { message?: string }[];
+            };
             // Key already exists
             if (errorData.errors?.some((e) => e.message?.includes("already in use"))) {
                 return { success: true, message: "SSH key already added to GitHub" };
@@ -259,10 +266,7 @@ export async function listRepos(accessToken: string): Promise<GitHubRepo[]> {
     return repos;
 }
 
-export async function getRepo(
-    accessToken: string,
-    fullName: string
-): Promise<GitHubRepo> {
+export async function getRepo(accessToken: string, fullName: string): Promise<GitHubRepo> {
     const response = await fetch(`${GITHUB_API}/repos/${fullName}`, {
         headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -306,21 +310,24 @@ export async function listBranches(accessToken: string, fullName: string): Promi
     const perPage = 100;
 
     while (true) {
-        const response = await fetch(`${GITHUB_API}/repos/${fullName}/branches?per_page=${perPage}&page=${page}`, {
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                Accept: "application/vnd.github.v3+json",
-            },
-        });
+        const response = await fetch(
+            `${GITHUB_API}/repos/${fullName}/branches?per_page=${perPage}&page=${page}`,
+            {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    Accept: "application/vnd.github.v3+json",
+                },
+            }
+        );
 
         if (!response.ok) {
             throw new Error(`Failed to fetch branches: ${response.statusText}`);
         }
 
-        const data = await response.json() as any[];
+        const data = (await response.json()) as any[];
         if (data.length === 0) break;
 
-        branches.push(...data.map(b => b.name));
+        branches.push(...data.map((b) => b.name));
 
         if (data.length < perPage) break;
         page++;
@@ -329,7 +336,11 @@ export async function listBranches(accessToken: string, fullName: string): Promi
     return branches;
 }
 
-export async function checkRepoConfig(accessToken: string, fullName: string, ref: string): Promise<boolean> {
+export async function checkRepoConfig(
+    accessToken: string,
+    fullName: string,
+    ref: string
+): Promise<boolean> {
     // Check for okastr8.yaml or okastr8.yml
     const files = ["okastr8.yaml", "okastr8.yml"];
 
@@ -359,7 +370,7 @@ async function getRepoFileContent(
 
         if (!response.ok) return null;
 
-        const data = await response.json() as any;
+        const data = (await response.json()) as any;
         if (!data?.content) return null;
 
         return Buffer.from(data.content, "base64").toString("utf-8");
@@ -489,7 +500,6 @@ export async function inspectRepoConfig(
     };
 }
 
-
 // Auto-detection for build configs
 export interface DetectedConfig {
     buildSteps: string[];
@@ -515,8 +525,6 @@ function normalizeBuildSteps(value: unknown): string[] {
     return [];
 }
 
-
-
 // Prepare repository for deployment (Clone & Detect Config)
 export async function prepareRepoImport(
     options: ImportOptions,
@@ -531,13 +539,14 @@ export async function prepareRepoImport(
     hasUserDocker?: boolean;
 }> {
     const { createApp } = await import("./app");
-    const { createVersion, initializeVersioning, updateVersionStatus, removeVersion } = await import("./version");
+    const { createVersion, initializeVersioning, updateVersionStatus, removeVersion } =
+        await import("./version");
     const githubConfig = await getGitHubConfig();
 
     // Helper to log
     const log = (message: string) => {
         if (deploymentId) {
-            const { streamLog } = require('../utils/deploymentLogger');
+            const { streamLog } = require("../utils/deploymentLogger");
             streamLog(deploymentId, message);
         } else {
             console.log(message);
@@ -563,13 +572,20 @@ export async function prepareRepoImport(
         // Save app metadata if new
         const appMetaPath = join(appDir, "app.json");
         if (!existsSync(appMetaPath)) {
-            await writeFile(appMetaPath, JSON.stringify({
-                name: appName,
-                repo: repo.full_name,
-                branch: branch,
-                webhookBranch: branch,
-                created_at: new Date().toISOString()
-            }, null, 2));
+            await writeFile(
+                appMetaPath,
+                JSON.stringify(
+                    {
+                        name: appName,
+                        repo: repo.full_name,
+                        branch: branch,
+                        webhookBranch: branch,
+                        created_at: new Date().toISOString(),
+                    },
+                    null,
+                    2
+                )
+            );
         }
 
         log(`Preparing deployment for ${repo.full_name} (${branch})...`);
@@ -580,8 +596,12 @@ export async function prepareRepoImport(
         // CLEANUP on failure
         const cleanupFailedPrepare = async (reason: string) => {
             log(` Cleaning up prepare: ${reason}`);
-            try { await removeVersion(appName, versionId); } catch { }
-            try { await rm(releasePath, { recursive: true, force: true }); } catch { }
+            try {
+                await removeVersion(appName, versionId);
+            } catch {}
+            try {
+                await rm(releasePath, { recursive: true, force: true });
+            } catch {}
         };
 
         await updateVersionStatus(appName, versionId, "pending", "Cloning repository");
@@ -592,7 +612,14 @@ export async function prepareRepoImport(
             : repo.clone_url;
 
         const cloneResult = await runCommand("git", [
-            "clone", "--progress", "--branch", branch, "--depth", "1", cloneUrl, releasePath
+            "clone",
+            "--progress",
+            "--branch",
+            branch,
+            "--depth",
+            "1",
+            cloneUrl,
+            releasePath,
         ]);
 
         if (cloneResult.exitCode !== 0) {
@@ -609,24 +636,24 @@ export async function prepareRepoImport(
         ];
         const configPath = configPathCandidates.find((path) => existsSync(path));
         let detectedConfig: DetectedConfig = {
-            runtime: 'node', // Default
+            runtime: "node", // Default
             buildSteps: [],
-            startCommand: '',
+            startCommand: "",
             port: 3000,
-            env: {}
+            env: {},
         };
         let detectedRuntime: string | undefined;
 
         if (configPath) {
             log(` ${configPath.endsWith(".yml") ? "okastr8.yml" : "okastr8.yaml"} found`);
             try {
-                const { load } = await import('js-yaml');
-                const configContent = await readFile(configPath, 'utf-8');
+                const { load } = await import("js-yaml");
+                const configContent = await readFile(configPath, "utf-8");
                 const config = load(configContent) as any;
                 detectedConfig = {
-                    runtime: config.runtime || 'custom',
+                    runtime: config.runtime || "custom",
                     buildSteps: normalizeBuildSteps(config.build),
-                    startCommand: config.start || '',
+                    startCommand: config.start || "",
                     port: config.port || 3000,
                     domain: config.domain,
                     database: config.database,
@@ -646,12 +673,16 @@ export async function prepareRepoImport(
                 log(`   Detected runtime: ${runtime}`);
 
                 // Basic heuristic defaults based on runtime
-                if (runtime === 'node') {
-                    const pkgJsonPath = join(releasePath, 'package.json');
+                if (runtime === "node") {
+                    const pkgJsonPath = join(releasePath, "package.json");
                     if (existsSync(pkgJsonPath)) {
-                        const pkg = JSON.parse(await readFile(pkgJsonPath, 'utf-8'));
-                        detectedConfig.buildSteps = pkg.scripts?.build ? ['npm install', 'npm run build'] : ['npm install'];
-                        detectedConfig.startCommand = pkg.scripts?.start ? 'npm run start' : 'node index.js';
+                        const pkg = JSON.parse(await readFile(pkgJsonPath, "utf-8"));
+                        detectedConfig.buildSteps = pkg.scripts?.build
+                            ? ["npm install", "npm run build"]
+                            : ["npm install"];
+                        detectedConfig.startCommand = pkg.scripts?.start
+                            ? "npm run start"
+                            : "node index.js";
                     }
                 }
             } catch (e) {
@@ -675,9 +706,8 @@ export async function prepareRepoImport(
             versionId,
             config: detectedConfig,
             detectedRuntime,
-            hasUserDocker
+            hasUserDocker,
         };
-
     } catch (error: any) {
         return { success: false, message: error.message };
     }
@@ -690,13 +720,14 @@ export async function finalizeRepoImport(
     config: DetectedConfig,
     deploymentId?: string
 ): Promise<{ success: boolean; message: string }> {
-    const { updateVersionStatus, removeVersion, getVersions, setCurrentVersion, cleanOldVersions } = await import("./version");
+    const { updateVersionStatus, removeVersion, getVersions, setCurrentVersion, cleanOldVersions } =
+        await import("./version");
     const { logActivity } = await import("../utils/activity");
 
     // Helper log
     const log = (message: string) => {
         if (deploymentId) {
-            const { streamLog } = require('../utils/deploymentLogger');
+            const { streamLog } = require("../utils/deploymentLogger");
             streamLog(deploymentId, message);
         } else {
             console.log(message);
@@ -706,10 +737,10 @@ export async function finalizeRepoImport(
     // Cancellation check helper
     const checkCancelled = async (cleanup?: () => Promise<void>) => {
         if (deploymentId) {
-            const { isDeploymentCancelled } = require('../utils/deploymentLogger');
+            const { isDeploymentCancelled } = require("../utils/deploymentLogger");
             if (isDeploymentCancelled(deploymentId)) {
                 if (cleanup) await cleanup();
-                throw new Error('DEPLOYMENT_CANCELLED');
+                throw new Error("DEPLOYMENT_CANCELLED");
             }
         }
     };
@@ -726,7 +757,7 @@ export async function finalizeRepoImport(
             const meta = JSON.parse(await readFile(appMetaPath, "utf-8"));
             branch = meta.gitBranch || meta.branch;
         }
-    } catch { }
+    } catch {}
 
     await logActivity("deploy", {
         id: activityId,
@@ -734,7 +765,7 @@ export async function finalizeRepoImport(
         appName,
         branch,
         versionId,
-        source: "github"
+        source: "github",
     });
 
     // CLEANUP HELPER
@@ -742,17 +773,17 @@ export async function finalizeRepoImport(
         log(` Cleaning up: ${reason}`);
         try {
             const { stopContainer, removeContainer, composeDown } = await import("./docker");
-            await stopContainer(appName).catch(() => { });
-            await removeContainer(appName).catch(() => { });
+            await stopContainer(appName).catch(() => {});
+            await removeContainer(appName).catch(() => {});
 
             // Check for compose files to clean up
             const composeFiles = [
                 join(releasePath, "docker-compose.yml"),
-                join(releasePath, "docker-compose.generated.yml")
+                join(releasePath, "docker-compose.generated.yml"),
             ];
             for (const f of composeFiles) {
                 if (existsSync(f)) {
-                    await composeDown(f, appName).catch(() => { });
+                    await composeDown(f, appName).catch(() => {});
                     break;
                 }
             }
@@ -761,13 +792,17 @@ export async function finalizeRepoImport(
             const projectContainers = await getProjectContainers(appName);
             if (projectContainers.length > 0) {
                 for (const container of projectContainers) {
-                    await stopContainer(container.name).catch(() => { });
-                    await removeContainer(container.name).catch(() => { });
+                    await stopContainer(container.name).catch(() => {});
+                    await removeContainer(container.name).catch(() => {});
                 }
             }
-        } catch { }
-        try { await rm(releasePath, { recursive: true, force: true }); } catch { }
-        try { await removeVersion(appName, versionId); } catch { }
+        } catch {}
+        try {
+            await rm(releasePath, { recursive: true, force: true });
+        } catch {}
+        try {
+            await removeVersion(appName, versionId);
+        } catch {}
 
         // Remove app dir if empty
         try {
@@ -775,7 +810,7 @@ export async function finalizeRepoImport(
             if (data.versions.length === 0 && !data.current) {
                 await rm(appDir, { recursive: true, force: true });
             }
-        } catch { }
+        } catch {}
     };
 
     try {
@@ -783,7 +818,7 @@ export async function finalizeRepoImport(
 
         // 1. Persist Config to okastr8.yaml in release path
         try {
-            const { dump } = await import('js-yaml');
+            const { dump } = await import("js-yaml");
             const yamlContent = dump({
                 runtime: config.runtime,
                 build: config.buildSteps,
@@ -804,7 +839,7 @@ export async function finalizeRepoImport(
                 versionId,
                 error: e.message,
                 duration: (Date.now() - startTime) / 1000,
-                source: "github"
+                source: "github",
             });
             await cleanupFailedDeployment("Failed to save config");
             return { success: false, message: `Config save failed: ${e.message}` };
@@ -813,7 +848,7 @@ export async function finalizeRepoImport(
         await updateVersionStatus(appName, versionId, "building", "Building application");
 
         // 2. Validate Runtime
-        const supportedRuntimes = ['node', 'python', 'go', 'bun', 'deno'];
+        const supportedRuntimes = ["node", "python", "go", "bun", "deno"];
         if (supportedRuntimes.includes(config.runtime)) {
             const { checkRuntimeInstalled, formatMissingRuntimeError } = await import("./env");
             const isInstalled = await checkRuntimeInstalled(config.runtime);
@@ -826,10 +861,13 @@ export async function finalizeRepoImport(
                     versionId,
                     error: `Runtime missing: ${config.runtime}`,
                     duration: (Date.now() - startTime) / 1000,
-                    source: "github"
+                    source: "github",
                 });
                 await cleanupFailedDeployment("Runtime missing");
-                return { success: false, message: formatMissingRuntimeError(config.runtime as any) };
+                return {
+                    success: false,
+                    message: formatMissingRuntimeError(config.runtime as any),
+                };
             }
         }
 
@@ -837,13 +875,13 @@ export async function finalizeRepoImport(
         log(`Build steps: ${config.buildSteps.join(", ") || "none"}`);
         log(`▶️  Start command: ${config.startCommand}`);
 
-        await checkCancelled(() => cleanupFailedDeployment('Deployment cancelled'));
+        await checkCancelled(() => cleanupFailedDeployment("Deployment cancelled"));
 
         // 3. Build
         if (config.buildSteps.length > 0) {
             log("Running build steps...");
             for (const step of config.buildSteps) {
-                await checkCancelled(() => cleanupFailedDeployment('Deployment cancelled'));
+                await checkCancelled(() => cleanupFailedDeployment("Deployment cancelled"));
                 log(`  → ${step}`);
                 const buildResult = await runCommand("bash", ["-c", step], releasePath);
                 if (buildResult.exitCode !== 0) {
@@ -856,7 +894,7 @@ export async function finalizeRepoImport(
                         versionId,
                         error: buildResult.stderr || "Build failed",
                         duration: (Date.now() - startTime) / 1000,
-                        source: "github"
+                        source: "github",
                     });
                     await cleanupFailedDeployment("Build failed");
                     return { success: false, message: `Build failed: ${buildResult.stderr}` };
@@ -867,7 +905,7 @@ export async function finalizeRepoImport(
         await updateVersionStatus(appName, versionId, "deploying", "Starting container");
 
         // 4. Deploy
-        await checkCancelled(() => cleanupFailedDeployment('Deployment cancelled'));
+        await checkCancelled(() => cleanupFailedDeployment("Deployment cancelled"));
 
         const { deployFromPath } = await import("./deploy-core");
 
@@ -876,7 +914,7 @@ export async function finalizeRepoImport(
             releasePath,
             versionId,
             env: config.env,
-            onProgress: log
+            onProgress: log,
         });
 
         if (!deployResult.success) {
@@ -889,7 +927,7 @@ export async function finalizeRepoImport(
                 versionId,
                 error: deployResult.message,
                 duration: (Date.now() - startTime) / 1000,
-                source: "github"
+                source: "github",
             });
             await cleanupFailedDeployment(deployResult.message);
             return { success: false, message: deployResult.message };
@@ -913,13 +951,12 @@ export async function finalizeRepoImport(
             branch,
             versionId,
             duration: (Date.now() - startTime) / 1000,
-            source: "github"
+            source: "github",
         });
 
         return { success: true, message: `Successfully deployed ${appName}` };
-
     } catch (error: any) {
-        if (error.message === 'DEPLOYMENT_CANCELLED') {
+        if (error.message === "DEPLOYMENT_CANCELLED") {
             await logActivity("deploy", {
                 id: activityId,
                 status: "failed",
@@ -928,9 +965,9 @@ export async function finalizeRepoImport(
                 versionId,
                 error: "Deployment cancelled",
                 duration: (Date.now() - startTime) / 1000,
-                source: "github"
+                source: "github",
             });
-            return { success: false, message: 'Deployment was cancelled by user' };
+            return { success: false, message: "Deployment was cancelled by user" };
         }
         await logActivity("deploy", {
             id: activityId,
@@ -940,7 +977,7 @@ export async function finalizeRepoImport(
             versionId,
             error: error.message,
             duration: (Date.now() - startTime) / 1000,
-            source: "github"
+            source: "github",
         });
         await cleanupFailedDeployment(`Unexpected error: ${error.message}`);
         return { success: false, message: error.message };
@@ -964,14 +1001,18 @@ export async function importRepo(
     }
 
     // 2. Finalize immediately (using detected config)
-    const result = await finalizeRepoImport(prep.appName, prep.versionId, prep.config, deploymentId);
+    const result = await finalizeRepoImport(
+        prep.appName,
+        prep.versionId,
+        prep.config,
+        deploymentId
+    );
     return {
         ...result,
         appName: prep.appName,
-        config: prep.config
+        config: prep.config,
     };
 }
-
 
 // Disconnect GitHub
 export async function disconnectGitHub(): Promise<void> {
@@ -981,9 +1022,9 @@ export async function disconnectGitHub(): Promise<void> {
             github: {
                 access_token: undefined,
                 username: undefined,
-                connected_at: undefined
-            }
-        }
+                connected_at: undefined,
+            },
+        },
     });
 }
 
@@ -1014,11 +1055,11 @@ export async function ensureWebhookSecret(): Promise<string> {
     }
 
     // Generate new secret
-    const secret = randomBytes(32).toString('hex');
+    const secret = randomBytes(32).toString("hex");
     await saveSystemConfig({
         manager: {
-            github: { webhook_secret: secret }
-        }
+            github: { webhook_secret: secret },
+        },
     });
     return secret;
 }
@@ -1029,7 +1070,9 @@ export async function createWebhook(repoFullName: string, accessToken: string): 
         const baseUrl = config.tunnel?.url;
 
         if (!baseUrl) {
-            console.error("Cannot create webhook: Tunnel URL not configured in system.yaml (tunnel.url)");
+            console.error(
+                "Cannot create webhook: Tunnel URL not configured in system.yaml (tunnel.url)"
+            );
             return false;
         }
 
@@ -1040,12 +1083,12 @@ export async function createWebhook(repoFullName: string, accessToken: string): 
         const hooksRes = await fetch(`${GITHUB_API}/repos/${repoFullName}/hooks`, {
             headers: {
                 Authorization: `Bearer ${accessToken}`,
-                Accept: "application/vnd.github.v3+json"
-            }
+                Accept: "application/vnd.github.v3+json",
+            },
         });
 
         if (hooksRes.ok) {
-            const hooks = await hooksRes.json() as any[];
+            const hooks = (await hooksRes.json()) as any[];
             const exists = hooks.find((h: any) => h.config.url === webhookUrl);
             if (exists) {
                 console.log("Webhook already exists");
@@ -1070,9 +1113,9 @@ export async function createWebhook(repoFullName: string, accessToken: string): 
                     url: webhookUrl,
                     content_type: "json",
                     secret: secret,
-                    insecure_ssl: "0"
-                }
-            })
+                    insecure_ssl: "0",
+                },
+            }),
         });
 
         if (!res.ok) {

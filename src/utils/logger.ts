@@ -3,7 +3,7 @@
  * Stores logs in memory with severity levels for dashboard display
  */
 
-export type LogLevel = 'info' | 'warning' | 'error';
+export type LogLevel = "info" | "warning" | "error";
 
 export interface LogEntry {
     timestamp: string;
@@ -36,11 +36,11 @@ export function log(level: LogLevel, service: string, message: string): void {
 
     // Also log to console with color
     const colors = {
-        info: '\x1b[36m',    // Cyan
-        warning: '\x1b[33m', // Yellow
-        error: '\x1b[31m',   // Red
+        info: "\x1b[36m", // Cyan
+        warning: "\x1b[33m", // Yellow
+        error: "\x1b[31m", // Red
     };
-    const reset = '\x1b[0m';
+    const reset = "\x1b[0m";
     console.log(`${colors[level]}[${level.toUpperCase()}]${reset} [${service}] ${message}`);
 }
 
@@ -48,15 +48,15 @@ export function log(level: LogLevel, service: string, message: string): void {
  * Convenience methods
  */
 export function info(service: string, message: string): void {
-    log('info', service, message);
+    log("info", service, message);
 }
 
 export function warning(service: string, message: string): void {
-    log('warning', service, message);
+    log("warning", service, message);
 }
 
 export function error(service: string, message: string): void {
-    log('error', service, message);
+    log("error", service, message);
 }
 
 /**
@@ -71,9 +71,9 @@ export function getRecentLogs(count: number = 10): LogEntry[] {
  */
 export function getLogCounts(): { info: number; warning: number; error: number } {
     return {
-        info: logs.filter(l => l.level === 'info').length,
-        warning: logs.filter(l => l.level === 'warning').length,
-        error: logs.filter(l => l.level === 'error').length,
+        info: logs.filter((l) => l.level === "info").length,
+        warning: logs.filter((l) => l.level === "warning").length,
+        error: logs.filter((l) => l.level === "error").length,
     };
 }
 
@@ -87,15 +87,15 @@ export function clearLogs(): void {
 /**
  * Get health status based on recent logs
  */
-export function getHealthStatus(): 'ok' | 'warning' | 'error' {
+export function getHealthStatus(): "ok" | "warning" | "error" {
     // Check last 10 logs for issues
     const recent = logs.slice(0, 10);
 
-    if (recent.some(l => l.level === 'error')) {
-        return 'error';
+    if (recent.some((l) => l.level === "error")) {
+        return "error";
     }
-    if (recent.some(l => l.level === 'warning')) {
-        return 'warning';
+    if (recent.some((l) => l.level === "warning")) {
+        return "warning";
     }
-    return 'ok';
+    return "ok";
 }

@@ -39,9 +39,7 @@ export async function changeSshPort(port: number) {
 }
 
 export async function configureFirewall(sshPort?: number) {
-    const args = sshPort
-        ? [SCRIPTS.ufwDefaults, sshPort.toString()]
-        : [SCRIPTS.ufwDefaults];
+    const args = sshPort ? [SCRIPTS.ufwDefaults, sshPort.toString()] : [SCRIPTS.ufwDefaults];
     return await runCommand("sudo", args);
 }
 
@@ -55,9 +53,7 @@ export async function orchestrateEnvironment() {
 
 // Commander Integration
 export function addSetupCommands(program: Command) {
-    const setup = program
-        .command("setup")
-        .description("Server setup and hardening commands");
+    const setup = program.command("setup").description("Server setup and hardening commands");
 
     setup
         .command("full")
@@ -149,7 +145,9 @@ export function addSetupCommands(program: Command) {
 
             if (result.exitCode === 0) {
                 console.log("\n Sudoers configured successfully!");
-                console.log("   Okastr8 and Docker can now run system commands without password prompts.");
+                console.log(
+                    "   Okastr8 and Docker can now run system commands without password prompts."
+                );
                 console.log("   Try running a deployment now—it should be fast and seamless.");
             } else {
                 console.error("\n Sudoers configuration failed.");
@@ -164,27 +162,27 @@ export function addSetupCommands(program: Command) {
             console.log("New User Setup\n");
 
             try {
-                const response = await prompt([
+                const response = (await prompt([
                     {
-                        type: 'input',
-                        name: 'username',
-                        message: 'Enter username for the new user:',
-                        validate: (val: string) => val.length > 0
+                        type: "input",
+                        name: "username",
+                        message: "Enter username for the new user:",
+                        validate: (val: string) => val.length > 0,
                     },
                     {
-                        type: 'password',
-                        name: 'password',
-                        message: 'Enter password for the new user:',
-                        validate: (val: string) => val.length > 0
-                    }
-                ]) as any;
+                        type: "password",
+                        name: "password",
+                        message: "Enter password for the new user:",
+                        validate: (val: string) => val.length > 0,
+                    },
+                ])) as any;
 
                 console.log(`\nCreating user '${response.username}'...`);
 
                 const result = await runCommand("sudo", [
                     SCRIPTS.createUser,
                     response.username,
-                    response.password
+                    response.password,
                 ]);
 
                 console.log(result.stdout || result.stderr);
@@ -192,7 +190,9 @@ export function addSetupCommands(program: Command) {
                 if (result.exitCode === 0) {
                     console.log("\n User created successfully!");
                     console.log(`   You can now switch to the new user: su - ${response.username}`);
-                    console.log("   From there, you can run 'okastr8 setup full' to complete the installation.");
+                    console.log(
+                        "   From there, you can run 'okastr8 setup full' to complete the installation."
+                    );
                 } else {
                     console.error("\n Failed to create user.");
                     process.exit(1);

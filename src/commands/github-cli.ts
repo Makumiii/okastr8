@@ -29,9 +29,7 @@ async function requireAdminCli(): Promise<void> {
 }
 
 export function addGitHubCommands(program: Command) {
-    const github = program
-        .command("github")
-        .description("GitHub integration commands");
+    const github = program.command("github").description("GitHub integration commands");
 
     // Status command
     github
@@ -49,7 +47,7 @@ export function addGitHubCommands(program: Command) {
                     const config = await getGitHubConfig();
                     if (config.accessToken) {
                         const hasKey = await hasOkastr8DeployKey(config.accessToken);
-                        console.log(`   Deploy key: ${hasKey ? ' Configured' : ' Not configured'}`);
+                        console.log(`   Deploy key: ${hasKey ? " Configured" : " Not configured"}`);
                     }
                 } else {
                     console.log("Not connected to GitHub");
@@ -90,20 +88,24 @@ export function addGitHubCommands(program: Command) {
                 // Use manager's callback (requires manager to be running)
                 const callbackUrl = `http://localhost:41788/api/github/callback`;
 
-                const { getAuthUrl } = await import('./github');
-                const authUrl = getAuthUrl(config.clientId, callbackUrl, 'connect');
+                const { getAuthUrl } = await import("./github");
+                const authUrl = getAuthUrl(config.clientId, callbackUrl, "connect");
 
                 console.log("\nOpen this URL in your browser:\n");
                 console.log(`   ${authUrl}\n`);
 
                 // Try to open browser automatically
                 try {
-                    const { exec } = await import('child_process');
-                    const openCmd = process.platform === 'darwin' ? 'open' :
-                        process.platform === 'win32' ? 'start' : 'xdg-open';
+                    const { exec } = await import("child_process");
+                    const openCmd =
+                        process.platform === "darwin"
+                            ? "open"
+                            : process.platform === "win32"
+                              ? "start"
+                              : "xdg-open";
                     exec(`${openCmd} "${authUrl}"`);
                     console.log("   (Attempting to open browser automatically...)\n");
-                } catch { }
+                } catch {}
 
                 console.log("⏳ Waiting for authorization...");
                 console.log("   (Make sure okastr8-manager is running)\n");
@@ -116,13 +118,12 @@ export function addGitHubCommands(program: Command) {
                         console.log(`\n Connected to GitHub as: ${newStatus.username}`);
                         return;
                     }
-                    process.stdout.write('.');
-                    await new Promise(r => setTimeout(r, 2000));
+                    process.stdout.write(".");
+                    await new Promise((r) => setTimeout(r, 2000));
                 }
 
                 console.log("\n Timed out waiting for authorization.");
                 process.exit(1);
-
             } catch (error: any) {
                 console.error("Error:", error.message);
                 process.exit(1);
@@ -152,7 +153,7 @@ export function addGitHubCommands(program: Command) {
                 }
 
                 // Get deployed apps for status indication
-                const { listApps } = await import('./app');
+                const { listApps } = await import("./app");
                 const { apps: deployedApps } = await listApps();
                 const deployedRepos = new Map<string, { appName: string; branch: string }>();
                 for (const app of deployedApps) {
@@ -162,7 +163,7 @@ export function addGitHubCommands(program: Command) {
                         if (match) {
                             deployedRepos.set(match[1].toLowerCase(), {
                                 appName: app.name,
-                                branch: app.gitBranch || 'main'
+                                branch: app.gitBranch || "main",
                             });
                         }
                     }
@@ -173,14 +174,16 @@ export function addGitHubCommands(program: Command) {
                     for (const repo of repos) {
                         const privacyIcon = repo.private ? "[PRIVATE]" : "[PUBLIC]";
                         const deployed = deployedRepos.get(repo.full_name.toLowerCase());
-                        const status = deployed ? ` [ deployed: ${deployed.appName}@${deployed.branch}]` : '';
+                        const status = deployed
+                            ? ` [ deployed: ${deployed.appName}@${deployed.branch}]`
+                            : "";
                         console.log(`${privacyIcon} ${repo.full_name}${status}`);
                     }
                     return;
                 }
 
                 // Interactive mode with fuzzy search
-                const Enquirer = (await import('enquirer')).default;
+                const Enquirer = (await import("enquirer")).default;
 
                 // Build choices with deploy status
                 const choices = repos.map((repo: any) => {
@@ -192,8 +195,8 @@ export function addGitHubCommands(program: Command) {
                 });
 
                 const response = await Enquirer.prompt({
-                    type: 'autocomplete',
-                    name: 'repo',
+                    type: "autocomplete",
+                    name: "repo",
                     message: `Select a repository (${repos.length} total,  = deployed):`,
                     limit: 10,
                     choices: choices,
@@ -201,7 +204,7 @@ export function addGitHubCommands(program: Command) {
 
                 // Extract repo name from selection (remove status prefix)
                 const selectedRaw = (response as any).repo;
-                const repoName = selectedRaw.replace(/^[\s]+/, '').split(' [')[0];
+                const repoName = selectedRaw.replace(/^[\s]+/, "").split(" [")[0];
                 const repo = repos.find((r: any) => r.full_name === repoName);
 
                 if (!repo) return;
@@ -210,7 +213,7 @@ export function addGitHubCommands(program: Command) {
 
                 // Show repo details
                 console.log(`\n${repo.full_name}`);
-                console.log(`   ${repo.private ? 'Private' : 'Public'}`);
+                console.log(`   ${repo.private ? "Private" : "Public"}`);
                 if (repo.description) console.log(`   ${repo.description}`);
                 console.log(`   Default Branch: ${repo.default_branch}`);
                 if (deployed) {
@@ -219,60 +222,66 @@ export function addGitHubCommands(program: Command) {
 
                 // Action menu
                 const actionChoices = deployed
-                    ? ['Redeploy', 'View Details', 'Open on GitHub', 'Cancel']
-                    : ['Import and Deploy', 'View Details', 'Open on GitHub', 'Cancel'];
+                    ? ["Redeploy", "View Details", "Open on GitHub", "Cancel"]
+                    : ["Import and Deploy", "View Details", "Open on GitHub", "Cancel"];
 
                 const actionResponse = await Enquirer.prompt({
-                    type: 'select',
-                    name: 'action',
-                    message: 'What would you like to do?',
+                    type: "select",
+                    name: "action",
+                    message: "What would you like to do?",
                     choices: actionChoices,
                 } as any);
 
                 const action = (actionResponse as any).action;
 
-                if (action.includes('Cancel')) {
+                if (action.includes("Cancel")) {
                     console.log("Cancelled.");
                     return;
                 }
 
-                if (action.includes('Open on GitHub')) {
-                    const { exec } = await import('child_process');
-                    const openCmd = process.platform === 'darwin' ? 'open' :
-                        process.platform === 'win32' ? 'start' : 'xdg-open';
+                if (action.includes("Open on GitHub")) {
+                    const { exec } = await import("child_process");
+                    const openCmd =
+                        process.platform === "darwin"
+                            ? "open"
+                            : process.platform === "win32"
+                              ? "start"
+                              : "xdg-open";
                     exec(`${openCmd} "${repo.html_url}"`);
                     console.log(`Opening ${repo.html_url}`);
                     return;
                 }
 
-                if (action.includes('View Details')) {
+                if (action.includes("View Details")) {
                     console.log(`\nFull Details for ${repo.full_name}`);
                     console.log(`   URL: ${repo.html_url}`);
                     console.log(`   Clone: ${repo.clone_url}`);
-                    console.log(`   Language: ${repo.language || 'Unknown'}`);
+                    console.log(`   Language: ${repo.language || "Unknown"}`);
                     console.log(`   Updated: ${new Date(repo.updated_at).toLocaleDateString()}`);
                     console.log(`   Pushed: ${new Date(repo.pushed_at).toLocaleDateString()}`);
                     return;
                 }
 
                 // Import/Redeploy flow
-                if (action.includes('Import') || action.includes('Redeploy')) {
+                if (action.includes("Import") || action.includes("Redeploy")) {
                     // Branch selection
                     const branchResponse = await Enquirer.prompt({
-                        type: 'input',
-                        name: 'branch',
-                        message: 'Branch to deploy:',
+                        type: "input",
+                        name: "branch",
+                        message: "Branch to deploy:",
                         initial: deployed?.branch || repo.default_branch,
                     } as any);
                     const branch = (branchResponse as any).branch;
 
                     // Branch change warning
                     if (deployed && branch !== deployed.branch) {
-                        console.log(`\nWarning: Changing branch from '${deployed.branch}' to '${branch}'`);
+                        console.log(
+                            `\nWarning: Changing branch from '${deployed.branch}' to '${branch}'`
+                        );
                         const confirmResponse = await Enquirer.prompt({
-                            type: 'confirm',
-                            name: 'confirm',
-                            message: 'Are you sure you want to change the deployment branch?',
+                            type: "confirm",
+                            name: "confirm",
+                            message: "Are you sure you want to change the deployment branch?",
                             initial: false,
                         } as any);
                         if (!(confirmResponse as any).confirm) {
@@ -285,9 +294,9 @@ export function addGitHubCommands(program: Command) {
                     let appName = deployed?.appName;
                     if (!deployed) {
                         const nameResponse = await Enquirer.prompt({
-                            type: 'input',
-                            name: 'appName',
-                            message: 'App name:',
+                            type: "input",
+                            name: "appName",
+                            message: "App name:",
                             initial: repo.name,
                         } as any);
                         appName = (nameResponse as any).appName;
@@ -296,57 +305,59 @@ export function addGitHubCommands(program: Command) {
                     // 4. Environment Variables Prompt (Opinionated Flow)
                     let env: Record<string, string> = {};
                     const envOption = await Enquirer.prompt({
-                        type: 'select',
-                        name: 'choice',
-                        message: 'Configure environment variables?',
+                        type: "select",
+                        name: "choice",
+                        message: "Configure environment variables?",
                         choices: [
-                            'No, skip for now',
-                            'Import from .env file',
-                            'Manual entry (key=value)',
+                            "No, skip for now",
+                            "Import from .env file",
+                            "Manual entry (key=value)",
                         ],
                     } as any);
 
-                    if ((envOption as any).choice === 'Import from .env file') {
+                    if ((envOption as any).choice === "Import from .env file") {
                         const fileRes = await Enquirer.prompt({
-                            type: 'input',
-                            name: 'path',
-                            message: 'Path to .env file:',
-                            initial: '.env',
+                            type: "input",
+                            name: "path",
+                            message: "Path to .env file:",
+                            initial: ".env",
                         } as any);
                         const filePath = (fileRes as any).path;
                         if (existsSync(filePath)) {
-                            const { readFile } = await import('fs/promises');
-                            const content = await readFile(filePath, 'utf-8');
-                            content.split('\n').forEach(line => {
+                            const { readFile } = await import("fs/promises");
+                            const content = await readFile(filePath, "utf-8");
+                            content.split("\n").forEach((line) => {
                                 line = line.trim();
-                                if (!line || line.startsWith('#')) return;
-                                const [k, ...v] = line.split('=');
-                                if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+                                if (!line || line.startsWith("#")) return;
+                                const [k, ...v] = line.split("=");
+                                if (k && v.length > 0) env[k.trim()] = v.join("=").trim();
                             });
-                            console.log(`    Loaded ${Object.keys(env).length} variables from ${filePath}`);
+                            console.log(
+                                `    Loaded ${Object.keys(env).length} variables from ${filePath}`
+                            );
                         } else {
                             console.error(`    File not found: ${filePath}`);
                         }
-                    } else if ((envOption as any).choice === 'Manual entry (key=value)') {
-                        console.log('   Enter variables (empty key to finish):');
+                    } else if ((envOption as any).choice === "Manual entry (key=value)") {
+                        console.log("   Enter variables (empty key to finish):");
                         while (true) {
                             const pair = await Enquirer.prompt({
-                                type: 'input',
-                                name: 'val',
-                                message: 'Variable (KEY=VALUE):',
+                                type: "input",
+                                name: "val",
+                                message: "Variable (KEY=VALUE):",
                             } as any);
                             const val = (pair as any).val;
                             if (!val) break;
-                            const [k, ...v] = val.split('=');
+                            const [k, ...v] = val.split("=");
                             if (k && v.length > 0) {
-                                env[k.trim()] = v.join('=').trim();
+                                env[k.trim()] = v.join("=").trim();
                             } else {
-                                console.log('   Invalid format. Use KEY=VALUE');
+                                console.log("   Invalid format. Use KEY=VALUE");
                             }
                         }
                     }
 
-                    console.log(`\n${deployed ? 'Redeploying' : 'Importing'} ${repo.full_name}...`);
+                    console.log(`\n${deployed ? "Redeploying" : "Importing"} ${repo.full_name}...`);
                     console.log(`   App: ${appName}`);
                     console.log(`   Branch: ${branch}\n`);
 
@@ -356,7 +367,7 @@ export function addGitHubCommands(program: Command) {
                         appName: appName,
                         branch: branch,
                         setupWebhook: true,
-                        env: Object.keys(env).length > 0 ? env : undefined
+                        env: Object.keys(env).length > 0 ? env : undefined,
                     });
 
                     if (result.success) {
@@ -365,9 +376,8 @@ export function addGitHubCommands(program: Command) {
                         console.error(`\n ${result.message}`);
                     }
                 }
-
             } catch (error: any) {
-                if (error.message === '' || error.name === 'ExitPromptError') {
+                if (error.message === "" || error.name === "ExitPromptError") {
                     console.log("\nCancelled.");
                     return;
                 }
@@ -399,13 +409,13 @@ export function addGitHubCommands(program: Command) {
                 // Parse --env-file
                 if (options.envFile) {
                     if (existsSync(options.envFile)) {
-                        const { readFile } = await import('fs/promises');
-                        const content = await readFile(options.envFile, 'utf-8');
-                        content.split('\n').forEach(line => {
+                        const { readFile } = await import("fs/promises");
+                        const content = await readFile(options.envFile, "utf-8");
+                        content.split("\n").forEach((line) => {
                             line = line.trim();
-                            if (!line || line.startsWith('#')) return;
-                            const [k, ...v] = line.split('=');
-                            if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+                            if (!line || line.startsWith("#")) return;
+                            const [k, ...v] = line.split("=");
+                            if (k && v.length > 0) env[k.trim()] = v.join("=").trim();
                         });
                     } else {
                         console.error(` Env file not found: ${options.envFile}`);
@@ -416,8 +426,8 @@ export function addGitHubCommands(program: Command) {
                 // Parse --env flags
                 if (options.env) {
                     options.env.forEach((pair: string) => {
-                        const [k, ...v] = pair.split('=');
-                        if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+                        const [k, ...v] = pair.split("=");
+                        if (k && v.length > 0) env[k.trim()] = v.join("=").trim();
                     });
                 }
 
@@ -427,7 +437,7 @@ export function addGitHubCommands(program: Command) {
                     repoFullName: repo,
                     branch: options.branch,
                     setupWebhook: options.webhook !== false,
-                    env: Object.keys(env).length > 0 ? env : undefined
+                    env: Object.keys(env).length > 0 ? env : undefined,
                 });
 
                 if (result.success) {
@@ -460,7 +470,10 @@ export function addGitHubCommands(program: Command) {
                 });
 
                 const answer = await new Promise<string>((resolve) => {
-                    rl.question("Are you sure you want to disconnect from GitHub? (y/N): ", resolve);
+                    rl.question(
+                        "Are you sure you want to disconnect from GitHub? (y/N): ",
+                        resolve
+                    );
                 });
                 rl.close();
 
@@ -507,10 +520,14 @@ export function addGitHubCommands(program: Command) {
                     await runCommand("chmod", ["700", sshDir]);
 
                     const genResult = await runCommand("ssh-keygen", [
-                        "-t", "ed25519",
-                        "-f", SSH_KEY_PATH,
-                        "-N", "",  // No passphrase
-                        "-C", "okastr8-deploy-key"
+                        "-t",
+                        "ed25519",
+                        "-f",
+                        SSH_KEY_PATH,
+                        "-N",
+                        "", // No passphrase
+                        "-C",
+                        "okastr8-deploy-key",
                     ]);
 
                     if (genResult.exitCode !== 0) {
@@ -536,7 +553,12 @@ export function addGitHubCommands(program: Command) {
 
                 // Configure Git
                 console.log("Configuring Git to use SSH...");
-                await runCommand("git", ["config", "--global", "url.git@github.com:.insteadOf", "https://github.com/"]);
+                await runCommand("git", [
+                    "config",
+                    "--global",
+                    "url.git@github.com:.insteadOf",
+                    "https://github.com/",
+                ]);
 
                 console.log("\n Deploy key configured successfully!");
                 console.log("   All GitHub clones will now use SSH automatically.");

@@ -93,7 +93,7 @@ export async function getVersions(appName: string): Promise<VersionsRes> {
     return {
         versions,
         current: currentVersionId,
-        maxVersions: 5
+        maxVersions: 5,
     };
 }
 
@@ -114,12 +114,12 @@ async function updateAppJson(appName: string, updates: any): Promise<void> {
         try {
             const content = await readFile(appJsonPath, "utf-8");
             currentData = JSON.parse(content);
-        } catch { }
+        } catch {}
     } else {
         // Initialize minimal app.json if missing
         currentData = {
             name: appName,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
         };
     }
 
@@ -130,10 +130,13 @@ async function updateAppJson(appName: string, updates: any): Promise<void> {
 /**
  * SAVE versions (wrapper around updateAppJson)
  */
-async function saveVersions(appName: string, versions: AppVersion[], currentVersionId: number | null): Promise<void> {
+async function saveVersions(
+    appName: string,
+    versions: AppVersion[],
+    currentVersionId: number | null
+): Promise<void> {
     await updateAppJson(appName, { versions, currentVersionId });
 }
-
 
 /**
  * Create a new version entry (before build)
@@ -156,7 +159,7 @@ export async function createVersion(
         commit,
         branch,
         timestamp: new Date().toISOString(),
-        status: "pending"
+        status: "pending",
     };
 
     data.versions.push(newVersion);
@@ -176,7 +179,7 @@ export async function updateVersionStatus(
     message?: string
 ): Promise<void> {
     const data = await getVersions(appName);
-    const version = data.versions.find(v => v.id === versionId);
+    const version = data.versions.find((v) => v.id === versionId);
 
     if (version) {
         version.status = status;
@@ -190,7 +193,7 @@ export async function updateVersionStatus(
  */
 export async function setCurrentVersion(appName: string, versionId: number): Promise<boolean> {
     const data = await getVersions(appName);
-    const version = data.versions.find(v => v.id === versionId);
+    const version = data.versions.find((v) => v.id === versionId);
 
     if (!version) return false;
 
@@ -203,7 +206,7 @@ export async function setCurrentVersion(appName: string, versionId: number): Pro
         if (existsSync(currentPath)) {
             await unlink(currentPath);
         }
-    } catch { }
+    } catch {}
 
     await symlink(releasePath, currentPath);
 
@@ -227,7 +230,7 @@ export async function rollback(
     const progressHandler = onProgress ? log : undefined;
 
     const data = await getVersions(appName);
-    const version = data.versions.find(v => v.id === versionId);
+    const version = data.versions.find((v) => v.id === versionId);
 
     if (!version) {
         return { success: false, message: `Version ${versionId} not found` };
@@ -276,10 +279,10 @@ export async function removeVersion(appName: string, versionId: number): Promise
     const releasePath = join(getReleasesDir(appName), `v${versionId}`);
     try {
         await rm(releasePath, { recursive: true, force: true });
-    } catch { }
+    } catch {}
 
     const data = await getVersions(appName);
-    const newVersions = data.versions.filter(v => v.id !== versionId);
+    const newVersions = data.versions.filter((v) => v.id !== versionId);
 
     // If we removed the current version (shouldn't happen for failed deploys, but safety check)
     let newCurrent = data.current;
@@ -298,16 +301,17 @@ export async function cleanOldVersions(appName: string): Promise<void> {
     const maxVersions = data.maxVersions || 5;
 
     const successfulVersions = data.versions
-        .filter(v => v.status === "success")
+        .filter((v) => v.status === "success")
         .sort((a, b) => b.id - a.id);
 
     const versionsToDelete = successfulVersions
         .slice(maxVersions)
-        .filter(v => v.id !== data.current);
+        .filter((v) => v.id !== data.current);
 
-    const failedVersions = successfulVersions.length > 0
-        ? data.versions.filter(v => v.status === "failed" && v.id < successfulVersions[0]!.id)
-        : [];
+    const failedVersions =
+        successfulVersions.length > 0
+            ? data.versions.filter((v) => v.status === "failed" && v.id < successfulVersions[0]!.id)
+            : [];
 
     const allToDelete = [...versionsToDelete, ...failedVersions];
 
@@ -315,9 +319,9 @@ export async function cleanOldVersions(appName: string): Promise<void> {
         const releasePath = join(getReleasesDir(appName), `v${version.id}`);
         try {
             await rm(releasePath, { recursive: true, force: true });
-        } catch { }
+        } catch {}
 
-        const index = data.versions.findIndex(v => v.id === version.id);
+        const index = data.versions.findIndex((v) => v.id === version.id);
         if (index !== -1) data.versions.splice(index, 1);
     }
 
@@ -361,7 +365,7 @@ export async function initializeVersioning(appName: string): Promise<void> {
             branch: "main",
             timestamp: new Date().toISOString(),
             status: "success",
-            message: "Migrated from legacy deployment"
+            message: "Migrated from legacy deployment",
         };
 
         await saveVersions(appName, [v1], 1);
@@ -374,5 +378,5 @@ export async function initializeVersioning(appName: string): Promise<void> {
 export async function getCurrentVersion(appName: string): Promise<AppVersion | null> {
     const data = await getVersions(appName);
     if (!data.current) return null;
-    return data.versions.find(v => v.id === data.current) || null;
+    return data.versions.find((v) => v.id === data.current) || null;
 }

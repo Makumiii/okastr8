@@ -5,7 +5,6 @@ export function resolveRegistryServer(imageRef: string): string {
     }
 
     const first = imageRef.split("/")[0] || "";
-    const looksLikeRegistry =
-        first.includes(".") || first.includes(":") || first === "localhost";
+    const looksLikeRegistry = first.includes(".") || first.includes(":") || first === "localhost";
     return looksLikeRegistry ? first : "docker.io";
 }

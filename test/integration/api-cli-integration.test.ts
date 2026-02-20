@@ -1,16 +1,16 @@
-import { afterEach, describe, expect, it } from 'bun:test';
-import { cleanupTempHomes, createTempHome, runIsolatedScript } from './helpers';
+import { afterEach, describe, expect, it } from "bun:test";
+import { cleanupTempHomes, createTempHome, runIsolatedScript } from "./helpers";
 
 afterEach(() => {
-  cleanupTempHomes();
+    cleanupTempHomes();
 });
 
-describe('API/CLI integration', () => {
-  it('accepts bearer token on protected API routes', () => {
-    const home = createTempHome();
-    const result = runIsolatedScript(
-      home,
-      `
+describe("API/CLI integration", () => {
+    it("accepts bearer token on protected API routes", () => {
+        const home = createTempHome();
+        const result = runIsolatedScript(
+            home,
+            `
         const auth = await import('./src/commands/auth.ts');
         const api = (await import('./src/api.ts')).default;
         const tokenRes = await auth.generateToken('integration-user', '1h');
@@ -23,21 +23,21 @@ describe('API/CLI integration', () => {
         const body = await response.json();
         console.log(JSON.stringify({ status: response.status, body }));
       `
-    );
+        );
 
-    expect(result.exitCode).toBe(0);
-    expect(result.stderr).toBe('');
+        expect(result.exitCode).toBe(0);
+        expect(result.stderr).toBe("");
 
-    const data = JSON.parse(result.stdout);
-    expect(data.status).toBe(200);
-    expect(data.body).toMatchObject({ success: true, message: 'Recent logs' });
-  });
+        const data = JSON.parse(result.stdout);
+        expect(data.status).toBe(200);
+        expect(data.body).toMatchObject({ success: true, message: "Recent logs" });
+    });
 
-  it('accepts session cookie token for auth/me route', () => {
-    const home = createTempHome();
-    const result = runIsolatedScript(
-      home,
-      `
+    it("accepts session cookie token for auth/me route", () => {
+        const home = createTempHome();
+        const result = runIsolatedScript(
+            home,
+            `
         const auth = await import('./src/commands/auth.ts');
         const api = (await import('./src/api.ts')).default;
         const tokenRes = await auth.generateToken('cookie-user', '1h');
@@ -50,24 +50,24 @@ describe('API/CLI integration', () => {
         const body = await response.json();
         console.log(JSON.stringify({ status: response.status, body }));
       `
-    );
+        );
 
-    expect(result.exitCode).toBe(0);
-    const data = JSON.parse(result.stdout);
+        expect(result.exitCode).toBe(0);
+        const data = JSON.parse(result.stdout);
 
-    expect(data.status).toBe(200);
-    expect(data.body).toMatchObject({
-      success: true,
-      message: 'Session valid',
-      data: { userId: 'cookie-user' },
+        expect(data.status).toBe(200);
+        expect(data.body).toMatchObject({
+            success: true,
+            message: "Session valid",
+            data: { userId: "cookie-user" },
+        });
     });
-  });
 
-  it('rejects tampered bearer tokens on protected routes', () => {
-    const home = createTempHome();
-    const result = runIsolatedScript(
-      home,
-      `
+    it("rejects tampered bearer tokens on protected routes", () => {
+        const home = createTempHome();
+        const result = runIsolatedScript(
+            home,
+            `
         const auth = await import('./src/commands/auth.ts');
         const api = (await import('./src/api.ts')).default;
         const tokenRes = await auth.generateToken('tamper-user', '1h');
@@ -82,21 +82,21 @@ describe('API/CLI integration', () => {
         const body = await response.json();
         console.log(JSON.stringify({ status: response.status, body }));
       `
-    );
+        );
 
-    expect(result.exitCode).toBe(0);
-    const data = JSON.parse(result.stdout);
+        expect(result.exitCode).toBe(0);
+        const data = JSON.parse(result.stdout);
 
-    expect(data.status).toBe(401);
-    expect(data.body.success).toBe(false);
-    expect(String(data.body.message)).toContain('Invalid');
-  });
+        expect(data.status).toBe(401);
+        expect(data.body.success).toBe(false);
+        expect(String(data.body.message)).toContain("Invalid");
+    });
 
-  it('keeps CLI and API usable in same isolated environment', () => {
-    const home = createTempHome();
-    const result = runIsolatedScript(
-      home,
-      `
+    it("keeps CLI and API usable in same isolated environment", () => {
+        const home = createTempHome();
+        const result = runIsolatedScript(
+            home,
+            `
         const auth = await import('./src/commands/auth.ts');
         const api = (await import('./src/api.ts')).default;
         const tokenRes = await auth.generateToken('bridge-user', '1h');
@@ -122,14 +122,14 @@ describe('API/CLI integration', () => {
           apiBody: body,
         }));
       `
-    );
+        );
 
-    expect(result.exitCode).toBe(0);
-    const data = JSON.parse(result.stdout);
+        expect(result.exitCode).toBe(0);
+        const data = JSON.parse(result.stdout);
 
-    expect(data.cliExitCode).toBe(0);
-    expect(data.cliVersion).toBe('0.0.1');
-    expect(data.apiStatus).toBe(200);
-    expect(data.apiBody).toMatchObject({ success: true, message: 'Session valid' });
-  });
+        expect(data.cliExitCode).toBe(0);
+        expect(data.cliVersion).toBe("0.0.1");
+        expect(data.apiStatus).toBe(200);
+        expect(data.apiBody).toMatchObject({ success: true, message: "Session valid" });
+    });
 });

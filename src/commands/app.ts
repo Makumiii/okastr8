@@ -14,7 +14,7 @@ import {
     restartContainer as restartDockerContainer,
     removeContainer,
     listContainers,
-    getProjectContainers
+    getProjectContainers,
 } from "./docker";
 
 // Helper to get __dirname in ESM
@@ -80,7 +80,7 @@ export async function createApp(config: AppConfig) {
     // Legacy support wrapper or direct redirect to deploy-core?
     // In the new flow, "createApp" is mostly "register metadata" + "initial deploy"
     // For now, we'll keep the metadata creation but use deployFromPath for the actual work
-    // However, createApp is often called by UI before code exists. 
+    // However, createApp is often called by UI before code exists.
     // If this is just reserving the name:
 
     try {
@@ -100,7 +100,7 @@ export async function createApp(config: AppConfig) {
             imageReleases: [],
             currentImageReleaseId: null,
             webhookAutoDeploy: config.webhookAutoDeploy ?? true,
-            webhookBranch: config.webhookBranch || config.gitBranch
+            webhookBranch: config.webhookBranch || config.gitBranch,
         };
 
         await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
@@ -131,14 +131,14 @@ export async function deleteApp(appName: string) {
         console.log(` Cleaning up Docker resources for ${appName}...`);
 
         // Stop single container (container name = app name)
-        await stopDockerContainer(appName).catch(() => { });
-        await removeContainer(appName).catch(() => { });
+        await stopDockerContainer(appName).catch(() => {});
+        await removeContainer(appName).catch(() => {});
 
         // Stop compose services if a compose file exists in the current deployment
         const currentComposePath = join(APPS_DIR, appName, "current", "docker-compose.yml");
         if (existsSync(currentComposePath)) {
             const { composeDown } = await import("./docker");
-            await composeDown(currentComposePath, appName).catch(() => { });
+            await composeDown(currentComposePath, appName).catch(() => {});
         }
 
         // Remove app directory
@@ -154,7 +154,7 @@ export async function deleteApp(appName: string) {
         console.error(`Error deleting app ${appName}:`, error);
         // Even if docker fails (maybe already gone), try to remove files
         const appDir = join(APPS_DIR, appName);
-        await rm(appDir, { recursive: true, force: true }).catch(() => { });
+        await rm(appDir, { recursive: true, force: true }).catch(() => {});
 
         return {
             success: false,
@@ -171,7 +171,7 @@ export async function listApps() {
 
         // Get running containers to cross-reference status
         const runningContainers = await listContainers();
-        const runningMap = new Map(runningContainers.map(c => [c.name, c.state]));
+        const runningMap = new Map(runningContainers.map((c) => [c.name, c.state]));
 
         for (const entry of entries) {
             if (entry.isDirectory()) {
@@ -188,25 +188,29 @@ export async function listApps() {
                         const projectContainers = await getProjectContainers(entry.name);
                         if (projectContainers.length > 0) {
                             // If any container in the project is running, consider the app running
-                            const anyRunning = projectContainers.some(c => c.status === 'running');
-                            state = anyRunning ? 'running' : projectContainers[0]?.status || 'stopped';
+                            const anyRunning = projectContainers.some(
+                                (c) => c.status === "running"
+                            );
+                            state = anyRunning
+                                ? "running"
+                                : projectContainers[0]?.status || "stopped";
                         }
                     }
 
                     // Extra health status from state (format: "running (healthy)")
                     let health: string | undefined = undefined;
-                    if (state?.includes('(') && state.includes(')')) {
-                        health = state.split('(')[1]?.split(')')[0];
+                    if (state?.includes("(") && state.includes(")")) {
+                        health = state.split("(")[1]?.split(")")[0];
                     }
 
                     apps.push({
                         ...metadata,
-                        running: state === 'running' || state?.includes('running'),
-                        status: state || 'stopped',
-                        health: health
+                        running: state === "running" || state?.includes("running"),
+                        status: state || "stopped",
+                        health: health,
                     });
                 } catch {
-                    apps.push({ name: entry.name, status: 'unknown' });
+                    apps.push({ name: entry.name, status: "unknown" });
                 }
             }
         }
@@ -222,12 +226,15 @@ export async function getAppStatus(appName: string) {
     try {
         const status = await containerStatus(appName);
         return {
-            success: status.status !== 'not found' && status.running,
+            success: status.status !== "not found" && status.running,
             message: status.status,
-            details: status
+            details: status,
         };
     } catch (e) {
-        return { success: false, message: e instanceof Error ? e.message : "Error checking status" };
+        return {
+            success: false,
+            message: e instanceof Error ? e.message : "Error checking status",
+        };
     }
 }
 
@@ -236,7 +243,7 @@ export async function getAppLogs(appName: string, lines: number = 50) {
         const logs = await containerLogs(appName, lines);
         return {
             success: true,
-            logs: logs
+            logs: logs,
         };
     } catch (e) {
         return { success: false, logs: "Failed to retrieve logs", error: e };
@@ -331,16 +338,16 @@ export async function updateApp(appName: string, env?: Record<string, string>) {
         const branch = metadata.gitBranch || "main";
 
         // Log Deployment Start
-        await logActivity('deploy', {
+        await logActivity("deploy", {
             id: deploymentId,
-            status: 'started',
+            status: "started",
             appName,
-            branch
+            branch,
         });
 
         // 1. Create new version entry (V2 Logic)
-        // We use "HEAD" initially, and deployFromPath doesn't strictly require git hash for logic, 
-        // but ideally we'd get the hash traverse. 
+        // We use "HEAD" initially, and deployFromPath doesn't strictly require git hash for logic,
+        // but ideally we'd get the hash traverse.
         const versionResult = await createVersion(appName, "HEAD", branch);
         versionId = versionResult.versionId;
         releasePath = versionResult.releasePath;
@@ -350,21 +357,26 @@ export async function updateApp(appName: string, env?: Record<string, string>) {
         // 2. Clone code into release path (Fresh clone like importRepo)
         // Inject OAuth token for HTTPS URLs to avoid password prompts
         let cloneUrl = metadata.gitRepo;
-        if (cloneUrl.startsWith('https://github.com/')) {
-            const { getGitHubConfig } = await import('./github');
+        if (cloneUrl.startsWith("https://github.com/")) {
+            const { getGitHubConfig } = await import("./github");
             const ghConfig = await getGitHubConfig();
             if (ghConfig.accessToken) {
-                cloneUrl = cloneUrl.replace('https://github.com/', `https://${ghConfig.accessToken}@github.com/`);
+                cloneUrl = cloneUrl.replace(
+                    "https://github.com/",
+                    `https://${ghConfig.accessToken}@github.com/`
+                );
             }
         }
 
         console.log(`Cloning ${branch} into release...`);
         const cloneResult = await runCommand("git", [
             "clone",
-            "--depth", "1",
-            "--branch", branch,
+            "--depth",
+            "1",
+            "--branch",
+            branch,
             cloneUrl,
-            releasePath
+            releasePath,
         ]);
 
         if (cloneResult.exitCode !== 0) {
@@ -380,21 +392,21 @@ export async function updateApp(appName: string, env?: Record<string, string>) {
             gitRepo: metadata.gitRepo,
             gitBranch: branch,
             env: env,
-            deploymentId: deploymentId
+            deploymentId: deploymentId,
         });
 
         const duration = (Date.now() - startTime) / 1000;
 
         if (!deployResult.success) {
             // Log Failure
-            await logActivity('deploy', {
+            await logActivity("deploy", {
                 id: deploymentId,
-                status: 'failed',
+                status: "failed",
                 appName,
                 branch,
                 versionId,
                 error: deployResult.message,
-                duration
+                duration,
             });
 
             // Cleanup on failure
@@ -405,17 +417,16 @@ export async function updateApp(appName: string, env?: Record<string, string>) {
         }
 
         // Log Success
-        await logActivity('deploy', {
+        await logActivity("deploy", {
             id: deploymentId,
-            status: 'success',
+            status: "success",
             appName,
             branch,
             versionId,
-            duration
+            duration,
         });
 
         return { success: true, message: `App updated to v${versionId}` };
-
     } catch (error: any) {
         console.error(`Error updating app ${appName}:`, error);
         // Ensure cleanup if we created a version but failed before deployFromPath returned
@@ -423,16 +434,16 @@ export async function updateApp(appName: string, env?: Record<string, string>) {
             try {
                 await rm(releasePath, { recursive: true, force: true });
                 await removeVersion(appName, versionId);
-            } catch { }
+            } catch {}
         }
 
         // Log unexpected error
-        await logActivity('deploy', {
+        await logActivity("deploy", {
             id: deploymentId,
-            status: 'failed',
+            status: "failed",
             appName,
             error: error.message,
-            duration: (Date.now() - startTime) / 1000
+            duration: (Date.now() - startTime) / 1000,
         });
 
         throw error;
@@ -444,12 +455,12 @@ async function parseEnvFromOptions(options: any): Promise<Record<string, string>
 
     if (options.envFile) {
         if (existsSync(options.envFile)) {
-            const content = await readFile(options.envFile, 'utf-8');
-            content.split('\n').forEach(line => {
+            const content = await readFile(options.envFile, "utf-8");
+            content.split("\n").forEach((line) => {
                 line = line.trim();
-                if (!line || line.startsWith('#')) return;
-                const [k, ...v] = line.split('=');
-                if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+                if (!line || line.startsWith("#")) return;
+                const [k, ...v] = line.split("=");
+                if (k && v.length > 0) env[k.trim()] = v.join("=").trim();
             });
         } else {
             throw new Error(`Env file not found: ${options.envFile}`);
@@ -458,8 +469,8 @@ async function parseEnvFromOptions(options: any): Promise<Record<string, string>
 
     if (options.env) {
         options.env.forEach((pair: string) => {
-            const [k, ...v] = pair.split('=');
-            if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+            const [k, ...v] = pair.split("=");
+            if (k && v.length > 0) env[k.trim()] = v.join("=").trim();
         });
     }
 
@@ -474,7 +485,10 @@ export async function setAppWebhookAutoDeploy(appName: string, enabled: boolean)
         const metadata = JSON.parse(content);
         metadata.webhookAutoDeploy = enabled;
         await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
-        return { success: true, message: `Webhook auto-deploy ${enabled ? 'enabled' : 'disabled'} for ${appName}` };
+        return {
+            success: true,
+            message: `Webhook auto-deploy ${enabled ? "enabled" : "disabled"} for ${appName}`,
+        };
     } catch {
         throw new Error(`App ${appName} not found or corrupted`);
     }
@@ -496,12 +510,9 @@ export async function setAppWebhookBranch(appName: string, branch: string) {
 
 // Commander Integration
 export function addAppCommands(program: Command) {
-    const app = program
-        .command("app")
-        .description("Manage okastr8 applications");
+    const app = program.command("app").description("Manage okastr8 applications");
 
-    app
-        .command("create")
+    app.command("create")
         .description("Create a new application")
         .argument("<name>", "Application name")
         .argument("<exec_start>", "Command to run (e.g., 'bun run start')")
@@ -523,7 +534,7 @@ export function addAppCommands(program: Command) {
 
                 // Save env vars if present
                 if (Object.keys(env).length > 0) {
-                    const { saveEnvVars } = await import('../utils/env-manager');
+                    const { saveEnvVars } = await import("../utils/env-manager");
                     await saveEnvVars(name, env);
                 }
 
@@ -538,7 +549,7 @@ export function addAppCommands(program: Command) {
                     gitRepo: options.gitRepo,
                     gitBranch: options.gitBranch,
                     database: options.database,
-                    cache: options.cache
+                    cache: options.cache,
                 });
                 console.log(result.message);
                 console.log(`App created at ${result.appDir}`);
@@ -548,8 +559,7 @@ export function addAppCommands(program: Command) {
             }
         });
 
-    app
-        .command("create-image")
+    app.command("create-image")
         .description("Create an application deployed directly from a container image")
         .argument("<name>", "Application name")
         .argument("<image_ref>", "Container image reference (e.g., traefik/whoami:latest)")
@@ -561,7 +571,11 @@ export function addAppCommands(program: Command) {
         .option("--pull-policy <policy>", "Image pull policy: always or if-not-present", "always")
         .option("--registry-credential <id>", "Registry credential id from `okastr8 registry add`")
         .option("--registry-server <server>", "Registry server override (e.g., ghcr.io)")
-        .option("--registry-provider <provider>", "Registry provider: ghcr|dockerhub|ecr|generic", "ghcr")
+        .option(
+            "--registry-provider <provider>",
+            "Registry provider: ghcr|dockerhub|ecr|generic",
+            "ghcr"
+        )
         .option("--release-retention <count>", "Number of image releases to keep in history", "50")
         .option("--env <vars...>", "Environment variables (KEY=VALUE)")
         .option("--env-file <path>", "Path to .env file")
@@ -569,7 +583,8 @@ export function addAppCommands(program: Command) {
             console.log(`Creating image app '${name}'...`);
             try {
                 const env = await parseEnvFromOptions(options);
-                const pullPolicy = options.pullPolicy === "if-not-present" ? "if-not-present" : "always";
+                const pullPolicy =
+                    options.pullPolicy === "if-not-present" ? "if-not-present" : "always";
                 const registryServer = options.registryServer || resolveRegistryServer(imageRef);
                 const imageReleaseRetention = parseInt(options.releaseRetention, 10);
                 if (Number.isNaN(imageReleaseRetention) || imageReleaseRetention <= 0) {
@@ -577,7 +592,7 @@ export function addAppCommands(program: Command) {
                 }
 
                 if (Object.keys(env).length > 0) {
-                    const { saveEnvVars } = await import('../utils/env-manager');
+                    const { saveEnvVars } = await import("../utils/env-manager");
                     await saveEnvVars(name, env);
                 }
 
@@ -588,7 +603,11 @@ export function addAppCommands(program: Command) {
                     workingDirectory: "",
                     user: options.user,
                     port: options.port ? parseInt(options.port, 10) : 8080,
-                    containerPort: options.containerPort ? parseInt(options.containerPort, 10) : (options.port ? parseInt(options.port, 10) : 8080),
+                    containerPort: options.containerPort
+                        ? parseInt(options.containerPort, 10)
+                        : options.port
+                          ? parseInt(options.port, 10)
+                          : 8080,
                     domain: options.domain,
                     deployStrategy: "image",
                     imageRef,
@@ -608,8 +627,7 @@ export function addAppCommands(program: Command) {
             }
         });
 
-    app
-        .command("delete")
+    app.command("delete")
         .description("Delete an application")
         .argument("<name>", "Application name")
         .action(async (name: string) => {
@@ -624,8 +642,7 @@ export function addAppCommands(program: Command) {
             }
         });
 
-    app
-        .command("list")
+    app.command("list")
         .description("List all okastr8 applications")
         .action(async () => {
             try {
@@ -635,7 +652,9 @@ export function addAppCommands(program: Command) {
                 } else {
                     console.log("Okastr8 Apps:");
                     for (const app of result.apps) {
-                        console.log(`  • ${app.name}${app.description ? ` - ${app.description}` : ""}`);
+                        console.log(
+                            `  • ${app.name}${app.description ? ` - ${app.description}` : ""}`
+                        );
                     }
                 }
             } catch (error: any) {
@@ -644,8 +663,7 @@ export function addAppCommands(program: Command) {
             }
         });
 
-    app
-        .command("status")
+    app.command("status")
         .description("Show status of an application")
         .argument("<name>", "Application name")
         .action(async (name: string) => {
@@ -658,8 +676,7 @@ export function addAppCommands(program: Command) {
             }
         });
 
-    app
-        .command("logs")
+    app.command("logs")
         .description("Show logs for an application")
         .argument("<name>", "Application name")
         .option("-n, --lines <lines>", "Number of lines to show", "50")
@@ -673,8 +690,7 @@ export function addAppCommands(program: Command) {
             }
         });
 
-    app
-        .command("export-logs")
+    app.command("export-logs")
         .description("Export logs to app directory")
         .argument("<name>", "Application name")
         .action(async (name: string) => {
@@ -687,8 +703,7 @@ export function addAppCommands(program: Command) {
             }
         });
 
-    app
-        .command("start")
+    app.command("start")
         .description("Start an application")
         .argument("<name>", "Application name")
         .action(async (name: string) => {
@@ -698,24 +713,23 @@ export function addAppCommands(program: Command) {
         });
 
     // Environment variable management
-    const env = app.command('env')
-        .description('Manage environment variables for an app');
+    const env = app.command("env").description("Manage environment variables for an app");
 
-    env.command('set')
-        .description('Set environment variables for an app')
-        .argument('<appName>', 'Name of the app')
-        .argument('<key=value...>', 'Environment variables in KEY=VALUE format')
+    env.command("set")
+        .description("Set environment variables for an app")
+        .argument("<appName>", "Name of the app")
+        .argument("<key=value...>", "Environment variables in KEY=VALUE format")
         .action(async (appName: string, keyValues: string[]) => {
             try {
-                const { setEnvVar } = await import('../utils/env-manager');
+                const { setEnvVar } = await import("../utils/env-manager");
 
                 for (const pair of keyValues) {
-                    const [key, ...valueParts] = pair.split('=');
+                    const [key, ...valueParts] = pair.split("=");
                     if (!key || valueParts.length === 0) {
                         console.error(`Invalid format: ${pair}. Expected KEY=VALUE`);
                         process.exit(1);
                     }
-                    const value = valueParts.join('=');
+                    const value = valueParts.join("=");
                     await setEnvVar(appName, key, value);
                     console.log(`Set ${key}`);
                 }
@@ -725,13 +739,13 @@ export function addAppCommands(program: Command) {
             }
         });
 
-    env.command('import')
-        .description('Import environment variables from a .env file')
-        .argument('<appName>', 'Name of the app')
-        .option('-f, --file <path>', 'Path to .env file', '.env')
+    env.command("import")
+        .description("Import environment variables from a .env file")
+        .argument("<appName>", "Name of the app")
+        .option("-f, --file <path>", "Path to .env file", ".env")
         .action(async (appName: string, options: any) => {
             try {
-                const { importEnvFile } = await import('../utils/env-manager');
+                const { importEnvFile } = await import("../utils/env-manager");
                 await importEnvFile(appName, options.file);
                 console.log(` Imported environment variables from ${options.file}`);
             } catch (error: any) {
@@ -740,19 +754,19 @@ export function addAppCommands(program: Command) {
             }
         });
 
-    env.command('list')
-        .description('List environment variable keys for an app')
-        .argument('<appName>', 'Name of the app')
+    env.command("list")
+        .description("List environment variable keys for an app")
+        .argument("<appName>", "Name of the app")
         .action(async (appName: string) => {
             try {
-                const { listEnvVars } = await import('../utils/env-manager');
+                const { listEnvVars } = await import("../utils/env-manager");
                 const keys = await listEnvVars(appName);
 
                 if (keys.length === 0) {
-                    console.log('No environment variables set');
+                    console.log("No environment variables set");
                 } else {
-                    console.log('Environment variables:');
-                    keys.forEach(key => console.log(`  ${key}=••••••••`));
+                    console.log("Environment variables:");
+                    keys.forEach((key) => console.log(`  ${key}=••••••••`));
                 }
             } catch (error: any) {
                 console.error(` Error: ${error.message}`);
@@ -760,13 +774,13 @@ export function addAppCommands(program: Command) {
             }
         });
 
-    env.command('export')
-        .description('Export environment variables to a file')
-        .argument('<appName>', 'Name of the app')
-        .option('-f, --file <path>', 'Output file path', 'exported.env')
+    env.command("export")
+        .description("Export environment variables to a file")
+        .argument("<appName>", "Name of the app")
+        .option("-f, --file <path>", "Output file path", "exported.env")
         .action(async (appName: string, options: any) => {
             try {
-                const { exportEnvFile } = await import('../utils/env-manager');
+                const { exportEnvFile } = await import("../utils/env-manager");
                 await exportEnvFile(appName, options.file);
                 console.log(` Exported environment variables to ${options.file}`);
             } catch (error: any) {
@@ -775,13 +789,13 @@ export function addAppCommands(program: Command) {
             }
         });
 
-    env.command('unset')
-        .description('Unset an environment variable')
-        .argument('<appName>', 'Name of the app')
-        .argument('<key>', 'Environment variable key to unset')
+    env.command("unset")
+        .description("Unset an environment variable")
+        .argument("<appName>", "Name of the app")
+        .argument("<key>", "Environment variable key to unset")
         .action(async (appName: string, key: string) => {
             try {
-                const { unsetEnvVar } = await import('../utils/env-manager');
+                const { unsetEnvVar } = await import("../utils/env-manager");
                 await unsetEnvVar(appName, key);
                 console.log(` Unset ${key}`);
             } catch (error: any) {
@@ -790,8 +804,7 @@ export function addAppCommands(program: Command) {
             }
         });
 
-    app
-        .command("stop")
+    app.command("stop")
         .description("Stop an application")
         .argument("<name>", "Application name")
         .action(async (name: string) => {
@@ -800,8 +813,7 @@ export function addAppCommands(program: Command) {
             console.log(result.message);
         });
 
-    app
-        .command("restart")
+    app.command("restart")
         .description("Restart an application")
         .argument("<name>", "Application name")
         .action(async (name: string) => {
@@ -810,8 +822,7 @@ export function addAppCommands(program: Command) {
             console.log(result.message);
         });
 
-    app
-        .command("webhook")
+    app.command("webhook")
         .description("Show or set auto-deploy webhook status for an app")
         .argument("<name>", "Application name")
         .argument("[state]", "State (enable/disable, on/off) - omit to show current status")
@@ -823,12 +834,14 @@ export function addAppCommands(program: Command) {
                     const config = await getAppMetadata(name);
                     const enabled = config?.webhookAutoDeploy ?? true;
                     const branch = config?.webhookBranch || config?.gitBranch || "main";
-                    console.log(`Webhook auto-deploy for ${name}: ${enabled ? 'ENABLED' : 'DISABLED'}`);
+                    console.log(
+                        `Webhook auto-deploy for ${name}: ${enabled ? "ENABLED" : "DISABLED"}`
+                    );
                     console.log(`Webhook branch for ${name}: ${branch}`);
                 } else {
                     // Set status
-                    const enabled = ['enable', 'on', 'true', '1'].includes(state.toLowerCase());
-                    console.log(`${enabled ? 'Enabling' : 'Disabling'} webhooks for ${name}...`);
+                    const enabled = ["enable", "on", "true", "1"].includes(state.toLowerCase());
+                    console.log(`${enabled ? "Enabling" : "Disabling"} webhooks for ${name}...`);
                     const result = await setAppWebhookAutoDeploy(name, enabled);
                     console.log(result.message);
                 }

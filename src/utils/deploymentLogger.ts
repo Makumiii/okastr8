@@ -16,7 +16,7 @@ const deploymentStreams = new Map<string, DeploymentStream>();
 // Cleanup old streams after 1 hour
 const STREAM_TIMEOUT = 60 * 60 * 1000;
 
-import { writeUnifiedEntry } from './structured-logger';
+import { writeUnifiedEntry } from "./structured-logger";
 
 /**
  * Start a new deployment stream
@@ -38,7 +38,7 @@ export function streamLog(deploymentId: string, message: string): void {
     const stream = deploymentStreams.get(deploymentId);
     if (stream) {
         // Send to all connected clients
-        stream.callbacks.forEach(callback => {
+        stream.callbacks.forEach((callback) => {
             try {
                 callback(message);
             } catch (error) {
@@ -65,14 +65,11 @@ export function streamLog(deploymentId: string, message: string): void {
 /**
  * Subscribe to a deployment stream
  */
-export function subscribe(
-    deploymentId: string,
-    callback: (message: string) => void
-): () => void {
+export function subscribe(deploymentId: string, callback: (message: string) => void): () => void {
     const stream = deploymentStreams.get(deploymentId);
     if (!stream) {
         console.warn(`[DeploymentLogger] Stream not found: ${deploymentId}`);
-        return () => { };
+        return () => {};
     }
 
     stream.callbacks.add(callback);
@@ -92,9 +89,9 @@ export function endDeploymentStream(deploymentId: string): void {
     const stream = deploymentStreams.get(deploymentId);
     if (stream) {
         // Notify all subscribers that stream is ending
-        stream.callbacks.forEach(callback => {
+        stream.callbacks.forEach((callback) => {
             try {
-                callback('[DEPLOYMENT_STREAM_END]');
+                callback("[DEPLOYMENT_STREAM_END]");
             } catch (error) {
                 console.error(`[DeploymentLogger] End callback error:`, error);
             }
@@ -136,7 +133,7 @@ export function cancelDeployment(deploymentId: string): boolean {
     const stream = deploymentStreams.get(deploymentId);
     if (stream) {
         stream.cancelled = true;
-        streamLog(deploymentId, 'Deployment cancelled by user');
+        streamLog(deploymentId, "Deployment cancelled by user");
         console.log(`[DeploymentLogger] Deployment cancelled: ${deploymentId}`);
         return true;
     }

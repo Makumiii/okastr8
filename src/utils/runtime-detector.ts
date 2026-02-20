@@ -11,16 +11,20 @@ import { join } from "path";
  */
 export async function detectRuntime(releasePath: string): Promise<string> {
     // Check for Node.js
-    if (existsSync(join(releasePath, "package.json")) ||
-        existsSync(join(releasePath, "package-lock.json"))) {
+    if (
+        existsSync(join(releasePath, "package.json")) ||
+        existsSync(join(releasePath, "package-lock.json"))
+    ) {
         return "node";
     }
 
     // Check for Python
-    if (existsSync(join(releasePath, "requirements.txt")) ||
+    if (
+        existsSync(join(releasePath, "requirements.txt")) ||
         existsSync(join(releasePath, "Pipfile")) ||
         existsSync(join(releasePath, "setup.py")) ||
-        existsSync(join(releasePath, "pyproject.toml"))) {
+        existsSync(join(releasePath, "pyproject.toml"))
+    ) {
         return "python";
     }
 
@@ -45,13 +49,12 @@ export async function detectRuntime(releasePath: string): Promise<string> {
     }
 
     // Check for Deno
-    if (existsSync(join(releasePath, "deno.json")) ||
-        existsSync(join(releasePath, "deno.jsonc"))) {
+    if (existsSync(join(releasePath, "deno.json")) || existsSync(join(releasePath, "deno.jsonc"))) {
         return "deno";
     }
 
     throw new Error(
         "Could not auto-detect runtime. Please specify 'runtime' in okastr8.yaml.\\n" +
-        "Supported runtimes: node, python, go, rust, ruby, bun, deno"
+            "Supported runtimes: node, python, go, rust, ruby, bun, deno"
     );
 }

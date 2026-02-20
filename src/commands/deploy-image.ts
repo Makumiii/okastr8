@@ -63,7 +63,9 @@ export function selectImageRollbackTarget(
     }
 
     if (target) {
-        const matched = releases.find((r) => r.imageDigest === target || r.imageRef === target || String(r.id) === target);
+        const matched = releases.find(
+            (r) => r.imageDigest === target || r.imageRef === target || String(r.id) === target
+        );
         return matched || null;
     }
 
@@ -74,7 +76,10 @@ export function selectImageRollbackTarget(
     return releases[releases.length - 2] || null;
 }
 
-async function waitForContainerHealth(containerName: string, maxWaitSeconds = 60): Promise<boolean> {
+async function waitForContainerHealth(
+    containerName: string,
+    maxWaitSeconds = 60
+): Promise<boolean> {
     for (let elapsed = 0; elapsed < maxWaitSeconds; elapsed += 2) {
         const status = await containerStatus(containerName);
 
@@ -92,7 +97,9 @@ async function waitForContainerHealth(containerName: string, maxWaitSeconds = 60
     return false;
 }
 
-export async function updateAppFromImage(options: ImageDeployOptions): Promise<{ success: boolean; message: string }> {
+export async function updateAppFromImage(
+    options: ImageDeployOptions
+): Promise<{ success: boolean; message: string }> {
     const { appName, metadata, env } = options;
     const deploymentId = randomUUID();
     const startTime = Date.now();
@@ -124,8 +131,15 @@ export async function updateAppFromImage(options: ImageDeployOptions): Promise<{
         let loggedIn = false;
         if (credentialId) {
             const loginMaterial = await getRegistryLoginMaterial(credentialId);
-            if (!loginMaterial.success || !loginMaterial.server || !loginMaterial.username || !loginMaterial.password) {
-                throw new Error(loginMaterial.message || `Registry credential '${credentialId}' not found`);
+            if (
+                !loginMaterial.success ||
+                !loginMaterial.server ||
+                !loginMaterial.username ||
+                !loginMaterial.password
+            ) {
+                throw new Error(
+                    loginMaterial.message || `Registry credential '${credentialId}' not found`
+                );
             }
 
             const loginResult = await dockerLogin(
@@ -155,13 +169,19 @@ export async function updateAppFromImage(options: ImageDeployOptions): Promise<{
             await saveEnvVars(appName, env);
         }
 
-        await stopContainer(appName).catch(() => { });
-        await removeContainer(appName).catch(() => { });
+        await stopContainer(appName).catch(() => {});
+        await removeContainer(appName).catch(() => {});
 
         const envPath = join(APPS_DIR, appName, ".env.production");
         const envFilePath = existsSync(envPath) ? envPath : undefined;
 
-        const runResult = await runContainer(appName, metadata.imageRef, metadata.port, containerPort, envFilePath);
+        const runResult = await runContainer(
+            appName,
+            metadata.imageRef,
+            metadata.port,
+            containerPort,
+            envFilePath
+        );
         if (!runResult.success) {
             throw new Error(runResult.message);
         }
@@ -174,7 +194,9 @@ export async function updateAppFromImage(options: ImageDeployOptions): Promise<{
         const metadataPath = join(APPS_DIR, appName, "app.json");
         const content = await readFile(metadataPath, "utf-8");
         const current = JSON.parse(content);
-        const releases = Array.isArray(current.imageReleases) ? (current.imageReleases as ImageReleaseRecord[]) : [];
+        const releases = Array.isArray(current.imageReleases)
+            ? (current.imageReleases as ImageReleaseRecord[])
+            : [];
         const nextReleaseId = releases.reduce((max, r) => Math.max(max, r.id), 0) + 1;
 
         const releaseRecord: ImageReleaseRecord = {
@@ -190,7 +212,9 @@ export async function updateAppFromImage(options: ImageDeployOptions): Promise<{
             registryProvider: metadata.registryProvider || current.registryProvider,
         };
 
-        const retention = Number(current.imageReleaseRetention || metadata.imageReleaseRetention || 50);
+        const retention = Number(
+            current.imageReleaseRetention || metadata.imageReleaseRetention || 50
+        );
         const allReleases = [...releases, releaseRecord];
         const prunedReleases = pruneImageReleases(allReleases, retention);
 
@@ -209,7 +233,7 @@ export async function updateAppFromImage(options: ImageDeployOptions): Promise<{
         await writeFile(metadataPath, JSON.stringify(current, null, 2));
 
         if (loggedIn) {
-            await dockerLogout(registryServer).catch(() => { });
+            await dockerLogout(registryServer).catch(() => {});
         }
 
         await logActivity("deploy", {
@@ -229,9 +253,11 @@ export async function updateAppFromImage(options: ImageDeployOptions): Promise<{
                 : `Image deployment successful: ${metadata.imageRef}`,
         };
     } catch (error: any) {
-        const registryServer = metadata.registryServer || (metadata.imageRef ? resolveRegistryServer(metadata.imageRef) : "");
+        const registryServer =
+            metadata.registryServer ||
+            (metadata.imageRef ? resolveRegistryServer(metadata.imageRef) : "");
         if (registryServer) {
-            await dockerLogout(registryServer).catch(() => { });
+            await dockerLogout(registryServer).catch(() => {});
         }
 
         await logActivity("deploy", {
@@ -250,7 +276,10 @@ export async function updateAppFromImage(options: ImageDeployOptions): Promise<{
     }
 }
 
-export async function rollbackImageApp(appName: string, target?: string): Promise<{ success: boolean; message: string }> {
+export async function rollbackImageApp(
+    appName: string,
+    target?: string
+): Promise<{ success: boolean; message: string }> {
     const metadataPath = join(APPS_DIR, appName, "app.json");
     let metadata: AppConfig & { imageReleases?: ImageReleaseRecord[] };
 

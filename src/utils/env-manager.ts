@@ -22,10 +22,7 @@ function getEnvFilePath(appName: string): string {
  * Save environment variables for an app
  * Overwrites existing variables with the same keys
  */
-export async function saveEnvVars(
-    appName: string,
-    vars: Record<string, string>
-): Promise<void> {
+export async function saveEnvVars(appName: string, vars: Record<string, string>): Promise<void> {
     const envFilePath = getEnvFilePath(appName);
     const appDir = join(APPS_DIR, appName);
 
@@ -52,9 +49,7 @@ export async function saveEnvVars(
  * Load environment variables for an app
  * Returns empty object if no env file exists
  */
-export async function loadEnvVars(
-    appName: string
-): Promise<Record<string, string>> {
+export async function loadEnvVars(appName: string): Promise<Record<string, string>> {
     const envFilePath = getEnvFilePath(appName);
 
     if (!existsSync(envFilePath)) {
@@ -89,10 +84,7 @@ export async function loadEnvVars(
 /**
  * Import environment variables from a .env file
  */
-export async function importEnvFile(
-    appName: string,
-    filePath: string
-): Promise<void> {
+export async function importEnvFile(appName: string, filePath: string): Promise<void> {
     if (!existsSync(filePath)) {
         throw new Error(`File not found: ${filePath}`);
     }
@@ -124,10 +116,7 @@ export async function importEnvFile(
 /**
  * Export environment variables to a file
  */
-export async function exportEnvFile(
-    appName: string,
-    outputPath: string
-): Promise<void> {
+export async function exportEnvFile(appName: string, outputPath: string): Promise<void> {
     const vars = await loadEnvVars(appName);
 
     const content = Object.entries(vars)
@@ -140,11 +129,7 @@ export async function exportEnvFile(
 /**
  * Set a single environment variable
  */
-export async function setEnvVar(
-    appName: string,
-    key: string,
-    value: string
-): Promise<void> {
+export async function setEnvVar(appName: string, key: string, value: string): Promise<void> {
     await saveEnvVars(appName, { [key]: value });
 }
 

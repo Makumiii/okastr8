@@ -3,11 +3,11 @@
  * Validates tokens (RBAC removed - all tokens have full access)
  */
 
-import type { Context, Next, MiddlewareHandler } from 'hono';
-import { validateToken } from '../commands/auth';
+import type { Context, Next, MiddlewareHandler } from "hono";
+import { validateToken } from "../commands/auth";
 
 // Extend Hono context types
-declare module 'hono' {
+declare module "hono" {
     interface ContextVariableMap {
         userId: string;
     }
@@ -19,13 +19,13 @@ declare module 'hono' {
  */
 function extractToken(c: Context): string | null {
     // Check Authorization header first
-    const authHeader = c.req.header('Authorization');
-    if (authHeader?.startsWith('Bearer ')) {
+    const authHeader = c.req.header("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
         return authHeader.slice(7);
     }
 
     // Check cookie
-    const cookie = c.req.header('Cookie');
+    const cookie = c.req.header("Cookie");
     if (cookie) {
         const match = cookie.match(/okastr8_session=([^;]+)/);
         if (match && match[1]) {
@@ -45,23 +45,29 @@ export function requireAuth(): MiddlewareHandler {
         const token = extractToken(c);
 
         if (!token) {
-            return c.json({
-                success: false,
-                message: 'Authentication required'
-            }, 401);
+            return c.json(
+                {
+                    success: false,
+                    message: "Authentication required",
+                },
+                401
+            );
         }
 
         const result = await validateToken(token);
 
         if (!result.valid) {
-            return c.json({
-                success: false,
-                message: result.error || 'Invalid token'
-            }, 401);
+            return c.json(
+                {
+                    success: false,
+                    message: result.error || "Invalid token",
+                },
+                401
+            );
         }
 
         // Attach user info to context
-        c.set('userId', result.userId!);
+        c.set("userId", result.userId!);
 
         await next();
     };
@@ -77,7 +83,7 @@ export function optionalAuth(): MiddlewareHandler {
         if (token) {
             const result = await validateToken(token);
             if (result.valid) {
-                c.set('userId', result.userId!);
+                c.set("userId", result.userId!);
             }
         }
 

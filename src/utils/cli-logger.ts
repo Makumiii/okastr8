@@ -3,7 +3,7 @@
  * Uses ora for spinners and provides task progress tracking
  */
 
-import ora, { type Ora } from 'ora';
+import ora, { type Ora } from "ora";
 
 const colors = {
     red: "\x1b[31m",
@@ -24,8 +24,8 @@ export class TaskProgress {
     constructor(steps: string[]) {
         this.steps = steps;
         this.spinner = ora({
-            spinner: 'dots',
-            color: 'cyan',
+            spinner: "dots",
+            color: "cyan",
         });
     }
 

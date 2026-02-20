@@ -12,27 +12,27 @@ const RUNTIME_CHECKS: Record<RuntimeName, { cmd: string; args: string[]; regex: 
     node: {
         cmd: "node",
         args: ["--version"],
-        regex: /^v(\d+\.\d+\.\d+)/
+        regex: /^v(\d+\.\d+\.\d+)/,
     },
     python: {
         cmd: "python3",
         args: ["--version"],
-        regex: /Python (\d+\.\d+\.\d+)/
+        regex: /Python (\d+\.\d+\.\d+)/,
     },
     go: {
         cmd: "go",
         args: ["version"],
-        regex: /go(\d+\.\d+(?:\.\d+)?)/
+        regex: /go(\d+\.\d+(?:\.\d+)?)/,
     },
     bun: {
         cmd: "bun",
         args: ["--version"],
-        regex: /^(\d+\.\d+\.\d+)/
+        regex: /^(\d+\.\d+\.\d+)/,
     },
     deno: {
         cmd: "deno",
         args: ["--version"],
-        regex: /deno (\d+\.\d+\.\d+)/
+        regex: /deno (\d+\.\d+\.\d+)/,
     },
 };
 
@@ -42,31 +42,31 @@ const INSTALL_HINTS: Record<RuntimeName, Record<string, string>> = {
         fedora: "sudo dnf install nodejs",
         debian: "sudo apt install nodejs",
         arch: "sudo pacman -S nodejs",
-        default: "https://nodejs.org/en/download/"
+        default: "https://nodejs.org/en/download/",
     },
     python: {
         fedora: "sudo dnf install python3",
         debian: "sudo apt install python3",
         arch: "sudo pacman -S python",
-        default: "https://www.python.org/downloads/"
+        default: "https://www.python.org/downloads/",
     },
     go: {
         fedora: "sudo dnf install golang",
         debian: "sudo apt install golang-go",
         arch: "sudo pacman -S go",
-        default: "https://go.dev/dl/"
+        default: "https://go.dev/dl/",
     },
     bun: {
         fedora: "curl -fsSL https://bun.sh/install | bash",
         debian: "curl -fsSL https://bun.sh/install | bash",
         arch: "curl -fsSL https://bun.sh/install | bash",
-        default: "https://bun.sh/"
+        default: "https://bun.sh/",
     },
     deno: {
         fedora: "curl -fsSL https://deno.land/install.sh | sh",
         debian: "curl -fsSL https://deno.land/install.sh | sh",
         arch: "curl -fsSL https://deno.land/install.sh | sh",
-        default: "https://deno.land/"
+        default: "https://deno.land/",
     },
 };
 
@@ -94,7 +94,7 @@ export async function detectRuntime(name: RuntimeName): Promise<RuntimeInfo> {
             return {
                 installed: true,
                 version,
-                path
+                path,
             };
         }
     } catch (error) {
@@ -108,7 +108,7 @@ export async function detectRuntime(name: RuntimeName): Promise<RuntimeInfo> {
  * Detect all supported runtimes
  */
 export async function detectAllRuntimes(): Promise<Record<RuntimeName, RuntimeInfo>> {
-    const runtimes: RuntimeName[] = ['node', 'python', 'go', 'bun', 'deno'];
+    const runtimes: RuntimeName[] = ["node", "python", "go", "bun", "deno"];
     const results: Record<string, RuntimeInfo> = {};
 
     for (const runtime of runtimes) {
@@ -116,7 +116,9 @@ export async function detectAllRuntimes(): Promise<Record<RuntimeName, RuntimeIn
         results[runtime] = await detectRuntime(runtime);
 
         if (results[runtime].installed) {
-            console.log(`   ${runtime} ${results[runtime].version || ''} found at ${results[runtime].path || 'unknown'}`);
+            console.log(
+                `   ${runtime} ${results[runtime].version || ""} found at ${results[runtime].path || "unknown"}`
+            );
         } else {
             console.log(`   ${runtime} not found`);
         }
@@ -181,16 +183,20 @@ export function getInstallHint(runtime: RuntimeName, distro?: string): string {
     if (!hints) return "";
 
     // Try to detect distro from /etc/os-release or use provided
-    const distroKey = distro?.toLowerCase() || 'default';
+    const distroKey = distro?.toLowerCase() || "default";
 
     // Map common distro names to hint keys
-    let hintKey = 'default';
-    if (distroKey.includes('fedora') || distroKey.includes('rhel') || distroKey.includes('centos')) {
-        hintKey = 'fedora';
-    } else if (distroKey.includes('ubuntu') || distroKey.includes('debian')) {
-        hintKey = 'debian';
-    } else if (distroKey.includes('arch')) {
-        hintKey = 'arch';
+    let hintKey = "default";
+    if (
+        distroKey.includes("fedora") ||
+        distroKey.includes("rhel") ||
+        distroKey.includes("centos")
+    ) {
+        hintKey = "fedora";
+    } else if (distroKey.includes("ubuntu") || distroKey.includes("debian")) {
+        hintKey = "debian";
+    } else if (distroKey.includes("arch")) {
+        hintKey = "arch";
     }
 
     return hints[hintKey] ?? hints.default ?? "";

@@ -3,12 +3,12 @@
  * Handles sending automated emails for alerts and notifications
  */
 
-import { join } from 'path';
-import { homedir } from 'os';
-import { existsSync } from 'fs';
-import { readFile } from 'fs/promises';
-import { parse as parseYaml } from 'yaml';
-import { writeUnifiedEntry } from '../utils/structured-logger';
+import { join } from "path";
+import { homedir } from "os";
+import { existsSync } from "fs";
+import { readFile } from "fs/promises";
+import { parse as parseYaml } from "yaml";
+import { writeUnifiedEntry } from "../utils/structured-logger";
 
 // ============ Types ============
 
@@ -28,53 +28,53 @@ interface EmailOptions {
 
 // ============ Config ============
 
-const SYSTEM_YAML_PATH = join(homedir(), '.okastr8', 'system.yaml');
+const SYSTEM_YAML_PATH = join(homedir(), ".okastr8", "system.yaml");
 
 async function getBrevoConfig(): Promise<BrevoConfig | null> {
     try {
         if (!existsSync(SYSTEM_YAML_PATH)) {
             void writeUnifiedEntry({
                 timestamp: new Date().toISOString(),
-                level: 'warn',
-                source: 'email',
-                service: 'email',
-                message: 'system.yaml not found',
-                action: 'email-config-missing',
+                level: "warn",
+                source: "email",
+                service: "email",
+                message: "system.yaml not found",
+                action: "email-config-missing",
             });
             return null;
         }
 
-        const content = await readFile(SYSTEM_YAML_PATH, 'utf-8');
+        const content = await readFile(SYSTEM_YAML_PATH, "utf-8");
         const config = parseYaml(content);
 
         const brevo = config?.notifications?.brevo;
         if (!brevo?.api_key) {
             void writeUnifiedEntry({
                 timestamp: new Date().toISOString(),
-                level: 'warn',
-                source: 'email',
-                service: 'email',
-                message: 'Brevo config not found in system.yaml',
-                action: 'email-config-missing',
+                level: "warn",
+                source: "email",
+                service: "email",
+                message: "Brevo config not found in system.yaml",
+                action: "email-config-missing",
             });
             return null;
         }
 
         return {
             apiKey: brevo.api_key,
-            senderEmail: brevo.sender_email || 'robot@makumitech.co.ke',
-            senderName: brevo.sender_name || 'okastr8',
-            adminEmail: brevo.admin_email || ''
+            senderEmail: brevo.sender_email || "robot@makumitech.co.ke",
+            senderName: brevo.sender_name || "okastr8",
+            adminEmail: brevo.admin_email || "",
         };
     } catch (error: any) {
         void writeUnifiedEntry({
             timestamp: new Date().toISOString(),
-            level: 'error',
-            source: 'email',
-            service: 'email',
-            message: 'Failed to load email config',
-            action: 'email-config-error',
-            error: { name: error?.name || 'Error', message: error?.message || 'Unknown error' },
+            level: "error",
+            source: "email",
+            service: "email",
+            message: "Failed to load email config",
+            action: "email-config-error",
+            error: { name: error?.name || "Error", message: error?.message || "Unknown error" },
         });
         return null;
     }
@@ -85,68 +85,70 @@ async function getBrevoConfig(): Promise<BrevoConfig | null> {
 /**
  * Send an email via Brevo SMTP API
  */
-export async function sendEmail(options: EmailOptions): Promise<{ success: boolean; error?: string }> {
+export async function sendEmail(
+    options: EmailOptions
+): Promise<{ success: boolean; error?: string }> {
     const config = await getBrevoConfig();
     if (!config) {
-        return { success: false, error: 'Email not configured. Add brevo config to system.yaml' };
+        return { success: false, error: "Email not configured. Add brevo config to system.yaml" };
     }
 
     const mailOptions = {
         sender: {
             name: config.senderName,
-            email: config.senderEmail
+            email: config.senderEmail,
         },
         to: [{ email: options.to }],
         subject: options.subject,
         htmlContent: options.html,
-        textContent: options.text
+        textContent: options.text,
     };
 
     try {
-        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-            method: 'POST',
+        const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
-                'api-key': config.apiKey,
-                'Accept': 'application/json'
+                "Content-Type": "application/json",
+                "api-key": config.apiKey,
+                Accept: "application/json",
             },
-            body: JSON.stringify(mailOptions)
+            body: JSON.stringify(mailOptions),
         });
 
         if (!response.ok) {
-            const errorData = await response.json() as { message?: string };
+            const errorData = (await response.json()) as { message?: string };
             void writeUnifiedEntry({
                 timestamp: new Date().toISOString(),
-                level: 'error',
-                source: 'email',
-                service: 'email',
-                message: 'Email send failed',
-                action: 'email-send-failed',
-                data: { message: errorData.message || 'Unknown error' },
+                level: "error",
+                source: "email",
+                service: "email",
+                message: "Email send failed",
+                action: "email-send-failed",
+                data: { message: errorData.message || "Unknown error" },
             });
-            return { success: false, error: errorData.message || 'Failed to send email' };
+            return { success: false, error: errorData.message || "Failed to send email" };
         }
 
-        const result = await response.json() as { messageId?: string };
+        const result = (await response.json()) as { messageId?: string };
         void writeUnifiedEntry({
             timestamp: new Date().toISOString(),
-            level: 'info',
-            source: 'email',
-            service: 'email',
-            message: 'Email sent',
-            action: 'email-sent',
+            level: "info",
+            source: "email",
+            service: "email",
+            message: "Email sent",
+            action: "email-sent",
             data: { messageId: result.messageId },
         });
         return { success: true };
     } catch (error: any) {
         void writeUnifiedEntry({
             timestamp: new Date().toISOString(),
-            level: 'error',
-            source: 'email',
-            service: 'email',
-            message: 'Email send error',
-            action: 'email-send-error',
-            error: { name: error?.name || 'Error', message: error?.message || 'Unknown error' },
+            level: "error",
+            source: "email",
+            service: "email",
+            message: "Email send error",
+            action: "email-send-error",
+            error: { name: error?.name || "Error", message: error?.message || "Unknown error" },
         });
         return { success: false, error: error.message };
     }
@@ -155,16 +157,19 @@ export async function sendEmail(options: EmailOptions): Promise<{ success: boole
 /**
  * Send email to admin
  */
-export async function sendAdminEmail(subject: string, html: string): Promise<{ success: boolean; error?: string }> {
+export async function sendAdminEmail(
+    subject: string,
+    html: string
+): Promise<{ success: boolean; error?: string }> {
     const config = await getBrevoConfig();
     if (!config?.adminEmail) {
-        return { success: false, error: 'Admin email not configured in system.yaml' };
+        return { success: false, error: "Admin email not configured in system.yaml" };
     }
 
     return sendEmail({
         to: config.adminEmail,
         subject: `[okastr8] ${subject}`,
-        html
+        html,
     });
 }
 
@@ -175,11 +180,11 @@ export async function sendAdminEmail(subject: string, html: string): Promise<{ s
  */
 export async function sendDeploymentAlertEmail(
     appName: string,
-    status: 'success' | 'failed',
+    status: "success" | "failed",
     details: string
 ): Promise<{ success: boolean; error?: string }> {
-    const statusColor = status === 'success' ? '#10B981' : '#EF4444';
-    const statusText = status === 'success' ? 'Successful' : 'Failed';
+    const statusColor = status === "success" ? "#10B981" : "#EF4444";
+    const statusText = status === "success" ? "Successful" : "Failed";
 
     const html = `
 <!DOCTYPE html>

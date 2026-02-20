@@ -20,7 +20,7 @@ import { resolveDeployStrategy } from "../utils/deploy-strategy";
 
 /**
  * Deploy from an existing path (used for both fresh deploys and rollbacks)
- * 
+ *
  * Steps:
  * 1. Load okastr8.yaml from releasePath
  * 2. Auto-detect runtime if not specified
@@ -29,7 +29,8 @@ import { resolveDeployStrategy } from "../utils/deploy-strategy";
  * 5. Update metadata
  */
 export async function deployFromPath(options: DeployFromPathOptions): Promise<DeployResult> {
-    const { appName, releasePath, versionId, gitRepo, gitBranch, onProgress, deploymentId } = options;
+    const { appName, releasePath, versionId, gitRepo, gitBranch, onProgress, deploymentId } =
+        options;
 
     if (deploymentId) {
         await startDeploymentStream(deploymentId);
@@ -42,7 +43,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
         "deploy",
         "symlink",
         "metadata",
-        "proxy"
+        "proxy",
     ]);
 
     const useTaskProgress = !onProgress;
@@ -97,20 +98,25 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
 
     let config: DeployConfig;
     try {
-        const { load } = await import('js-yaml');
-        const configContent = await readFile(configPath, 'utf-8');
+        const { load } = await import("js-yaml");
+        const configContent = await readFile(configPath, "utf-8");
         const rawConfig = load(configContent) as any;
 
         const normalizedBuildSteps = Array.isArray(rawConfig.build)
-            ? rawConfig.build.map((step: unknown) => String(step).trim()).filter((step: string) => step)
+            ? rawConfig.build
+                  .map((step: unknown) => String(step).trim())
+                  .filter((step: string) => step)
             : typeof rawConfig.build === "string"
-              ? rawConfig.build.split("\n").map((step: string) => step.trim()).filter((step: string) => step)
+              ? rawConfig.build
+                    .split("\n")
+                    .map((step: string) => step.trim())
+                    .filter((step: string) => step)
               : [];
 
         config = {
             runtime: rawConfig.runtime,
             buildSteps: normalizedBuildSteps,
-            startCommand: rawConfig.start || '',
+            startCommand: rawConfig.start || "",
             port: rawConfig.port || 3000,
             domain: rawConfig.domain,
             database: rawConfig.database,
@@ -136,7 +142,8 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
         fail("No start command specified in okastr8.yaml");
         return {
             success: false,
-            message: "No start command specified in okastr8.yaml (required when no Dockerfile or docker-compose.yml is present)",
+            message:
+                "No start command specified in okastr8.yaml (required when no Dockerfile or docker-compose.yml is present)",
             config,
         };
     }
@@ -184,7 +191,9 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
 
     // 3. Deploy with Docker
     step("deploy", "Deploying with Docker...");
-    log("Tip: Apps must bind to 0.0.0.0 (not localhost) to be accessible. We inject HOST=0.0.0.0 automatically.");
+    log(
+        "Tip: Apps must bind to 0.0.0.0 (not localhost) to be accessible. We inject HOST=0.0.0.0 automatically."
+    );
     const { deployWithDocker } = await import("../utils/deploy-docker.ts");
     const deployResult = await deployWithDocker(options, config);
 
@@ -205,16 +214,14 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     try {
         const content = await readFile(metadataPath, "utf-8");
         existingMetadata = JSON.parse(content);
-    } catch { }
+    } catch {}
 
     const { writeFile: fsWriteFile } = await import("fs/promises");
     const user = process.env.USER || "root";
 
     const gitRepoFinal = gitRepo || existingMetadata.gitRepo || existingMetadata.repo;
     const gitBranchFinal = gitBranch || existingMetadata.gitBranch || existingMetadata.branch;
-    const webhookBranch =
-        existingMetadata.webhookBranch ||
-        gitBranchFinal;
+    const webhookBranch = existingMetadata.webhookBranch || gitBranchFinal;
     await fsWriteFile(
         metadataPath,
         JSON.stringify(
@@ -274,8 +281,8 @@ async function checkPortAvailability(port: number, myAppName: string, log: (msg:
         const isListening = check.stdout.includes(`:${port}`);
 
         if (!isListening) {
-            // Port is free at system level. 
-            // We still do a Registry Check (Okastr8 Scan) to prevent logical conflicts 
+            // Port is free at system level.
+            // We still do a Registry Check (Okastr8 Scan) to prevent logical conflicts
             // (e.g., if another app is configured for this port but not currently running).
             return await checkRegistryConflict(port, myAppName);
         }
@@ -292,10 +299,12 @@ async function checkPortAvailability(port: number, myAppName: string, log: (msg:
                 // If it's running, check if it's the one using the port
                 const { listContainers } = await import("./docker.ts");
                 const containers = await listContainers();
-                const myContainer = containers.find(c => c.name === myAppName);
+                const myContainer = containers.find((c) => c.name === myAppName);
 
                 if (myContainer && myContainer.ports.includes(`:${port}`)) {
-                    log(`Port ${port} is currently held by a running instance of this app. It will be released during deployment.`);
+                    log(
+                        `Port ${port} is currently held by a running instance of this app. It will be released during deployment.`
+                    );
                     return; // It's us, this is fine
                 }
             }
@@ -304,9 +313,11 @@ async function checkPortAvailability(port: number, myAppName: string, log: (msg:
             const projectContainers = await getProjectContainers(myAppName);
             if (projectContainers.length > 0) {
                 // This app has compose containers running - it's the one using the port
-                const anyRunning = projectContainers.some(c => c.status === 'running');
+                const anyRunning = projectContainers.some((c) => c.status === "running");
                 if (anyRunning) {
-                    log(`Port ${port} is currently held by compose services for this app. They will be replaced during deployment.`);
+                    log(
+                        `Port ${port} is currently held by compose services for this app. They will be replaced during deployment.`
+                    );
                     return; // It's us (compose), this is fine
                 }
             }
@@ -318,11 +329,12 @@ async function checkPortAvailability(port: number, myAppName: string, log: (msg:
         await checkRegistryConflict(port, myAppName);
 
         // C. Generic Fallback
-        throw new Error(`Port ${port} is occupied by an external process or another service. Please free the port before deploying.`);
-
+        throw new Error(
+            `Port ${port} is occupied by an external process or another service. Please free the port before deploying.`
+        );
     } catch (e: any) {
         // Re-throw valid conflict errors
-        if (e.message.includes('occupied') || e.message.includes('already registered')) throw e;
+        if (e.message.includes("occupied") || e.message.includes("already registered")) throw e;
         // For other errors (like ss not found), we fallback to registry check just in case
         await checkRegistryConflict(port, myAppName);
     }
@@ -346,9 +358,9 @@ async function checkRegistryConflict(port: number, myAppName: string) {
                 if (metaPort === port) {
                     throw new Error(`Port ${port} is already registered to application '${app}'`);
                 }
-            } catch (e) { }
+            } catch (e) {}
         }
     } catch (e: any) {
-        if (e.message.includes('already registered')) throw e;
+        if (e.message.includes("already registered")) throw e;
     }
 }

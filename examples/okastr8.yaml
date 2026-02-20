@@ -21,8 +21,8 @@ domain: myapp.example.com
 # Build commands (optional)
 # Run in order before starting the application
 build:
-  - npm install
-  - npm run build
+    - npm install
+    - npm run build
 
 # Managed database (optional)
 # Triggers Docker Compose deployment

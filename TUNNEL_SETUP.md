@@ -1,6 +1,7 @@
 # Setting up Tunnels & Webhooks
 
 Okastr8 natively supports **Cloudflare Tunnel** to expose your local instance to the public internet securely. This enables:
+
 1.  **Global Dashboard Access**: Manage your apps from anywhere.
 2.  **Automated Webhooks**: Receive push events from GitHub to trigger deployments.
 
@@ -31,8 +32,8 @@ In the Cloudflare Dashboard (same tunnel creation flow):
 1.  Click **Next** to go to the "Public Hostnames" tab.
 2.  Add a public hostname (e.g., `okastr8.yourdomain.com`).
 3.  **Service**:
-    *   **Type**: `HTTP`
-    *   **URL**: `localhost:41788` (Default Okastr8 Port)
+    - **Type**: `HTTP`
+    - **URL**: `localhost:41788` (Default Okastr8 Port)
 
 > **Note**: This tells Cloudflare to forward traffic from `okastr8.yourdomain.com` to your local Okastr8 instance.
 
@@ -47,11 +48,13 @@ okastr8 tunnel setup <your-token>
 ```
 
 This will:
-*   Install `cloudflared`.
-*   Register the service.
-*   Start the tunnel.
+
+- Install `cloudflared`.
+- Register the service.
+- Start the tunnel.
 
 Verify it's running:
+
 ```bash
 okastr8 tunnel status
 ```
@@ -63,6 +66,7 @@ okastr8 tunnel status
 ⚠️ **Important**: Okastr8 needs to know your public URL to register webhooks correctly. This is currently a manual step.
 
 1.  Open your system configuration file:
+
     ```bash
     nano ~/.okastr8/system.yaml
     ```
@@ -71,12 +75,12 @@ okastr8 tunnel status
 
     ```yaml
     tunnel:
-      enabled: true
-      auth_token: "ey..."
-      url: "https://okastr8.yourdomain.com"  # <--- CORE: Add this line!
+        enabled: true
+        auth_token: "ey..."
+        url: "https://okastr8.yourdomain.com" # <--- CORE: Add this line!
     ```
 
-    *Replace `https://okastr8.yourdomain.com` with the hostname you configured in Step 2.*
+    _Replace `https://okastr8.yourdomain.com` with the hostname you configured in Step 2._
 
 ---
 
@@ -85,15 +89,19 @@ okastr8 tunnel status
 Now that your tunnel is running and Okastr8 knows your public URL, you can connect your repositories.
 
 1.  **Connect GitHub** (if not already done):
+
     ```bash
     okastr8 github connect
     ```
 
 2.  **Import a Repo**:
+
     ```bash
     okastr8 github import <owner>/<repo> --setup-webhook
     ```
-    *   Or, if you already imported an app, toggle the webhook:*
+
+    - Or, if you already imported an app, toggle the webhook:\*
+
     ```bash
     okastr8 app webhook <app-name> on
     ```
@@ -105,6 +113,6 @@ Okastr8 will now automatically register a webhook on GitHub pointing to:
 
 ## Troubleshooting
 
-*   **Tunnel Status**: `okastr8 tunnel status`
-*   **Logs**: `journalctl -u cloudflared -f`
-*   **Webhook Failures**: Check `okastr8 app logs <name>` to see if the deployment triggered.
+- **Tunnel Status**: `okastr8 tunnel status`
+- **Logs**: `journalctl -u cloudflared -f`
+- **Webhook Failures**: Check `okastr8 app logs <name>` to see if the deployment triggered.

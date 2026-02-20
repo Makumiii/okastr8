@@ -50,17 +50,8 @@ export async function gitPull(repoPath: string, branch?: string) {
     return await runCommand("bash", args);
 }
 
-export async function runHealthCheck(
-    method: string,
-    target: string,
-    timeout: number = 30
-) {
-    return await runCommand("bash", [
-        SCRIPTS.healthCheck,
-        method,
-        target,
-        timeout.toString(),
-    ]);
+export async function runHealthCheck(method: string, target: string, timeout: number = 30) {
+    return await runCommand("bash", [SCRIPTS.healthCheck, method, target, timeout.toString()]);
 }
 
 export async function deployApp(options: DeployOptions) {
@@ -70,7 +61,7 @@ export async function deployApp(options: DeployOptions) {
 
     try {
         // Check for branch mismatch and warn user
-        const { getAppMetadata, updateApp } = await import('./app');
+        const { getAppMetadata, updateApp } = await import("./app");
 
         if (branch) {
             try {
@@ -88,20 +79,20 @@ export async function deployApp(options: DeployOptions) {
                     }
 
                     // Ask for confirmation
-                    const readline = await import('readline');
+                    const readline = await import("readline");
                     const rl = readline.createInterface({
                         input: process.stdin,
                         output: process.stdout,
                     });
 
                     const answer = await new Promise<string>((resolve) => {
-                        rl.question('Continue with branch change? (y/N): ', resolve);
+                        rl.question("Continue with branch change? (y/N): ", resolve);
                     });
                     rl.close();
 
-                    if (answer.toLowerCase() !== 'y' && answer.toLowerCase() !== 'yes') {
-                        console.log('Deployment cancelled.');
-                        return { success: false, message: 'Deployment cancelled by user' };
+                    if (answer.toLowerCase() !== "y" && answer.toLowerCase() !== "yes") {
+                        console.log("Deployment cancelled.");
+                        return { success: false, message: "Deployment cancelled by user" };
                     }
 
                     console.log(`Proceeding with deployment to ${branch}...`);
@@ -118,17 +109,21 @@ export async function deployApp(options: DeployOptions) {
         const result = await updateApp(appName, env);
 
         // Dynamically import to avoid circular dep if any
-        const { sendDeploymentAlertEmail } = await import('../services/email');
+        const { sendDeploymentAlertEmail } = await import("../services/email");
 
         if (result.success) {
             console.log(`\n${result.message}`);
             // Send Success Alert
-            const releaseId = (result as any).data?.releaseId || 'unknown';
-            await sendDeploymentAlertEmail(appName, 'success', `Deployment to ${branch || 'default branch'} successful.\nRelease ID: ${releaseId}`);
+            const releaseId = (result as any).data?.releaseId || "unknown";
+            await sendDeploymentAlertEmail(
+                appName,
+                "success",
+                `Deployment to ${branch || "default branch"} successful.\nRelease ID: ${releaseId}`
+            );
 
             // Update Caddy Routing
             try {
-                const { genCaddyFile } = await import('../utils/genCaddyFile');
+                const { genCaddyFile } = await import("../utils/genCaddyFile");
                 await genCaddyFile();
             } catch (err: any) {
                 console.error(`Warning: Failed to update Caddy routing: ${err.message}`);
@@ -136,7 +131,7 @@ export async function deployApp(options: DeployOptions) {
         } else {
             console.error(`\n${result.message}`);
             // Send Failure Alert
-            await sendDeploymentAlertEmail(appName, 'failed', result.message);
+            await sendDeploymentAlertEmail(appName, "failed", result.message);
         }
 
         return result;
@@ -145,9 +140,9 @@ export async function deployApp(options: DeployOptions) {
 
         // Send Failure Alert
         try {
-            const { sendDeploymentAlertEmail } = await import('../services/email');
-            await sendDeploymentAlertEmail(appName, 'failed', error.message);
-        } catch { } // Ignore error sending alert if it fails
+            const { sendDeploymentAlertEmail } = await import("../services/email");
+            await sendDeploymentAlertEmail(appName, "failed", error.message);
+        } catch {} // Ignore error sending alert if it fails
 
         return { success: false, message: error.message };
     }
@@ -163,7 +158,13 @@ async function recordDeployment(appName: string) {
         const gitHash = hashResult.stdout?.trim() || "unknown";
 
         // Get remote URL
-        const remoteResult = await runCommand("git", ["-C", repoDir, "remote", "get-url", "origin"]);
+        const remoteResult = await runCommand("git", [
+            "-C",
+            repoDir,
+            "remote",
+            "get-url",
+            "origin",
+        ]);
         const sshUrl = remoteResult.stdout?.trim() || "unknown";
 
         const deployment: DeploysMetadata = {
@@ -272,9 +273,7 @@ export async function getDeploymentHistory(appName: string) {
 
 // Commander Integration
 export function addDeployCommands(program: Command) {
-    const deploy = program
-        .command("deploy")
-        .description("Deployment management commands");
+    const deploy = program.command("deploy").description("Deployment management commands");
 
     deploy
         .command("trigger")
@@ -289,26 +288,29 @@ export function addDeployCommands(program: Command) {
         .option("--env <vars...>", "Environment variables (KEY=VALUE)")
         .option("--env-file <path>", "Path to .env file")
         .action(async (app, options) => {
-            const buildSteps = options.build ? options.build.split(",").map((s: string) => s.trim()) : [];
-            const healthCheck = options.healthMethod && options.healthTarget
-                ? {
-                    method: options.healthMethod,
-                    target: options.healthTarget,
-                    timeout: parseInt(options.healthTimeout, 10),
-                }
-                : undefined;
+            const buildSteps = options.build
+                ? options.build.split(",").map((s: string) => s.trim())
+                : [];
+            const healthCheck =
+                options.healthMethod && options.healthTarget
+                    ? {
+                          method: options.healthMethod,
+                          target: options.healthTarget,
+                          timeout: parseInt(options.healthTimeout, 10),
+                      }
+                    : undefined;
 
             let env: Record<string, string> = {};
 
             // Parse --env-file
             if (options.envFile) {
                 if (existsSync(options.envFile)) {
-                    const content = await readFile(options.envFile, 'utf-8');
-                    content.split('\n').forEach(line => {
+                    const content = await readFile(options.envFile, "utf-8");
+                    content.split("\n").forEach((line) => {
                         line = line.trim();
-                        if (!line || line.startsWith('#')) return;
-                        const [k, ...v] = line.split('=');
-                        if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+                        if (!line || line.startsWith("#")) return;
+                        const [k, ...v] = line.split("=");
+                        if (k && v.length > 0) env[k.trim()] = v.join("=").trim();
                     });
                 } else {
                     console.error(` Env file not found: ${options.envFile}`);
@@ -319,8 +321,8 @@ export function addDeployCommands(program: Command) {
             // Parse --env flags
             if (options.env) {
                 options.env.forEach((pair: string) => {
-                    const [k, ...v] = pair.split('=');
-                    if (k && v.length > 0) env[k.trim()] = v.join('=').trim();
+                    const [k, ...v] = pair.split("=");
+                    if (k && v.length > 0) env[k.trim()] = v.join("=").trim();
                 });
             }
 
@@ -330,7 +332,7 @@ export function addDeployCommands(program: Command) {
                 buildSteps,
                 healthCheck,
                 skipHealthCheck: options.skipHealth,
-                env: Object.keys(env).length > 0 ? env : undefined
+                env: Object.keys(env).length > 0 ? env : undefined,
             });
 
             if (!result.success) {

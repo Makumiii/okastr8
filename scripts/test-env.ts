@@ -3,7 +3,7 @@
  * Test runtime environment detection
  */
 
-import { detectAllRuntimes, scanAndSaveEnvironments } from '../src/commands/env';
+import { detectAllRuntimes, scanAndSaveEnvironments } from "../src/commands/env";
 
 async function main() {
     console.log("Testing runtime detection...\n");

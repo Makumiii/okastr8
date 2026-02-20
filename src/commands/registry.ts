@@ -32,7 +32,9 @@ export function deriveEcrRegionFromServer(server: string): string | undefined {
     return undefined;
 }
 
-async function getEcrPassword(server: string): Promise<{ success: boolean; password?: string; message?: string }> {
+async function getEcrPassword(
+    server: string
+): Promise<{ success: boolean; password?: string; message?: string }> {
     const region = deriveEcrRegionFromServer(server);
     if (!region) {
         return {
@@ -112,7 +114,7 @@ async function loadStore(): Promise<RegistryStore> {
 async function saveStore(store: RegistryStore): Promise<void> {
     await mkdir(OKASTR8_HOME, { recursive: true });
     await writeFile(REGISTRY_FILE, JSON.stringify(store, null, 2), "utf-8");
-    await chmod(REGISTRY_FILE, 0o600).catch(() => { });
+    await chmod(REGISTRY_FILE, 0o600).catch(() => {});
 }
 
 export async function listRegistryCredentials(): Promise<RegistryCredential[]> {
@@ -142,9 +144,16 @@ export async function removeRegistryCredential(id: string): Promise<boolean> {
     return true;
 }
 
-export async function testRegistryCredential(id: string): Promise<{ success: boolean; message: string }> {
+export async function testRegistryCredential(
+    id: string
+): Promise<{ success: boolean; message: string }> {
     const loginMaterial = await getRegistryLoginMaterial(id);
-    if (!loginMaterial.success || !loginMaterial.server || !loginMaterial.username || !loginMaterial.password) {
+    if (
+        !loginMaterial.success ||
+        !loginMaterial.server ||
+        !loginMaterial.username ||
+        !loginMaterial.password
+    ) {
         return { success: false, message: loginMaterial.message || "Invalid login material" };
     }
 
@@ -153,12 +162,16 @@ export async function testRegistryCredential(id: string): Promise<{ success: boo
         return { success: false, message: "Docker is not installed or unavailable" };
     }
 
-    const login = await dockerLogin(loginMaterial.server, loginMaterial.username, loginMaterial.password);
+    const login = await dockerLogin(
+        loginMaterial.server,
+        loginMaterial.username,
+        loginMaterial.password
+    );
     if (!login.success) {
         return login;
     }
 
-    await dockerLogout(loginMaterial.server).catch(() => { });
+    await dockerLogout(loginMaterial.server).catch(() => {});
     return { success: true, message: `Credential '${id}' authenticated successfully` };
 }
 
@@ -175,28 +188,38 @@ export function addRegistryCommands(program: Command) {
         .argument("<server>", "Registry server (e.g., ghcr.io)")
         .argument("<username>", "Registry username")
         .argument("<token>", "Registry token/password")
-        .action(async (id: string, provider: RegistryProvider, server: string, username: string, token: string) => {
-            try {
-                const providerValue = provider.toLowerCase() as RegistryProvider;
-                if (!["ghcr", "dockerhub", "ecr", "generic"].includes(providerValue)) {
-                    console.error("Unsupported provider. Use ghcr, dockerhub, ecr, or generic.");
+        .action(
+            async (
+                id: string,
+                provider: RegistryProvider,
+                server: string,
+                username: string,
+                token: string
+            ) => {
+                try {
+                    const providerValue = provider.toLowerCase() as RegistryProvider;
+                    if (!["ghcr", "dockerhub", "ecr", "generic"].includes(providerValue)) {
+                        console.error(
+                            "Unsupported provider. Use ghcr, dockerhub, ecr, or generic."
+                        );
+                        process.exit(1);
+                    }
+
+                    await upsertRegistryCredential({
+                        id,
+                        provider: providerValue,
+                        server,
+                        username,
+                        token,
+                        createdAt: new Date().toISOString(),
+                    });
+                    console.log(`Saved registry credential '${id}' (${providerValue} @ ${server})`);
+                } catch (error: any) {
+                    console.error(`Failed to save credential: ${error.message}`);
                     process.exit(1);
                 }
-
-                await upsertRegistryCredential({
-                    id,
-                    provider: providerValue,
-                    server,
-                    username,
-                    token,
-                    createdAt: new Date().toISOString(),
-                });
-                console.log(`Saved registry credential '${id}' (${providerValue} @ ${server})`);
-            } catch (error: any) {
-                console.error(`Failed to save credential: ${error.message}`);
-                process.exit(1);
             }
-        });
+        );
 
     registry
         .command("list")
