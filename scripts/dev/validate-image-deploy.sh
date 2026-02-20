@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+CLI_CMD=(bun run src/main.ts)
+APP_PREFIX="phase7-image-validate"
+PUBLIC_APP="${APP_PREFIX}-public"
+PUBLIC_PORT="${PUBLIC_PORT:-18110}"
+
+cleanup() {
+  set +e
+  "${CLI_CMD[@]}" app delete "$PUBLIC_APP" >/dev/null 2>&1 || true
+  if [[ -n "${PRIVATE_APP:-}" ]]; then
+    "${CLI_CMD[@]}" app delete "$PRIVATE_APP" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
+echo "[1/5] Creating public image app"
+"${CLI_CMD[@]}" app create-image "$PUBLIC_APP" "nginx:1.27-alpine" \
+  --port "$PUBLIC_PORT" \
+  --container-port 80 \
+  --pull-policy always \
+  --release-retention 3 \
+  --registry-provider dockerhub
+
+echo "[2/5] Deploying public image app"
+"${CLI_CMD[@]}" deploy trigger "$PUBLIC_APP"
+
+echo "[3/5] Verifying public app responds"
+sleep 2
+curl -fsS "http://127.0.0.1:${PUBLIC_PORT}" >/dev/null
+
+echo "[4/5] Rolling back by explicit image target"
+"${CLI_CMD[@]}" deploy rollback "$PUBLIC_APP" --target "nginx:1.27-alpine" >/dev/null
+
+echo "[5/5] Verifying release retention cap"
+COUNT=$(bun --eval "const fs=require('fs'); const p=JSON.parse(fs.readFileSync(process.env.HOME+'/.okastr8/apps/${PUBLIC_APP}/app.json','utf8')); console.log(p.imageReleases.length);")
+if [[ "$COUNT" -gt 3 ]]; then
+  echo "FAIL: expected <=3 image releases, found ${COUNT}" >&2
+  exit 1
+fi
+echo "PASS: public flow validated with release count ${COUNT}"
+
+echo "Optional private registry validations"
+if [[ -n "${GHCR_USER:-}" && -n "${GHCR_TOKEN:-}" && -n "${GHCR_IMAGE:-}" ]]; then
+  PRIVATE_APP="${APP_PREFIX}-ghcr"
+  PRIVATE_PORT="${GHCR_PORT:-18111}"
+  echo " - Running GHCR private image validation"
+  "${CLI_CMD[@]}" registry add phase7-ghcr ghcr ghcr.io "$GHCR_USER" "$GHCR_TOKEN" >/dev/null
+  "${CLI_CMD[@]}" app create-image "$PRIVATE_APP" "$GHCR_IMAGE" \
+    --port "$PRIVATE_PORT" \
+    --container-port "${GHCR_CONTAINER_PORT:-80}" \
+    --registry-provider ghcr \
+    --registry-credential phase7-ghcr \
+    --release-retention 3 >/dev/null
+  "${CLI_CMD[@]}" deploy trigger "$PRIVATE_APP"
+  sleep 2
+  curl -fsS "http://127.0.0.1:${PRIVATE_PORT}" >/dev/null
+  echo "PASS: GHCR private validation"
+fi
+
+if [[ -n "${DOCKERHUB_USER:-}" && -n "${DOCKERHUB_TOKEN:-}" && -n "${DOCKERHUB_IMAGE:-}" ]]; then
+  PRIVATE_APP="${APP_PREFIX}-dockerhub"
+  PRIVATE_PORT="${DOCKERHUB_PORT:-18112}"
+  echo " - Running DockerHub private image validation"
+  "${CLI_CMD[@]}" registry add phase7-dockerhub dockerhub docker.io "$DOCKERHUB_USER" "$DOCKERHUB_TOKEN" >/dev/null
+  "${CLI_CMD[@]}" app create-image "$PRIVATE_APP" "$DOCKERHUB_IMAGE" \
+    --port "$PRIVATE_PORT" \
+    --container-port "${DOCKERHUB_CONTAINER_PORT:-80}" \
+    --registry-provider dockerhub \
+    --registry-credential phase7-dockerhub \
+    --release-retention 3 >/dev/null
+  "${CLI_CMD[@]}" deploy trigger "$PRIVATE_APP"
+  sleep 2
+  curl -fsS "http://127.0.0.1:${PRIVATE_PORT}" >/dev/null
+  echo "PASS: DockerHub private validation"
+fi
+
+if [[ -n "${ECR_SERVER:-}" && -n "${ECR_USER:-}" && -n "${ECR_TOKEN:-}" && -n "${ECR_IMAGE:-}" ]]; then
+  PRIVATE_APP="${APP_PREFIX}-ecr"
+  PRIVATE_PORT="${ECR_PORT:-18113}"
+  echo " - Running ECR private image validation"
+  "${CLI_CMD[@]}" registry add phase7-ecr ecr "$ECR_SERVER" "$ECR_USER" "$ECR_TOKEN" >/dev/null
+  "${CLI_CMD[@]}" app create-image "$PRIVATE_APP" "$ECR_IMAGE" \
+    --port "$PRIVATE_PORT" \
+    --container-port "${ECR_CONTAINER_PORT:-80}" \
+    --registry-provider ecr \
+    --registry-server "$ECR_SERVER" \
+    --registry-credential phase7-ecr \
+    --release-retention 3 >/dev/null
+  "${CLI_CMD[@]}" deploy trigger "$PRIVATE_APP"
+  sleep 2
+  curl -fsS "http://127.0.0.1:${PRIVATE_PORT}" >/dev/null
+  echo "PASS: ECR private validation"
+fi
+
+echo "Validation complete."
