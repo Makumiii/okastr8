@@ -11,6 +11,18 @@ interface ApiResponse<T = any> {
     data?: T;
 }
 
+export function redirectToLogin(): void {
+    if (typeof navigator !== "undefined" && navigator.userAgent.includes("jsdom")) {
+        return;
+    }
+
+    try {
+        window.location.assign("/login");
+    } catch {
+        // jsdom and non-browser environments may not implement full navigation.
+    }
+}
+
 /**
  * Make an authenticated API request
  */
@@ -31,7 +43,7 @@ export async function apiRequest<T = any>(
 
     // Handle unauthorized - redirect to login
     if (response.status === 401) {
-        window.location.href = "/login";
+        redirectToLogin();
         throw new Error("Unauthorized");
     }
 
@@ -42,8 +54,11 @@ export async function apiRequest<T = any>(
 /**
  * GET request helper
  */
-export async function get<T = any>(endpoint: string): Promise<ApiResponse<T>> {
-    return apiRequest<T>(endpoint, { method: "GET" });
+export async function get<T = any>(
+    endpoint: string,
+    options: RequestInit = {}
+): Promise<ApiResponse<T>> {
+    return apiRequest<T>(endpoint, { method: "GET", ...options });
 }
 
 /**

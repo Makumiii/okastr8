@@ -4,9 +4,15 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "build": "bun build src/main.ts --outdir=build --target=node"
+    "build": "bun build src/main.ts --outdir=build --target=node",
+    "test": "bun run test:unit && bun run test:smoke",
+    "test:unit": "bun test test/unit",
+    "test:smoke": "bun test test/smoke",
+    "test:integration": "bun test test/integration",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.1",
     "@types/bun": "latest"
   },
   "peerDependencies": {
