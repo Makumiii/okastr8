@@ -7,6 +7,9 @@ PUBLIC_APP="${APP_PREFIX}-public"
 PUBLIC_PORT="${PUBLIC_PORT:-18110}"
 FAILURE_APP="${APP_PREFIX}-failure"
 REGISTRY_IDS=()
+PRIVATE_EXPECTED=3
+PRIVATE_RAN=0
+PRIVATE_SKIPPED=()
 
 cleanup() {
   set +e
@@ -64,6 +67,7 @@ echo "PASS: failure path returns non-zero as expected"
 
 echo "Optional private registry validations"
 if [[ -n "${GHCR_USER:-}" && -n "${GHCR_TOKEN:-}" && -n "${GHCR_IMAGE:-}" ]]; then
+  PRIVATE_RAN=$((PRIVATE_RAN + 1))
   PRIVATE_APP="${APP_PREFIX}-ghcr"
   PRIVATE_PORT="${GHCR_PORT:-18111}"
   echo " - Running GHCR private image validation"
@@ -79,9 +83,12 @@ if [[ -n "${GHCR_USER:-}" && -n "${GHCR_TOKEN:-}" && -n "${GHCR_IMAGE:-}" ]]; th
   sleep 2
   curl -fsS "http://127.0.0.1:${PRIVATE_PORT}" >/dev/null
   echo "PASS: GHCR private validation"
+else
+  PRIVATE_SKIPPED+=("GHCR (set GHCR_USER, GHCR_TOKEN, GHCR_IMAGE)")
 fi
 
 if [[ -n "${DOCKERHUB_USER:-}" && -n "${DOCKERHUB_TOKEN:-}" && -n "${DOCKERHUB_IMAGE:-}" ]]; then
+  PRIVATE_RAN=$((PRIVATE_RAN + 1))
   PRIVATE_APP="${APP_PREFIX}-dockerhub"
   PRIVATE_PORT="${DOCKERHUB_PORT:-18112}"
   echo " - Running DockerHub private image validation"
@@ -97,9 +104,12 @@ if [[ -n "${DOCKERHUB_USER:-}" && -n "${DOCKERHUB_TOKEN:-}" && -n "${DOCKERHUB_I
   sleep 2
   curl -fsS "http://127.0.0.1:${PRIVATE_PORT}" >/dev/null
   echo "PASS: DockerHub private validation"
+else
+  PRIVATE_SKIPPED+=("DockerHub (set DOCKERHUB_USER, DOCKERHUB_TOKEN, DOCKERHUB_IMAGE)")
 fi
 
 if [[ -n "${ECR_SERVER:-}" && -n "${ECR_USER:-}" && -n "${ECR_TOKEN:-}" && -n "${ECR_IMAGE:-}" ]]; then
+  PRIVATE_RAN=$((PRIVATE_RAN + 1))
   PRIVATE_APP="${APP_PREFIX}-ecr"
   PRIVATE_PORT="${ECR_PORT:-18113}"
   echo " - Running ECR private image validation"
@@ -116,6 +126,15 @@ if [[ -n "${ECR_SERVER:-}" && -n "${ECR_USER:-}" && -n "${ECR_TOKEN:-}" && -n "$
   sleep 2
   curl -fsS "http://127.0.0.1:${PRIVATE_PORT}" >/dev/null
   echo "PASS: ECR private validation"
+else
+  PRIVATE_SKIPPED+=("ECR (set ECR_SERVER, ECR_USER, ECR_TOKEN, ECR_IMAGE)")
 fi
 
 echo "Validation complete."
+echo "Private matrix summary: ran ${PRIVATE_RAN}/${PRIVATE_EXPECTED}"
+if [[ "${#PRIVATE_SKIPPED[@]}" -gt 0 ]]; then
+  printf 'Skipped private checks:\n'
+  for item in "${PRIVATE_SKIPPED[@]}"; do
+    printf ' - %s\n' "$item"
+  done
+fi
