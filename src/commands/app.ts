@@ -28,7 +28,8 @@ const PROJECT_ROOT = join(__dirname, "..", "..");
 import { randomUUID } from "crypto";
 import { logActivity } from "../utils/activity";
 import { resolveDeployStrategy, type DeployStrategy } from "../utils/deploy-strategy";
-import { resolveRegistryServer } from "../utils/registry-image";
+import { normalizeImageRef, resolveRegistryServer } from "../utils/registry-image";
+import { publishLocalImageToRegistry } from "../utils/image-publish";
 
 // App directory structure
 import { OKASTR8_HOME } from "../config";
@@ -62,6 +63,23 @@ export interface AppConfig {
     imageReleaseRetention?: number;
 }
 
+export interface PublishImageOptions {
+    imageRef: string;
+    registryCredentialId: string;
+}
+
+export async function publishGitDeploymentImage(
+    appName: string,
+    versionId: number,
+    options: PublishImageOptions
+): Promise<{ success: boolean; message: string; digest?: string }> {
+    return publishLocalImageToRegistry({
+        localImageRef: `${appName}:v${versionId}`,
+        targetImageRef: options.imageRef,
+        registryCredentialId: options.registryCredentialId,
+    });
+}
+
 // Ensure the app directory structure exists
 async function ensureAppDirs(appName: string) {
     const appDir = join(APPS_DIR, appName);
@@ -90,6 +108,7 @@ export async function createApp(config: AppConfig) {
         const metadataPath = join(appDir, "app.json");
         const metadata = {
             ...config,
+            imageRef: config.imageRef ? normalizeImageRef(config.imageRef) : config.imageRef,
             createdAt: new Date().toISOString(),
             deploymentType: "docker", // Default to docker now
             deployStrategy: config.deployStrategy || "git",
@@ -310,7 +329,11 @@ export async function getAppMetadata(appName: string): Promise<AppConfig & { rep
     }
 }
 
-export async function updateApp(appName: string, env?: Record<string, string>) {
+export async function updateApp(
+    appName: string,
+    env?: Record<string, string>,
+    publishImageOptions?: PublishImageOptions
+) {
     let versionId: number = 0;
     let releasePath: string = "";
     const deploymentId = randomUUID();
@@ -416,6 +439,21 @@ export async function updateApp(appName: string, env?: Record<string, string>) {
             throw new Error(deployResult.message);
         }
 
+        // Optionally publish built image to registry for multi-node workflows.
+        let publishMessage = "";
+        if (publishImageOptions) {
+            const publishResult = await publishGitDeploymentImage(
+                appName,
+                versionId,
+                publishImageOptions
+            );
+            if (publishResult.success) {
+                publishMessage = ` ${publishResult.message}`;
+            } else {
+                publishMessage = ` Image publish skipped: ${publishResult.message}`;
+            }
+        }
+
         // Log Success
         await logActivity("deploy", {
             id: deploymentId,
@@ -426,7 +464,7 @@ export async function updateApp(appName: string, env?: Record<string, string>) {
             duration,
         });
 
-        return { success: true, message: `App updated to v${versionId}` };
+        return { success: true, message: `App updated to v${versionId}.${publishMessage}`.trim() };
     } catch (error: any) {
         console.error(`Error updating app ${appName}:`, error);
         // Ensure cleanup if we created a version but failed before deployFromPath returned
@@ -505,6 +543,44 @@ export async function setAppWebhookBranch(appName: string, branch: string) {
         return { success: true, message: `Webhook branch set to ${branch} for ${appName}` };
     } catch {
         throw new Error(`App ${appName} not found or corrupted`);
+    }
+}
+
+export async function updateImageAppConfig(
+    appName: string,
+    updates: {
+        imageRef?: string;
+        pullPolicy?: "always" | "if-not-present";
+        containerPort?: number;
+        port?: number;
+        registryCredentialId?: string;
+        registryServer?: string;
+        registryProvider?: "ghcr" | "dockerhub" | "ecr" | "generic";
+    }
+) {
+    const appDir = join(APPS_DIR, appName);
+    const metadataPath = join(appDir, "app.json");
+    try {
+        const content = await readFile(metadataPath, "utf-8");
+        const metadata = JSON.parse(content);
+        metadata.deployStrategy = "image";
+        if (updates.imageRef) metadata.imageRef = normalizeImageRef(updates.imageRef);
+        if (updates.pullPolicy) metadata.pullPolicy = updates.pullPolicy;
+        if (updates.containerPort) metadata.containerPort = updates.containerPort;
+        if (updates.port) metadata.port = updates.port;
+        if (updates.registryCredentialId !== undefined) {
+            metadata.registryCredentialId = updates.registryCredentialId;
+        }
+        if (updates.registryServer !== undefined) {
+            metadata.registryServer = updates.registryServer;
+        }
+        if (updates.registryProvider !== undefined) {
+            metadata.registryProvider = updates.registryProvider;
+        }
+        await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+        return { success: true, message: `Updated image config for ${appName}` };
+    } catch {
+        return { success: false, message: `App ${appName} not found or corrupted` };
     }
 }
 

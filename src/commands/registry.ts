@@ -122,6 +122,25 @@ export async function listRegistryCredentials(): Promise<RegistryCredential[]> {
     return store.credentials;
 }
 
+export async function listRegistryCredentialSummaries(): Promise<
+    Array<{
+        id: string;
+        provider: RegistryProvider;
+        server: string;
+        username: string;
+        createdAt: string;
+    }>
+> {
+    const store = await loadStore();
+    return store.credentials.map((credential) => ({
+        id: credential.id,
+        provider: credential.provider,
+        server: credential.server,
+        username: credential.username,
+        createdAt: credential.createdAt,
+    }));
+}
+
 export async function getRegistryCredential(id: string): Promise<RegistryCredential | undefined> {
     const store = await loadStore();
     return store.credentials.find((c) => c.id === id);
@@ -173,6 +192,122 @@ export async function testRegistryCredential(
 
     await dockerLogout(loginMaterial.server).catch(() => {});
     return { success: true, message: `Credential '${id}' authenticated successfully` };
+}
+
+async function ghcrFetch(
+    token: string,
+    path: string
+): Promise<{ success: boolean; data?: any; message?: string }> {
+    try {
+        const response = await fetch(`https://api.github.com${path}`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        });
+        if (!response.ok) {
+            const text = await response.text();
+            return {
+                success: false,
+                message: `GHCR API ${response.status}: ${text || response.statusText}`,
+            };
+        }
+        const data = await response.json();
+        return { success: true, data };
+    } catch (error: any) {
+        return { success: false, message: error.message };
+    }
+}
+
+export async function listGhcrPackages(options: {
+    credentialId: string;
+    ownerType?: "user" | "org";
+    owner?: string;
+}): Promise<{
+    success: boolean;
+    ownerType?: "user" | "org";
+    owner?: string;
+    packages?: Array<{ name: string; visibility?: string; updatedAt?: string }>;
+    message?: string;
+}> {
+    const credential = await getRegistryCredential(options.credentialId);
+    if (!credential) {
+        return { success: false, message: `Credential '${options.credentialId}' not found` };
+    }
+    if (credential.provider !== "ghcr") {
+        return { success: false, message: `Credential '${options.credentialId}' is not GHCR` };
+    }
+
+    const ownerType = options.ownerType || "user";
+    const owner = options.owner || credential.username;
+    const basePath =
+        ownerType === "org"
+            ? `/orgs/${encodeURIComponent(owner)}/packages?package_type=container&per_page=100`
+            : `/users/${encodeURIComponent(owner)}/packages?package_type=container&per_page=100`;
+
+    const result = await ghcrFetch(credential.token, basePath);
+    if (!result.success) return { success: false, message: result.message };
+    const rows = Array.isArray(result.data) ? result.data : [];
+    return {
+        success: true,
+        ownerType,
+        owner,
+        packages: rows.map((row: any) => ({
+            name: row.name,
+            visibility: row.visibility,
+            updatedAt: row.updated_at,
+        })),
+    };
+}
+
+export async function listGhcrPackageTags(options: {
+    credentialId: string;
+    packageName: string;
+    ownerType?: "user" | "org";
+    owner?: string;
+}): Promise<{
+    success: boolean;
+    ownerType?: "user" | "org";
+    owner?: string;
+    packageName?: string;
+    versions?: Array<{ id: string; tags: string[]; digest?: string; updatedAt?: string }>;
+    message?: string;
+}> {
+    const credential = await getRegistryCredential(options.credentialId);
+    if (!credential) {
+        return { success: false, message: `Credential '${options.credentialId}' not found` };
+    }
+    if (credential.provider !== "ghcr") {
+        return { success: false, message: `Credential '${options.credentialId}' is not GHCR` };
+    }
+    if (!options.packageName) {
+        return { success: false, message: "packageName is required" };
+    }
+
+    const ownerType = options.ownerType || "user";
+    const owner = options.owner || credential.username;
+    const scope =
+        ownerType === "org"
+            ? `/orgs/${encodeURIComponent(owner)}`
+            : `/users/${encodeURIComponent(owner)}`;
+    const path = `${scope}/packages/container/${encodeURIComponent(options.packageName)}/versions?per_page=100`;
+
+    const result = await ghcrFetch(credential.token, path);
+    if (!result.success) return { success: false, message: result.message };
+    const rows = Array.isArray(result.data) ? result.data : [];
+    return {
+        success: true,
+        ownerType,
+        owner,
+        packageName: options.packageName,
+        versions: rows.map((row: any) => ({
+            id: String(row.id),
+            tags: row.metadata?.container?.tags || [],
+            digest: row.name,
+            updatedAt: row.updated_at,
+        })),
+    };
 }
 
 export function addRegistryCommands(program: Command) {

@@ -1,10 +1,10 @@
 import {
     LayoutDashboard,
-    Github,
     Box,
     ChartLine,
     Inbox,
     FileText,
+    Rocket,
 } from "lucide-svelte";
 
 export interface NavItem {
@@ -15,7 +15,7 @@ export interface NavItem {
 
 export const navItems: NavItem[] = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/github", label: "GitHub", icon: Github },
+    { href: "/deploy", label: "Deploy", icon: Rocket },
     { href: "/apps", label: "Apps", icon: Box },
     { href: "/metrics", label: "Metrics", icon: ChartLine },
     { href: "/activity", label: "Activity", icon: Inbox },

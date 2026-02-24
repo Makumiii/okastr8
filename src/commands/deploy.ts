@@ -41,6 +41,10 @@ export interface DeployOptions {
     };
     skipHealthCheck?: boolean;
     env?: Record<string, string>;
+    publishImage?: {
+        imageRef: string;
+        registryCredentialId: string;
+    };
 }
 
 // Core Functions
@@ -55,7 +59,7 @@ export async function runHealthCheck(method: string, target: string, timeout: nu
 }
 
 export async function deployApp(options: DeployOptions) {
-    const { appName, branch, skipHealthCheck, env } = options;
+    const { appName, branch, skipHealthCheck, env, publishImage } = options;
 
     console.log(`Starting deployment for ${appName}...`);
 
@@ -106,7 +110,7 @@ export async function deployApp(options: DeployOptions) {
         // This creates a new release, clones fresh, builds, and switches symlink
         console.log(`\nUsing immutable deployment strategy (V2)...`);
 
-        const result = await updateApp(appName, env);
+        const result = await updateApp(appName, env, publishImage);
 
         // Dynamically import to avoid circular dep if any
         const { sendDeploymentAlertEmail } = await import("../services/email");
@@ -287,6 +291,15 @@ export function addDeployCommands(program: Command) {
         .option("--skip-health", "Skip health check")
         .option("--env <vars...>", "Environment variables (KEY=VALUE)")
         .option("--env-file <path>", "Path to .env file")
+        .option(
+            "--push-image",
+            "After successful git deployment, push built image to a container registry"
+        )
+        .option("--push-image-ref <ref>", "Target image ref for push (e.g., ghcr.io/org/app:tag)")
+        .option(
+            "--push-registry-credential <id>",
+            "Registry credential id from `okastr8 registry add`"
+        )
         .action(async (app, options) => {
             const buildSteps = options.build
                 ? options.build.split(",").map((s: string) => s.trim())
@@ -326,6 +339,25 @@ export function addDeployCommands(program: Command) {
                 });
             }
 
+            let publishImage:
+                | {
+                      imageRef: string;
+                      registryCredentialId: string;
+                  }
+                | undefined;
+            if (options.pushImage) {
+                if (!options.pushImageRef || !options.pushRegistryCredential) {
+                    console.error(
+                        "When using --push-image, you must also provide --push-image-ref and --push-registry-credential."
+                    );
+                    process.exit(1);
+                }
+                publishImage = {
+                    imageRef: options.pushImageRef,
+                    registryCredentialId: options.pushRegistryCredential,
+                };
+            }
+
             const result = await deployApp({
                 appName: app,
                 branch: options.branch,
@@ -333,6 +365,7 @@ export function addDeployCommands(program: Command) {
                 healthCheck,
                 skipHealthCheck: options.skipHealth,
                 env: Object.keys(env).length > 0 ? env : undefined,
+                publishImage,
             });
 
             if (!result.success) {

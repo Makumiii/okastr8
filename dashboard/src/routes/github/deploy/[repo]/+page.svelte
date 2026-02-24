@@ -1,7 +1,7 @@
 <script lang="ts">
     import { page } from "$app/stores";
     import { Card, Badge, Button } from "$lib/components/ui";
-    import { post } from "$lib/api";
+    import { get, post } from "$lib/api";
     import { onMount } from "svelte";
     import { toasts } from "$lib/stores/toasts";
     import DeployConfig from "$lib/components/DeployConfig.svelte";
@@ -50,6 +50,16 @@
     let deployStrategy = $state<DeployStrategy>("yaml");
     let dockerPort = $state<number>(3000);
     let dockerDomain = $state<string>("");
+    let publishImage = $state(false);
+    let publishImageRef = $state("");
+    let publishRegistryCredentialId = $state("");
+    interface RegistryCredentialSummary {
+        id: string;
+        provider: "ghcr" | "dockerhub" | "ecr" | "generic";
+        server: string;
+        username: string;
+    }
+    let registryCredentials = $state<RegistryCredentialSummary[]>([]);
     let branchWarning = $state<string>("");
     let webhookBranchLabel = $state<string>("");
     const hasDockerStrategy = $derived(
@@ -58,7 +68,20 @@
 
     onMount(() => {
         loadBranches();
+        loadRegistryCredentials();
     });
+
+    async function loadRegistryCredentials() {
+        const result = await get<{ credentials: RegistryCredentialSummary[] }>(
+            "/registry/credentials",
+        );
+        if (result.success && result.data?.credentials) {
+            registryCredentials = result.data.credentials;
+            if (!publishRegistryCredentialId && registryCredentials.length > 0) {
+                publishRegistryCredentialId = registryCredentials[0].id;
+            }
+        }
+    }
 
     async function loadBranches() {
         const result = await post<{ branches: string[] }>("/github/branches", {
@@ -223,6 +246,12 @@
             toasts.error("Fix environment variable errors before deploying.");
             return;
         }
+        if (publishImage && (!publishImageRef.trim() || !publishRegistryCredentialId)) {
+            toasts.error(
+                "Publish is enabled. Provide target image reference and registry credential.",
+            );
+            return;
+        }
         const config = getConfigForStrategy();
         if (!config) return;
         pendingConfig = config;
@@ -230,8 +259,20 @@
     }
 
     function getConfigForStrategy() {
+        const publishConfig = publishImage
+            ? {
+                  publishImage: {
+                      enabled: true,
+                      imageRef: publishImageRef.trim(),
+                      registryCredentialId: publishRegistryCredentialId,
+                  },
+              }
+            : {};
+
         if (deployStrategy === "yaml") {
-            return deployConfigRef?.getConfig?.();
+            const base = deployConfigRef?.getConfig?.();
+            if (!base) return base;
+            return { ...base, ...publishConfig };
         }
         return {
             runtime: preparedRuntime || preparedConfig?.runtime || "custom",
@@ -241,6 +282,7 @@
             domain: dockerDomain?.trim?.() || "",
             database: preparedConfig?.database,
             cache: preparedConfig?.cache,
+            ...publishConfig,
         };
     }
 
@@ -674,6 +716,62 @@
                     </div>
                 </div>
 
+                <div class="mt-6 space-y-3 border-t border-[var(--border)] pt-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm font-semibold text-[var(--text-primary)]">
+                                Publish Built Image (optional)
+                            </h3>
+                            <p class="text-xs text-[var(--text-secondary)]">
+                                After successful GitHub deploy, push built image to OCR.
+                            </p>
+                        </div>
+                        <label class="inline-flex items-center gap-2 text-sm">
+                            <input
+                                type="checkbox"
+                                bind:checked={publishImage}
+                                disabled={deployState === "loading" || deployState === "deploying"}
+                            />
+                            Enable
+                        </label>
+                    </div>
+                    {#if publishImage}
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div class="space-y-2">
+                                <label for="publish-image-ref" class="text-sm font-medium text-[var(--text-primary)]">
+                                    Target image reference
+                                </label>
+                                <input
+                                    id="publish-image-ref"
+                                    type="text"
+                                    bind:value={publishImageRef}
+                                    class="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
+                                    placeholder="ghcr.io/org/app:tag"
+                                    disabled={deployState === "loading" || deployState === "deploying"}
+                                />
+                            </div>
+                            <div class="space-y-2">
+                                <label for="publish-credential" class="text-sm font-medium text-[var(--text-primary)]">
+                                    Registry credential
+                                </label>
+                                <select
+                                    id="publish-credential"
+                                    bind:value={publishRegistryCredentialId}
+                                    class="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
+                                    disabled={deployState === "loading" || deployState === "deploying"}
+                                >
+                                    <option value="">Select credential</option>
+                                    {#each registryCredentials as credential}
+                                        <option value={credential.id}>
+                                            {credential.id} ({credential.provider})
+                                        </option>
+                                    {/each}
+                                </select>
+                            </div>
+                        </div>
+                    {/if}
+                </div>
+
                 <!-- Actions -->
                 <div class="mt-6 flex flex-col gap-3">
                     {#if deployState === "loading" || deployState === "deploying"}
@@ -844,6 +942,18 @@
                             {Object.keys(entriesToEnv(envEntries)).length}
                         </span>
                     </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[var(--text-secondary)]">Publish image</span>
+                        <span class="font-medium">
+                            {pendingConfig?.publishImage?.enabled ? "Yes" : "No"}
+                        </span>
+                    </div>
+                    {#if pendingConfig?.publishImage?.enabled}
+                        <div class="flex items-center justify-between">
+                            <span class="text-[var(--text-secondary)]">Target image ref</span>
+                            <span class="font-medium">{pendingConfig?.publishImage?.imageRef || "—"}</span>
+                        </div>
+                    {/if}
                 </div>
 
                 <div class="mt-6 flex items-center justify-end gap-3">

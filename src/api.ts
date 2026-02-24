@@ -686,6 +686,21 @@ api.post("/app/create", async (c) => {
     }
 });
 
+api.post("/app/update-image", async (c) => {
+    try {
+        const { updateImageAppConfig } = await import("./commands/app");
+        const { name, ...updates } = await c.req.json();
+        if (!name) {
+            return c.json(apiResponse(false, "name is required"));
+        }
+        const result = await updateImageAppConfig(name, updates);
+        return c.json(apiResponse(result.success, result.message));
+    } catch (error: any) {
+        console.error("API: /app/update-image error:", error);
+        return c.json(apiResponse(false, error.message || "Internal Server Error"));
+    }
+});
+
 api.post("/app/delete", async (c) => {
     try {
         const { deleteApp } = await import("./commands/app");
@@ -883,6 +898,53 @@ api.post("/deploy/trigger", async (c) => {
         return c.json(apiResponse(result.success, result.message));
     } catch (error: any) {
         console.error("API: /deploy/trigger error:", error);
+        return c.json(apiResponse(false, error.message || "Internal Server Error"));
+    }
+});
+
+// Registry discovery routes (for dashboard UX)
+api.get("/registry/credentials", async (c) => {
+    try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
+        const { listRegistryCredentialSummaries } = await import("./commands/registry");
+        const credentials = await listRegistryCredentialSummaries();
+        return c.json(apiResponse(true, "Registry credentials", { credentials }));
+    } catch (error: any) {
+        console.error("API: /registry/credentials error:", error);
+        return c.json(apiResponse(false, error.message || "Internal Server Error"));
+    }
+});
+
+api.post("/registry/ghcr/packages", async (c) => {
+    try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
+        const { listGhcrPackages } = await import("./commands/registry");
+        const { credentialId, ownerType, owner } = await c.req.json();
+        const result = await listGhcrPackages({ credentialId, ownerType, owner });
+        return c.json(apiResponse(result.success, result.message || "GHCR packages", result));
+    } catch (error: any) {
+        console.error("API: /registry/ghcr/packages error:", error);
+        return c.json(apiResponse(false, error.message || "Internal Server Error"));
+    }
+});
+
+api.post("/registry/ghcr/tags", async (c) => {
+    try {
+        const adminCheck = await enforceAdmin(c);
+        if (adminCheck) return adminCheck;
+        const { listGhcrPackageTags } = await import("./commands/registry");
+        const { credentialId, packageName, ownerType, owner } = await c.req.json();
+        const result = await listGhcrPackageTags({
+            credentialId,
+            packageName,
+            ownerType,
+            owner,
+        });
+        return c.json(apiResponse(result.success, result.message || "GHCR tags", result));
+    } catch (error: any) {
+        console.error("API: /registry/ghcr/tags error:", error);
         return c.json(apiResponse(false, error.message || "Internal Server Error"));
     }
 });

@@ -45,7 +45,7 @@
             </p>
         </div>
         <a
-            href="/github"
+            href="/deploy"
             class="inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-[var(--primary-ink)] transition-colors hover:bg-[var(--primary-strong)]"
         >
             + Deploy New
@@ -81,13 +81,13 @@
                 No Apps Deployed
             </h2>
             <p class="mt-2 text-center text-[var(--text-secondary)]">
-                Deploy your first app from GitHub to get started
+                Deploy your first app from GitHub or a container registry
             </p>
             <a
-                href="/github"
+                href="/deploy"
                 class="mt-6 inline-flex items-center gap-2 rounded-[var(--radius-md)] bg-[var(--primary)] px-6 py-2.5 text-sm font-medium text-[var(--primary-ink)] transition-colors hover:bg-[var(--primary-strong)]"
             >
-                Go to GitHub
+                Go to Deploy
             </a>
         </Card>
     {:else}

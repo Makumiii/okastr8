@@ -510,6 +510,11 @@ export interface DetectedConfig {
     database?: string;
     cache?: string;
     env?: Record<string, string>;
+    publishImage?: {
+        enabled: boolean;
+        imageRef: string;
+        registryCredentialId: string;
+    };
 }
 
 function normalizeBuildSteps(value: unknown): string[] {
@@ -934,6 +939,25 @@ export async function finalizeRepoImport(
         }
 
         await updateVersionStatus(appName, versionId, "active", "Running");
+
+        // Optional: publish the built image after successful git deploy.
+        if (
+            config.publishImage?.enabled &&
+            config.publishImage.imageRef &&
+            config.publishImage.registryCredentialId
+        ) {
+            const { publishLocalImageToRegistry } = await import("../utils/image-publish");
+            const publishResult = await publishLocalImageToRegistry({
+                localImageRef: `${appName}:v${versionId}`,
+                targetImageRef: config.publishImage.imageRef,
+                registryCredentialId: config.publishImage.registryCredentialId,
+            });
+            if (publishResult.success) {
+                log(`📦 ${publishResult.message}`);
+            } else {
+                log(`⚠️ Image publish skipped: ${publishResult.message}`);
+            }
+        }
 
         // 5. Update Symlink
         log("Switching to new version...");

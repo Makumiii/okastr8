@@ -18,7 +18,7 @@ import {
 import { logActivity } from "../utils/activity";
 import { OKASTR8_HOME } from "../config";
 import { getRegistryLoginMaterial } from "./registry";
-import { resolveRegistryServer } from "../utils/registry-image";
+import { normalizeImageRef, resolveRegistryServer } from "../utils/registry-image";
 
 const APPS_DIR = join(OKASTR8_HOME, "apps");
 
@@ -108,6 +108,7 @@ export async function updateAppFromImage(
         if (!metadata.imageRef) {
             throw new Error("Image strategy requires imageRef in app metadata");
         }
+        const normalizedImageRef = normalizeImageRef(metadata.imageRef);
         if (!metadata.port) {
             throw new Error("Image strategy requires a configured app port");
         }
@@ -123,11 +124,11 @@ export async function updateAppFromImage(
             status: "started",
             appName,
             strategy: "image",
-            imageRef: metadata.imageRef,
+            imageRef: normalizedImageRef,
         });
 
         const credentialId = metadata.registryCredentialId;
-        const registryServer = metadata.registryServer || resolveRegistryServer(metadata.imageRef);
+        const registryServer = metadata.registryServer || resolveRegistryServer(normalizedImageRef);
         let loggedIn = false;
         if (credentialId) {
             const loginMaterial = await getRegistryLoginMaterial(credentialId);
@@ -154,15 +155,15 @@ export async function updateAppFromImage(
         }
 
         const pullPolicy = metadata.pullPolicy || "always";
-        const shouldPull = pullPolicy === "always" || !(await imageExists(metadata.imageRef));
+        const shouldPull = pullPolicy === "always" || !(await imageExists(normalizedImageRef));
         if (shouldPull) {
-            const pullResult = await pullImage(metadata.imageRef);
+            const pullResult = await pullImage(normalizedImageRef);
             if (!pullResult.success) {
                 throw new Error(pullResult.message);
             }
         }
 
-        const imageDigest = await inspectImageDigest(metadata.imageRef);
+        const imageDigest = await inspectImageDigest(normalizedImageRef);
 
         if (env && Object.keys(env).length > 0) {
             const { saveEnvVars } = await import("../utils/env-manager");
@@ -177,7 +178,7 @@ export async function updateAppFromImage(
 
         const runResult = await runContainer(
             appName,
-            metadata.imageRef,
+            normalizedImageRef,
             metadata.port,
             containerPort,
             envFilePath
@@ -202,7 +203,7 @@ export async function updateAppFromImage(
         const releaseRecord: ImageReleaseRecord = {
             id: nextReleaseId,
             deployedAt: new Date().toISOString(),
-            imageRef: metadata.imageRef,
+            imageRef: normalizedImageRef,
             imageDigest: imageDigest,
             containerPort,
             hostPort: metadata.port,
@@ -219,7 +220,7 @@ export async function updateAppFromImage(
         const prunedReleases = pruneImageReleases(allReleases, retention);
 
         current.deployStrategy = "image";
-        current.imageRef = metadata.imageRef;
+        current.imageRef = normalizedImageRef;
         current.imageDigest = imageDigest;
         current.pullPolicy = pullPolicy;
         current.registryCredentialId = credentialId;
@@ -241,7 +242,7 @@ export async function updateAppFromImage(
             status: "success",
             appName,
             strategy: "image",
-            imageRef: metadata.imageRef,
+            imageRef: normalizedImageRef,
             imageDigest,
             duration: (Date.now() - startTime) / 1000,
         });
@@ -249,8 +250,8 @@ export async function updateAppFromImage(
         return {
             success: true,
             message: imageDigest
-                ? `Image deployment successful: ${metadata.imageRef} (${imageDigest})`
-                : `Image deployment successful: ${metadata.imageRef}`,
+                ? `Image deployment successful: ${normalizedImageRef} (${imageDigest})`
+                : `Image deployment successful: ${normalizedImageRef}`,
         };
     } catch (error: any) {
         const registryServer =

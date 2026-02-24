@@ -324,14 +324,14 @@
                             Deploy new app?
                         </h3>
                         <p class="mt-1 text-sm text-[var(--text-secondary)]">
-                            Connect to GitHub and ship in seconds.
+                            Choose GitHub or container registry flow.
                         </p>
                     </div>
                     <a
-                        href="/github"
+                        href="/deploy"
                         class="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--primary)] px-6 py-2.5 text-sm font-semibold text-[var(--primary-ink)] transition-colors hover:bg-[var(--primary-strong)]"
                     >
-                        Go to GitHub <ArrowRight size={16} />
+                        Go to Deploy <ArrowRight size={16} />
                     </a>
                 </Card>
 

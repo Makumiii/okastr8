@@ -102,6 +102,51 @@ export async function pullImage(image: string): Promise<{ success: boolean; mess
     }
 }
 
+export async function tagImage(
+    sourceImage: string,
+    targetImage: string
+): Promise<{ success: boolean; message: string }> {
+    try {
+        const result = await dockerCommand(["tag", sourceImage, targetImage]);
+        if (result.exitCode !== 0) {
+            return {
+                success: false,
+                message: `Failed to tag image: ${result.stderr || result.stdout}`,
+            };
+        }
+        return {
+            success: true,
+            message: `Tagged ${sourceImage} as ${targetImage}`,
+        };
+    } catch (error: any) {
+        return {
+            success: false,
+            message: `Tag error: ${error.message}`,
+        };
+    }
+}
+
+export async function pushImage(image: string): Promise<{ success: boolean; message: string }> {
+    try {
+        const result = await dockerCommand(["push", image]);
+        if (result.exitCode !== 0) {
+            return {
+                success: false,
+                message: `Failed to push image: ${result.stderr || result.stdout}`,
+            };
+        }
+        return {
+            success: true,
+            message: `Pushed image ${image}`,
+        };
+    } catch (error: any) {
+        return {
+            success: false,
+            message: `Push error: ${error.message}`,
+        };
+    }
+}
+
 export async function dockerLogin(
     server: string,
     username: string,
