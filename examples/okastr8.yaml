@@ -18,6 +18,11 @@ start: npm start
 # Custom domain for reverse proxy (optional)
 domain: myapp.example.com
 
+# Use Cloudflare Tunnel routing (optional)
+# Set to true to bypass Caddy and run an isolated sidecar agent.
+# Requires TUNNEL_TOKEN to be set in the app environment.
+tunnel_routing: false
+
 # Build commands (optional)
 # Run in order before starting the application
 build:

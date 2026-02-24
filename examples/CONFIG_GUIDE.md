@@ -16,7 +16,7 @@ okastr8 uses **YAML** for all configuration. There are two main files you need t
 |                  | `api_key`       | Secret key protecting the dashboard.         |
 | `manager.github` | `client_id`     | GitHub OAuth Client ID.                      |
 |                  | `client_secret` | GitHub OAuth Client Secret.                  |
-| `tunnel`         | `auth_token`    | Your Ngrok authtoken.                        |
+| `tunnel`         | `auth_token`    | Your Cloudflare tunnel token.                |
 |                  | `url`           | The public URL of your dashboard.            |
 
 **Example:**
@@ -49,8 +49,9 @@ tunnel:
 | `build`   | string[] | List of build commands.                                  |
 | `start`   | string   | Start command (e.g. `npm start`).                        |
 | `port`    | number   | Internal port the app listens on.                        |
-| `domain`  | string   | Public domain name.                                      |
-| `env`     | object   | Environment variables (KEY: VALUE).                      |
+| `domain`         | string   | Public domain name.                                      |
+| `tunnel_routing` | boolean  | Use Cloudflare Tunnel sidecar (bypasses Caddy).          |
+| `env`            | object   | Environment variables (KEY: VALUE).                      |
 
 **Example:**
 
@@ -62,6 +63,7 @@ build:
     - npm run build
 start: npm start
 port: 3000
+tunnel_routing: true
 env:
     NODE_ENV: production
 ```
