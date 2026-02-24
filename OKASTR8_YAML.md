@@ -34,6 +34,7 @@ port: 3000 # Port for health checks and routing
 # Optional
 runtime: "node:22" # Runtime with version (auto-detected if omitted)
 domain: "myapp.com" # Custom domain for Caddy routing
+tunnel_routing: true # Spins up a Cloudflare Tunnel sidecar (bypassing caddy)
 build: # Build commands to run before starting
     - "npm ci"
     - "npm run build"
@@ -81,15 +82,16 @@ domain: "myapp.com" # Custom domain for Caddy routing
 
 ## Field Reference
 
-| Field      | Type     | Required                 | Description                                                             |
-| :--------- | :------- | :----------------------- | :---------------------------------------------------------------------- |
-| `start`    | string   | **When no Docker files** | Command to start your server.                                           |
-| `port`     | number   | **Always**               | Port your app listens on. Required for health checks and Caddy routing. |
-| `build`    | string[] | No                       | Build commands (only for auto-generated Dockerfile).                    |
-| `runtime`  | string   | No                       | Runtime with version (auto-detected if omitted).                        |
-| `domain`   | string   | No                       | Custom domain for Caddy reverse proxy.                                  |
-| `database` | string   | No                       | Managed database (triggers auto-compose).                               |
-| `cache`    | string   | No                       | Managed cache (triggers auto-compose).                                  |
+| Field            | Type     | Required                 | Description                                                             |
+| :--------------- | :------- | :----------------------- | :---------------------------------------------------------------------- |
+| `start`          | string   | **When no Docker files** | Command to start your server.                                           |
+| `port`           | number   | **Always**               | Port your app listens on. Required for health checks and Caddy routing. |
+| `build`          | string[] | No                       | Build commands (only for auto-generated Dockerfile).                    |
+| `runtime`        | string   | No                       | Runtime with version (auto-detected if omitted).                        |
+| `domain`         | string   | No                       | Custom domain for Caddy reverse proxy.                                  |
+| `tunnel_routing` | boolean  | No                       | Opt-in to run a dedicated Cloudflare Tunnel sidecar container.          |
+| `database`       | string   | No                       | Managed database (triggers auto-compose).                               |
+| `cache`          | string   | No                       | Managed cache (triggers auto-compose).                                  |
 
 ## Environment Variables
 
@@ -117,7 +119,7 @@ Environment variables are stored securely in `/var/okastr8/apps/{appName}/.env.p
 
 ## Managed Services
 
-If you specify a `database` or `cache` (auto-compose only), Okastr8 automatically:
+If you specify a `database` or `cache` (for both Git auto-compose deployments AND Direct Image deployments), Okastr8 automatically:
 
 1. Generates a Docker Compose setup
 2. Spins up the service container alongside your app

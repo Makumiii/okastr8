@@ -39,6 +39,26 @@ okastr8 app create <name> <exec_start> [options]
 okastr8 app create myapp "bun run start" -p 3000 --domain myapp.example.com
 ```
 
+### Create from Image
+
+```bash
+okastr8 app create-image <name> <image_ref> [options]
+
+# Options:
+#   -p, --port <port>             Container port (e.g. 80)
+#   --domain <domain>             Domain for reverse proxy
+#   --tunnel-routing              Use Cloudflare Tunnel instead of Caddy for routing
+#   --database <type:version>     Managed database (e.g., 'postgres:15')
+#   --cache <type:version>        Managed cache (e.g., 'redis:7')
+#   --env <vars...>               Environment variables (KEY=VALUE)
+#   --env-file <path>             Path to .env file
+#   --pull-policy <policy>        Image pull policy (always, missing)
+#   --registry-credential <id>    Credential ID for private registries
+
+# Example:
+okastr8 app create-image myapp nginx:latest -p 80 --domain myapp.example.com --database postgres:15
+```
+
 ### Delete an app
 
 ```bash

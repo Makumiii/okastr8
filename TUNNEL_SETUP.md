@@ -116,3 +116,50 @@ Okastr8 will now automatically register a webhook on GitHub pointing to:
 - **Tunnel Status**: `okastr8 tunnel status`
 - **Logs**: `journalctl -u cloudflared -f`
 - **Webhook Failures**: Check `okastr8 app logs <name>` to see if the deployment triggered.
+
+---
+
+## App-Specific Cloudflare Tunnels (Bypassing the Caddy Proxy)
+
+Okastr8 natively supports exposing individual applications securely to the internet through isolated Cloudflare Tunnels. This bypasses the default Caddy reverse proxy on your server, offering enhanced security and direct edge routing.
+
+### 1. Generate an App Tunnel Token
+Follow the same steps as above (Step 1) to create a new Tunnel in the Cloudflare Zero Trust Dashboard specifically for your app (e.g., `okastr8-my-app-tunnel`). 
+1. Copy the **Token** string (`ey...`).
+2. Go to the **Public Hostnames** tab, and configure your hostname (e.g. `api.yourdomain.com`).
+3. Set the **Service** to:
+   - **Type**: `HTTP`
+   - **URL**: `localhost:<YOUR_APP_PORT>` (Replace `<YOUR_APP_PORT>` with the port defined in your `okastr8.yaml` or `-p` flag).
+
+### 2. Configure the App Environment
+For security reasons, Cloudflare Tokens are **never** committed to `okastr8.yaml`. You must inject the token into your app's environment variables. 
+Set the environment variable `TUNNEL_TOKEN` with your token:
+```bash
+# via CLI
+okastr8 app env set myapp TUNNEL_TOKEN="ey..."
+
+# or pass it during deployment
+okastr8 deploy trigger myapp --env TUNNEL_TOKEN="ey..."
+```
+
+*(You can also set this via the Environment Variables tab in the Okastr8 Dashboard before deploying).*
+
+### 3. Deploy with Tunnel Routing Enabled
+Now, instruct Okastr8 to spin up a Cloudflare sidecar for your app.
+
+**For Git Deployments:**
+Add `tunnel_routing: true` to your `okastr8.yaml` file:
+```yaml
+port: 3000
+tunnel_routing: true
+```
+
+**For Image Deployments:**
+Pass the `--tunnel-routing` flag:
+```bash
+okastr8 app create-image myapp nginx:latest -p 80 --tunnel-routing
+```
+
+*(You can also toggle this via the "Use Cloudflare Tunnel routing" checkbox in the Dashboard UI).*
+
+Okastr8 will now deploy a dedicated `cloudflared` agent alongside your application linked specifically to your provided token!
