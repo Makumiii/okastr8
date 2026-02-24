@@ -51,6 +51,7 @@ tunnel:
 | `port`    | number   | Internal port the app listens on.                        |
 | `domain`         | string   | Public domain name.                                      |
 | `tunnel_routing` | boolean  | Use Cloudflare Tunnel sidecar (bypasses Caddy).          |
+| `publish_image`  | object   | Opt-in publish of built git deployment image to registry. |
 | `env`            | object   | Environment variables (KEY: VALUE).                      |
 
 **Example:**
@@ -64,6 +65,10 @@ build:
 start: npm start
 port: 3000
 tunnel_routing: true
+publish_image:
+    enabled: true
+    image: ghcr.io/your-org/my-app:latest
+    registry_credential: ghcr-main
 env:
     NODE_ENV: production
 ```

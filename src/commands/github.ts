@@ -456,6 +456,7 @@ export async function inspectRepoConfig(
                 tunnel_routing: parsed.tunnel_routing ?? false,
                 database: parsed.database,
                 cache: parsed.cache,
+                publishImage: parsePublishImageConfig(parsed),
                 env: {},
             };
         } catch {
@@ -516,6 +517,28 @@ export interface DetectedConfig {
         enabled: boolean;
         imageRef: string;
         registryCredentialId: string;
+    };
+}
+
+function parsePublishImageConfig(rawConfig: any): DetectedConfig["publishImage"] | undefined {
+    const section = rawConfig?.publish_image ?? rawConfig?.publishImage;
+    if (!section || typeof section !== "object") return undefined;
+
+    const enabled = Boolean(section.enabled ?? section.on ?? false);
+    const imageRef = String(section.image ?? section.image_ref ?? section.imageRef ?? "").trim();
+    const registryCredentialId = String(
+        section.registry_credential ??
+            section.registryCredential ??
+            section.registryCredentialId ??
+            ""
+    ).trim();
+
+    if (!enabled || !imageRef || !registryCredentialId) return undefined;
+
+    return {
+        enabled: true,
+        imageRef,
+        registryCredentialId,
     };
 }
 
@@ -666,6 +689,7 @@ export async function prepareRepoImport(
                     tunnel_routing: config.tunnel_routing ?? false,
                     database: config.database,
                     cache: config.cache,
+                    publishImage: parsePublishImageConfig(config),
                     env: {},
                 };
             } catch (e: any) {
@@ -836,6 +860,13 @@ export async function finalizeRepoImport(
                 tunnel_routing: config.tunnel_routing ?? false,
                 database: config.database,
                 cache: config.cache,
+                publish_image: config.publishImage
+                    ? {
+                          enabled: config.publishImage.enabled,
+                          image: config.publishImage.imageRef,
+                          registry_credential: config.publishImage.registryCredentialId,
+                      }
+                    : undefined,
             });
             await writeFile(join(releasePath, "okastr8.yaml"), yamlContent);
             log(" Configuration saved to release");

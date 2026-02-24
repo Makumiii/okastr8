@@ -119,6 +119,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
             startCommand: rawConfig.start || "",
             port: rawConfig.port || 3000,
             domain: rawConfig.domain,
+            tunnel_routing: rawConfig.tunnel_routing ?? false,
             database: rawConfig.database,
             cache: rawConfig.cache,
         };
@@ -233,6 +234,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
                 user: user,
                 port: config.port,
                 domain: config.domain,
+                tunnel_routing: config.tunnel_routing ?? false,
                 gitRepo: gitRepoFinal,
                 gitBranch: gitBranchFinal,
                 webhookBranch,

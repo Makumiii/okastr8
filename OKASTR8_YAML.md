@@ -40,6 +40,10 @@ build: # Build commands to run before starting
     - "npm run build"
 database: "postgres:15" # Triggers auto-compose with database
 cache: "redis:7" # Triggers auto-compose with cache
+publish_image:
+    enabled: true # Opt-in: push built git-deploy image to registry after success
+    image: "ghcr.io/your-org/myapp:latest" # Target image ref
+    registry_credential: "ghcr-main" # Credential id from `okastr8 registry add`
 ```
 
 ### User-Provided Dockerfile
@@ -92,6 +96,22 @@ domain: "myapp.com" # Custom domain for Caddy routing
 | `tunnel_routing` | boolean  | No                       | Opt-in to run a dedicated Cloudflare Tunnel sidecar container.          |
 | `database`       | string   | No                       | Managed database (triggers auto-compose).                               |
 | `cache`          | string   | No                       | Managed cache (triggers auto-compose).                                  |
+| `publish_image`  | object   | No                       | Opt-in publish of built git-deploy image to OCI registry after success. |
+
+### `publish_image` Fields
+
+```yaml
+publish_image:
+    enabled: true
+    image: "ghcr.io/your-org/myapp:latest"
+    registry_credential: "ghcr-main"
+```
+
+| Field                 | Type    | Required | Description                                               |
+| :-------------------- | :------ | :------- | :-------------------------------------------------------- |
+| `enabled`             | boolean | Yes      | Must be `true` to trigger image publish.                  |
+| `image`               | string  | Yes      | Target image reference (e.g. `ghcr.io/org/app:tag`).     |
+| `registry_credential` | string  | Yes      | Registry credential id configured via `okastr8 registry`. |
 
 ## Environment Variables
 
@@ -190,6 +210,11 @@ build:
 
 database: "postgres:15"
 cache: "redis:7"
+
+publish_image:
+    enabled: true
+    image: "ghcr.io/my-org/myapp:latest"
+    registry_credential: "ghcr-main"
 ```
 
 ### With User Dockerfile

@@ -39,6 +39,13 @@ database: "postgres:15"
 # Supported: redis
 cache: "redis:7"
 
+# Optional: publish built image after successful Git deployment (opt-in)
+# This uses your saved registry credential id (from `okastr8 registry add`)
+publish_image:
+    enabled: false
+    image: "ghcr.io/your-org/your-app:latest"
+    registry_credential: "ghcr-main"
+
 # ==============================================
 # NOTE: Environment Variables
 # ==============================================
