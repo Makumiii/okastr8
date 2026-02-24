@@ -170,19 +170,49 @@ export async function updateAppFromImage(
             await saveEnvVars(appName, env);
         }
 
-        await stopContainer(appName).catch(() => {});
-        await removeContainer(appName).catch(() => {});
+        await stopContainer(appName).catch(() => { });
+        await removeContainer(appName).catch(() => { });
+
+        const { composeDown, composeUp } = await import("./docker");
+        const appCurrentDir = join(APPS_DIR, appName, "current");
+        const currentComposePath = join(appCurrentDir, "docker-compose.yml");
+        if (existsSync(currentComposePath)) {
+            await composeDown(currentComposePath, appName).catch(() => { });
+        }
 
         const envPath = join(APPS_DIR, appName, ".env.production");
         const envFilePath = existsSync(envPath) ? envPath : undefined;
 
-        const runResult = await runContainer(
-            appName,
-            normalizedImageRef,
-            metadata.port,
-            containerPort,
-            envFilePath
-        );
+        let runResult;
+
+        if (metadata.database || metadata.cache) {
+            const { mkdir } = await import("fs/promises");
+            await mkdir(appCurrentDir, { recursive: true });
+
+            const { generateCompose } = await import("../utils/compose-generator");
+
+            const composeConfig = {
+                port: metadata.port,
+                database: metadata.database,
+                cache: metadata.cache,
+                deployStrategy: "image",
+                imageRef: normalizedImageRef
+            };
+
+            const composeContent = generateCompose(composeConfig as any, appName, envFilePath);
+            await writeFile(currentComposePath, composeContent, "utf-8");
+
+            runResult = await composeUp(currentComposePath, appName);
+        } else {
+            runResult = await runContainer(
+                appName,
+                normalizedImageRef,
+                metadata.port,
+                containerPort,
+                envFilePath
+            );
+        }
+
         if (!runResult.success) {
             throw new Error(runResult.message);
         }
@@ -231,10 +261,38 @@ export async function updateAppFromImage(
         current.lastDeployedAt = new Date().toISOString();
         current.imageReleases = prunedReleases;
         current.currentImageReleaseId = releaseRecord.id;
+        // Ensure tunnel state is caught
+        current.tunnel_routing = metadata.tunnel_routing ?? current.tunnel_routing ?? false;
         await writeFile(metadataPath, JSON.stringify(current, null, 2));
 
+        // Proxy and Cloudflare Tunnel Orchestration
+        const { genCaddyFile } = await import("../utils/genCaddyFile");
+        const { startAppTunnelContainer, stopAppTunnelContainer } = await import("./docker");
+
+        let tunnelToken: string | undefined = process.env.TUNNEL_TOKEN;
+
+        if (envFilePath && existsSync(envFilePath)) {
+            const content = await readFile(envFilePath, "utf-8");
+            const lines = content.split('\n');
+            for (const line of lines) {
+                const match = line.match(/^TUNNEL_TOKEN=(.*)$/);
+                if (match && match[1]) {
+                    tunnelToken = match[1].replace(/['"]/g, '').trim();
+                    break;
+                }
+            }
+        }
+
+        if (current.tunnel_routing && tunnelToken) {
+            await startAppTunnelContainer(appName, tunnelToken);
+        } else {
+            await stopAppTunnelContainer(appName).catch(() => { });
+        }
+
+        await genCaddyFile();
+
         if (loggedIn) {
-            await dockerLogout(registryServer).catch(() => {});
+            await dockerLogout(registryServer).catch(() => { });
         }
 
         await logActivity("deploy", {
@@ -258,7 +316,7 @@ export async function updateAppFromImage(
             metadata.registryServer ||
             (metadata.imageRef ? resolveRegistryServer(metadata.imageRef) : "");
         if (registryServer) {
-            await dockerLogout(registryServer).catch(() => {});
+            await dockerLogout(registryServer).catch(() => { });
         }
 
         await logActivity("deploy", {

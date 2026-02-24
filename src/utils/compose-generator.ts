@@ -18,10 +18,6 @@ export function generateCompose(
 ): string {
     const services: any = {
         app: {
-            build: {
-                context: ".",
-                dockerfile: "Dockerfile.generated",
-            },
             container_name: appName,
             ports: [`${config.port}:${config.port}`],
             restart: "unless-stopped",
@@ -38,6 +34,16 @@ export function generateCompose(
     // Add env_file if provided
     if (envFilePath) {
         services.app.env_file = [envFilePath];
+    }
+
+    // Set build or image
+    if (config.deployStrategy === "image" && config.imageRef) {
+        services.app.image = config.imageRef;
+    } else {
+        services.app.build = {
+            context: ".",
+            dockerfile: "Dockerfile.generated",
+        };
     }
 
     // Add environment variables for service connections
