@@ -50,7 +50,8 @@
     let deployStrategy = $state<DeployStrategy>("yaml");
     let dockerPort = $state<number>(3000);
     let dockerDomain = $state<string>("");
-    let dockerTunnelRouting = $state<boolean>(false);
+    type RoutingMode = "caddy" | "tunnel";
+    let dockerRoutingMode = $state<RoutingMode>("caddy");
     let publishImage = $state(false);
     let publishImageRef = $state("");
     let publishRegistryCredentialId = $state("");
@@ -119,6 +120,9 @@
             deployStrategy = prefersDocker ? "docker" : "yaml";
             dockerPort = result.data.config?.port ?? 3000;
             dockerDomain = result.data.config?.domain ?? "";
+            dockerRoutingMode = result.data.config?.tunnel_routing
+                ? "tunnel"
+                : "caddy";
             await checkBranchWarning();
             deployState = "idle";
         } else {
@@ -281,7 +285,7 @@
             startCommand: "",
             port: Number(dockerPort) || 3000,
             domain: dockerDomain?.trim?.() || "",
-            tunnel_routing: dockerTunnelRouting,
+            tunnel_routing: dockerRoutingMode === "tunnel",
             database: preparedConfig?.database,
             cache: preparedConfig?.cache,
             ...publishConfig,
@@ -615,16 +619,31 @@
                                         placeholder="app.example.com"
                                         disabled={deployState === "loading" || deployState === "deploying"}
                                     />
-                                    <div class="mt-2 flex items-center gap-2">
-                                        <input
-                                            type="checkbox"
-                                            id="docker-tunnel-routing"
-                                            bind:checked={dockerTunnelRouting}
-                                            class="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)] transition-colors"
-                                            disabled={deployState === "loading" || deployState === "deploying"}
-                                        />
-                                        <label for="docker-tunnel-routing" class="text-sm text-[var(--text-secondary)]">
-                                            Use Cloudflare Tunnel routing (bypasses default proxy)
+                                    <div class="mt-2 space-y-2">
+                                        <p class="text-sm text-[var(--text-secondary)]">
+                                            Routing strategy
+                                        </p>
+                                        <label class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                                            <input
+                                                type="radio"
+                                                name="docker-routing-mode"
+                                                value="caddy"
+                                                bind:group={dockerRoutingMode}
+                                                class="h-4 w-4 border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
+                                                disabled={deployState === "loading" || deployState === "deploying"}
+                                            />
+                                            Default Caddy routing (domain-based)
+                                        </label>
+                                        <label class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                                            <input
+                                                type="radio"
+                                                name="docker-routing-mode"
+                                                value="tunnel"
+                                                bind:group={dockerRoutingMode}
+                                                class="h-4 w-4 border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
+                                                disabled={deployState === "loading" || deployState === "deploying"}
+                                            />
+                                            Cloudflare Tunnel routing (sidecar / bypass Caddy)
                                         </label>
                                     </div>
                                 </div>
@@ -941,6 +960,14 @@
                     <div class="flex items-center justify-between">
                         <span class="text-[var(--text-secondary)]">Domain</span>
                         <span class="font-medium">{pendingConfig?.domain || "—"}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-[var(--text-secondary)]">Routing</span>
+                        <span class="font-medium">
+                            {pendingConfig?.tunnel_routing
+                                ? "Cloudflare Tunnel"
+                                : "Default Caddy"}
+                        </span>
                     </div>
                     <div class="flex items-center justify-between">
                         <span class="text-[var(--text-secondary)]">Database</span>

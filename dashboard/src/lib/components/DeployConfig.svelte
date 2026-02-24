@@ -108,7 +108,7 @@
     let startCommand = $state<string>("");
     let buildSteps = $state<string[]>([]);
     let domain = $state<string>("");
-    let tunnelRouting = $state<boolean>(false);
+    let routingMode = $state<"caddy" | "tunnel">("caddy");
     let isSubmitting = $state(false);
     let prevDbType = $state<string>("");
     let prevCacheType = $state<string>("");
@@ -144,7 +144,7 @@
             .filter((step: string) => step);
 
         domain = configData.domain ?? "";
-        tunnelRouting = configData.tunnel_routing ?? false;
+        routingMode = configData.tunnel_routing ? "tunnel" : "caddy";
     });
 
     $effect(() => {
@@ -201,7 +201,7 @@
             startCommand,
             buildSteps: buildSteps.map((s) => s.trim()).filter((s) => s),
             domain,
-            tunnel_routing: tunnelRouting,
+            tunnel_routing: routingMode === "tunnel",
             database,
             cache,
         };
@@ -310,16 +310,31 @@
                     placeholder="myapp.example.com"
                     disabled={isDisabled}
                 />
-            <div class="mt-2 flex items-center gap-2">
-                <input
-                    type="checkbox"
-                    id="tunnel-routing"
-                    bind:checked={tunnelRouting}
-                    class="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)] transition-colors"
-                    disabled={isDisabled}
-                />
-                <label for="tunnel-routing" class="text-sm text-[var(--text-secondary)]">
-                    Use Cloudflare Tunnel routing (bypasses default proxy)
+            <div class="mt-2 space-y-2">
+                <p class="text-sm text-[var(--text-secondary)]">
+                    Routing strategy
+                </p>
+                <label class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                    <input
+                        type="radio"
+                        name="routing-mode"
+                        value="caddy"
+                        bind:group={routingMode}
+                        class="h-4 w-4 border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
+                        disabled={isDisabled}
+                    />
+                    Default Caddy routing (domain-based)
+                </label>
+                <label class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                    <input
+                        type="radio"
+                        name="routing-mode"
+                        value="tunnel"
+                        bind:group={routingMode}
+                        class="h-4 w-4 border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
+                        disabled={isDisabled}
+                    />
+                    Cloudflare Tunnel routing (sidecar / bypass Caddy)
                 </label>
             </div>
         </div>

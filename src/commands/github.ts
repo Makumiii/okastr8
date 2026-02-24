@@ -453,6 +453,7 @@ export async function inspectRepoConfig(
                 startCommand: parsed.start || "",
                 port: parsed.port || 3000,
                 domain: parsed.domain,
+                tunnel_routing: parsed.tunnel_routing ?? false,
                 database: parsed.database,
                 cache: parsed.cache,
                 env: {},
@@ -507,6 +508,7 @@ export interface DetectedConfig {
     runtime: string;
     port?: number;
     domain?: string;
+    tunnel_routing?: boolean;
     database?: string;
     cache?: string;
     env?: Record<string, string>;
@@ -661,6 +663,7 @@ export async function prepareRepoImport(
                     startCommand: config.start || "",
                     port: config.port || 3000,
                     domain: config.domain,
+                    tunnel_routing: config.tunnel_routing ?? false,
                     database: config.database,
                     cache: config.cache,
                     env: {},
@@ -830,6 +833,7 @@ export async function finalizeRepoImport(
                 start: config.startCommand,
                 port: config.port,
                 domain: config.domain,
+                tunnel_routing: config.tunnel_routing ?? false,
                 database: config.database,
                 cache: config.cache,
             });

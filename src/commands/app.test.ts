@@ -30,6 +30,7 @@ describe("App Configuration with Tunnel Routing", () => {
     test("creates app with tunnel_routing enabled", async () => {
         const result = await createApp({
             name: testAppName,
+            description: "Test app for tunnel routing config",
             port: 3000,
             domain: "tunnel.example.com",
             tunnel_routing: true, // Key feature being tested
