@@ -42,8 +42,13 @@ export async function genCaddyFile(onLog?: (msg: string) => void) {
 
                 const domain = metadata.domain;
                 const port = metadata.port;
+                const tunnelRouting = metadata.tunnel_routing;
 
                 if (domain && port) {
+                    if (tunnelRouting) {
+                        if (onLog) onLog(`  Skipped route: ${domain} (using Cloudflare Tunnel)`);
+                        continue;
+                    }
                     // Use http:// prefix for localhost domains to avoid auto-HTTPS
                     const scheme = domain.endsWith(".localhost") ? "http://" : "";
                     caddyEntries.push(`${scheme}${domain} {\n  reverse_proxy localhost:${port}\n}`);

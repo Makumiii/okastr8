@@ -108,6 +108,7 @@
     let startCommand = $state<string>("");
     let buildSteps = $state<string[]>([]);
     let domain = $state<string>("");
+    let tunnelRouting = $state<boolean>(false);
     let isSubmitting = $state(false);
     let prevDbType = $state<string>("");
     let prevCacheType = $state<string>("");
@@ -143,6 +144,7 @@
             .filter((step: string) => step);
 
         domain = configData.domain ?? "";
+        tunnelRouting = configData.tunnel_routing ?? false;
     });
 
     $effect(() => {
@@ -199,6 +201,7 @@
             startCommand,
             buildSteps: buildSteps.map((s) => s.trim()).filter((s) => s),
             domain,
+            tunnel_routing: tunnelRouting,
             database,
             cache,
         };
@@ -307,6 +310,18 @@
                     placeholder="myapp.example.com"
                     disabled={isDisabled}
                 />
+            <div class="mt-2 flex items-center gap-2">
+                <input
+                    type="checkbox"
+                    id="tunnel-routing"
+                    bind:checked={tunnelRouting}
+                    class="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)] transition-colors"
+                    disabled={isDisabled}
+                />
+                <label for="tunnel-routing" class="text-sm text-[var(--text-secondary)]">
+                    Use Cloudflare Tunnel routing (bypasses default proxy)
+                </label>
+            </div>
         </div>
 
         <!-- Infrastructure / Services -->

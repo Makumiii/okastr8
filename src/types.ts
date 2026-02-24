@@ -77,6 +77,9 @@ export interface DeployConfig {
     database?: string; // e.g., "postgres:15" | "mysql:8" | "mongodb:7"
     cache?: string; // e.g., "redis:7"
     env?: Record<string, string>;
+    tunnel_routing?: boolean;
+    deployStrategy?: "git" | "image";
+    imageRef?: string;
 }
 
 export interface DeployFromPathOptions {

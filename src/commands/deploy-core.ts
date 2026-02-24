@@ -104,14 +104,14 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
 
         const normalizedBuildSteps = Array.isArray(rawConfig.build)
             ? rawConfig.build
-                  .map((step: unknown) => String(step).trim())
-                  .filter((step: string) => step)
+                .map((step: unknown) => String(step).trim())
+                .filter((step: string) => step)
             : typeof rawConfig.build === "string"
-              ? rawConfig.build
+                ? rawConfig.build
                     .split("\n")
                     .map((step: string) => step.trim())
                     .filter((step: string) => step)
-              : [];
+                : [];
 
         config = {
             runtime: rawConfig.runtime,
@@ -214,7 +214,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     try {
         const content = await readFile(metadataPath, "utf-8");
         existingMetadata = JSON.parse(content);
-    } catch {}
+    } catch { }
 
     const { writeFile: fsWriteFile } = await import("fs/promises");
     const user = process.env.USER || "root";
@@ -251,7 +251,46 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
         )
     );
 
-    // 6. Update Caddy configuration (Reverse Proxy)
+    // 6. Tunnel Configuration (App-specific Cloudflare Tunnel)
+    try {
+        step("tunnel", "Configuring application tunnel routing...");
+        const envPath = join(APPS_DIR, appName, ".env.production");
+        let tunnelToken: string | undefined;
+
+        if (existsSync(envPath)) {
+            const content = await readFile(envPath, "utf-8");
+            const lines = content.split('\n');
+            for (const line of lines) {
+                const match = line.match(/^TUNNEL_TOKEN=(.*)$/);
+                if (match && match[1]) {
+                    tunnelToken = match[1].replace(/['"]/g, '').trim();
+                    break;
+                }
+            }
+        }
+
+        const {
+            startAppTunnelContainer,
+            stopAppTunnelContainer,
+        } = await import("./docker.ts");
+
+        if (config.tunnel_routing && tunnelToken) {
+            log("App has tunnel_routing enabled and a TUNNEL_TOKEN. Starting sidecar tunnel...");
+            const tunnelResult = await startAppTunnelContainer(appName, tunnelToken);
+            if (!tunnelResult.success) {
+                log(`Warning: Failed to start tunnel container: ${tunnelResult.message}`);
+            } else {
+                log("Cloudflare Tunnel sidecar successfully started.");
+            }
+        } else {
+            // Ensure no lingering tunnel container if they turned it off
+            await stopAppTunnelContainer(appName);
+        }
+    } catch (e) {
+        log(`Failed to configure tunnel: ${e instanceof Error ? e.message : String(e)}`);
+    }
+
+    // 7. Update Caddy configuration (Reverse Proxy)
     try {
         step("proxy", "Updating reverse proxy configuration...");
         const { genCaddyFile } = await import("../utils/genCaddyFile.ts");
@@ -358,7 +397,7 @@ async function checkRegistryConflict(port: number, myAppName: string) {
                 if (metaPort === port) {
                     throw new Error(`Port ${port} is already registered to application '${app}'`);
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
     } catch (e: any) {
         if (e.message.includes("already registered")) throw e;

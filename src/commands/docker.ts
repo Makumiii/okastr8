@@ -476,6 +476,80 @@ export async function containerStatus(
 }
 
 /**
+ * Start an app-specific Cloudflare Tunnel sidecar container
+ */
+export async function startAppTunnelContainer(
+    appName: string,
+    tunnelToken: string
+): Promise<{ success: boolean; message: string }> {
+    try {
+        const containerName = `${appName}-tunnel`;
+
+        // Remove existing if any
+        await removeContainer(containerName).catch(() => { });
+
+        const result = await dockerCommand([
+            "run",
+            "-d",
+            "--name",
+            containerName,
+            "--network",
+            "host",
+            "--restart",
+            "unless-stopped",
+            "cloudflare/cloudflared:latest",
+            "tunnel",
+            "--no-autoupdate",
+            "run",
+            "--token",
+            tunnelToken,
+        ]);
+
+        if (result.exitCode !== 0) {
+            return {
+                success: false,
+                message: `Failed to start tunnel container: ${result.stderr}`,
+            };
+        }
+
+        return {
+            success: true,
+            message: `Tunnel container ${containerName} started successfully`,
+        };
+    } catch (error: any) {
+        return {
+            success: false,
+            message: `Tunnel start error: ${error.message}`,
+        };
+    }
+}
+
+/**
+ * Stop and remove an app-specific Cloudflare Tunnel sidecar container
+ */
+export async function stopAppTunnelContainer(
+    appName: string
+): Promise<{ success: boolean; message: string }> {
+    const containerName = `${appName}-tunnel`;
+    let success = true;
+    let message = `Tunnel container ${containerName} stopped and removed`;
+
+    const stopResult = await stopContainer(containerName);
+    if (!stopResult.success && !stopResult.message.includes("No such container")) {
+        success = false;
+        message = stopResult.message;
+    }
+
+    const rmResult = await removeContainer(containerName);
+    if (!rmResult.success && !rmResult.message.includes("No such container")) {
+        success = false;
+        message = rmResult.message;
+    }
+
+    return { success, message };
+}
+
+/**
  * Get container logs
  */
 export async function containerLogs(containerName: string, lines: number = 50): Promise<string> {

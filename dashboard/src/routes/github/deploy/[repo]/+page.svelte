@@ -50,6 +50,7 @@
     let deployStrategy = $state<DeployStrategy>("yaml");
     let dockerPort = $state<number>(3000);
     let dockerDomain = $state<string>("");
+    let dockerTunnelRouting = $state<boolean>(false);
     let publishImage = $state(false);
     let publishImageRef = $state("");
     let publishRegistryCredentialId = $state("");
@@ -280,6 +281,7 @@
             startCommand: "",
             port: Number(dockerPort) || 3000,
             domain: dockerDomain?.trim?.() || "",
+            tunnel_routing: dockerTunnelRouting,
             database: preparedConfig?.database,
             cache: preparedConfig?.cache,
             ...publishConfig,
@@ -613,6 +615,18 @@
                                         placeholder="app.example.com"
                                         disabled={deployState === "loading" || deployState === "deploying"}
                                     />
+                                    <div class="mt-2 flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            id="docker-tunnel-routing"
+                                            bind:checked={dockerTunnelRouting}
+                                            class="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)] transition-colors"
+                                            disabled={deployState === "loading" || deployState === "deploying"}
+                                        />
+                                        <label for="docker-tunnel-routing" class="text-sm text-[var(--text-secondary)]">
+                                            Use Cloudflare Tunnel routing (bypasses default proxy)
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                         </div>

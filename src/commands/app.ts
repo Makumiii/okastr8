@@ -61,6 +61,7 @@ export interface AppConfig {
     registryServer?: string;
     registryProvider?: "ghcr" | "dockerhub" | "ecr" | "generic";
     imageReleaseRetention?: number;
+    tunnel_routing?: boolean;
 }
 
 export interface PublishImageOptions {
@@ -120,6 +121,7 @@ export async function createApp(config: AppConfig) {
             currentImageReleaseId: null,
             webhookAutoDeploy: config.webhookAutoDeploy ?? true,
             webhookBranch: config.webhookBranch || config.gitBranch,
+            tunnel_routing: config.tunnel_routing ?? false,
         };
 
         await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
@@ -150,14 +152,14 @@ export async function deleteApp(appName: string) {
         console.log(` Cleaning up Docker resources for ${appName}...`);
 
         // Stop single container (container name = app name)
-        await stopDockerContainer(appName).catch(() => {});
-        await removeContainer(appName).catch(() => {});
+        await stopDockerContainer(appName).catch(() => { });
+        await removeContainer(appName).catch(() => { });
 
         // Stop compose services if a compose file exists in the current deployment
         const currentComposePath = join(APPS_DIR, appName, "current", "docker-compose.yml");
         if (existsSync(currentComposePath)) {
             const { composeDown } = await import("./docker");
-            await composeDown(currentComposePath, appName).catch(() => {});
+            await composeDown(currentComposePath, appName).catch(() => { });
         }
 
         // Remove app directory
@@ -173,7 +175,7 @@ export async function deleteApp(appName: string) {
         console.error(`Error deleting app ${appName}:`, error);
         // Even if docker fails (maybe already gone), try to remove files
         const appDir = join(APPS_DIR, appName);
-        await rm(appDir, { recursive: true, force: true }).catch(() => {});
+        await rm(appDir, { recursive: true, force: true }).catch(() => { });
 
         return {
             success: false,
@@ -472,7 +474,7 @@ export async function updateApp(
             try {
                 await rm(releasePath, { recursive: true, force: true });
                 await removeVersion(appName, versionId);
-            } catch {}
+            } catch { }
         }
 
         // Log unexpected error
@@ -597,6 +599,7 @@ export function addAppCommands(program: Command) {
         .option("-w, --working-dir <dir>", "Working directory")
         .option("-p, --port <port>", "Application port")
         .option("--domain <domain>", "Domain for Caddy reverse proxy")
+        .option("--tunnel-routing", "Use Cloudflare Tunnel instead of Caddy for routing", false)
         .option("--git-repo <url>", "Git repository URL")
         .option("--git-branch <branch>", "Git branch to track", "main")
         .option("--database <type:version>", "Database service (e.g., 'postgres:15')")
@@ -622,6 +625,7 @@ export function addAppCommands(program: Command) {
                     user: options.user,
                     port: options.port ? parseInt(options.port, 10) : undefined,
                     domain: options.domain,
+                    tunnel_routing: options.tunnelRouting,
                     gitRepo: options.gitRepo,
                     gitBranch: options.gitBranch,
                     database: options.database,
@@ -644,6 +648,7 @@ export function addAppCommands(program: Command) {
         .option("-p, --port <port>", "Application port", "8080")
         .option("--container-port <port>", "Container internal port (default: same as --port)")
         .option("--domain <domain>", "Domain for Caddy reverse proxy")
+        .option("--tunnel-routing", "Use Cloudflare Tunnel instead of Caddy for routing", false)
         .option("--pull-policy <policy>", "Image pull policy: always or if-not-present", "always")
         .option("--registry-credential <id>", "Registry credential id from `okastr8 registry add`")
         .option("--registry-server <server>", "Registry server override (e.g., ghcr.io)")
@@ -653,6 +658,8 @@ export function addAppCommands(program: Command) {
             "ghcr"
         )
         .option("--release-retention <count>", "Number of image releases to keep in history", "50")
+        .option("--database <type:version>", "Database service (e.g., 'postgres:15')")
+        .option("--cache <type:version>", "Cache service (e.g., 'redis:7')")
         .option("--env <vars...>", "Environment variables (KEY=VALUE)")
         .option("--env-file <path>", "Path to .env file")
         .action(async (name: string, imageRef: string, options: any) => {
@@ -682,9 +689,10 @@ export function addAppCommands(program: Command) {
                     containerPort: options.containerPort
                         ? parseInt(options.containerPort, 10)
                         : options.port
-                          ? parseInt(options.port, 10)
-                          : 8080,
+                            ? parseInt(options.port, 10)
+                            : 8080,
                     domain: options.domain,
+                    tunnel_routing: options.tunnelRouting,
                     deployStrategy: "image",
                     imageRef,
                     pullPolicy,
@@ -692,6 +700,8 @@ export function addAppCommands(program: Command) {
                     registryServer,
                     registryProvider: options.registryProvider,
                     imageReleaseRetention,
+                    database: options.database,
+                    cache: options.cache,
                     webhookAutoDeploy: false,
                 });
 
