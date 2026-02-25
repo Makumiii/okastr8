@@ -6,6 +6,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-gate-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality-gate:
     runs-on: ubuntu-latest
@@ -48,6 +55,37 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
+
+  dashboard-gate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install Dashboard Dependencies
+        run: npm ci
+
+      - name: Dashboard Check
+        run: npm run check
+
+      - name: Dashboard Unit Tests
+        run: npm run test:unit
+
+      - name: Dashboard Build
+        run: npm run build
+
+      - name: Dashboard NPM Audit (HIGH/CRITICAL)
+        run: npm audit --omit=dev --audit-level=high
 
   live-e2e:
     if: github.event_name == 'workflow_dispatch'
