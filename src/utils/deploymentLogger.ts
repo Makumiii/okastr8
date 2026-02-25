@@ -11,6 +11,7 @@ export interface DeploymentStream {
     ended: boolean;
     endedAt?: number;
     history: string[];
+    cancelHandlers: Set<() => void>;
 }
 
 // Store active deployment streams
@@ -32,8 +33,13 @@ export function startDeploymentStream(deploymentId: string): void {
         cancelled: false,
         ended: false,
         history: [],
+        cancelHandlers: new Set(),
     });
     console.log(`[DeploymentLogger] Started stream: ${deploymentId}`);
+}
+
+export function hasDeploymentStream(deploymentId: string): boolean {
+    return deploymentStreams.has(deploymentId);
 }
 
 /**
@@ -129,6 +135,7 @@ export function endDeploymentStream(deploymentId: string): void {
             }
         });
         stream.callbacks.clear();
+        stream.cancelHandlers.clear();
         console.log(`[DeploymentLogger] Ended stream: ${deploymentId}`);
     }
 }
@@ -169,6 +176,13 @@ export function cancelDeployment(deploymentId: string): boolean {
     const stream = deploymentStreams.get(deploymentId);
     if (stream) {
         stream.cancelled = true;
+        for (const stop of Array.from(stream.cancelHandlers)) {
+            try {
+                stop();
+            } catch {
+                // Best-effort cancellation.
+            }
+        }
         streamLog(deploymentId, "Deployment cancelled by user");
         console.log(`[DeploymentLogger] Deployment cancelled: ${deploymentId}`);
         return true;
@@ -182,4 +196,20 @@ export function cancelDeployment(deploymentId: string): boolean {
 export function isDeploymentCancelled(deploymentId: string): boolean {
     const stream = deploymentStreams.get(deploymentId);
     return stream?.cancelled ?? false;
+}
+
+/**
+ * Register a process cancellation hook for a deployment stream.
+ * Returns an unregister function.
+ */
+export function registerDeploymentCancelHandler(
+    deploymentId: string,
+    stop: () => void
+): () => void {
+    const stream = deploymentStreams.get(deploymentId);
+    if (!stream) return () => {};
+    stream.cancelHandlers.add(stop);
+    return () => {
+        stream.cancelHandlers.delete(stop);
+    };
 }

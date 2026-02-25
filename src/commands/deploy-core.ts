@@ -9,7 +9,7 @@ import { existsSync } from "fs";
 import { OKASTR8_HOME } from "../config.ts";
 import { runCommand } from "../utils/command.ts";
 import { TaskProgress, cli } from "../utils/cli-logger.ts";
-import { startDeploymentStream, streamLog } from "../utils/deploymentLogger.ts";
+import { hasDeploymentStream, startDeploymentStream, streamLog } from "../utils/deploymentLogger.ts";
 
 // Helper to get script path
 // Since we are in src/commands, project root is ../..
@@ -32,7 +32,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     const { appName, releasePath, versionId, gitRepo, gitBranch, onProgress, deploymentId } =
         options;
 
-    if (deploymentId) {
+    if (deploymentId && !hasDeploymentStream(deploymentId)) {
         await startDeploymentStream(deploymentId);
     }
 

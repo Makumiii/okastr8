@@ -995,7 +995,13 @@ export async function finalizeRepoImport(
             for (const step of config.buildSteps) {
                 await checkCancelled(() => cleanupFailedDeployment("Deployment cancelled"));
                 log(`  → ${step}`);
-                const buildResult = await runCommand("bash", ["-c", step], releasePath);
+                const buildResult = await runCommand(
+                    "bash",
+                    ["-c", step],
+                    releasePath,
+                    undefined,
+                    deploymentId ? { deploymentId } : undefined
+                );
                 if (buildResult.exitCode !== 0) {
                     await updateVersionStatus(appName, versionId, "failed", "Build failed");
                     await logActivity("deploy", {
@@ -1027,6 +1033,7 @@ export async function finalizeRepoImport(
             versionId,
             env: config.env,
             onProgress: log,
+            deploymentId,
         });
 
         if (!deployResult.success) {

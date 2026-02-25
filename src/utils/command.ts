@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+import { registerDeploymentCancelHandler } from "./deploymentLogger";
 
 interface CommandResult {
     stdout: string;
@@ -6,11 +7,16 @@ interface CommandResult {
     exitCode: number | null;
 }
 
+interface RunCommandOptions {
+    deploymentId?: string;
+}
+
 export async function runCommand(
     command: string,
     args: string[] = [],
     cwd?: string,
-    stdin?: string
+    stdin?: string,
+    options?: RunCommandOptions
 ): Promise<CommandResult> {
     let cmdToExecute: string;
     let argsToExecute: string[];
@@ -29,6 +35,21 @@ export async function runCommand(
             stdio: stdin ? ["pipe", "pipe", "pipe"] : ["inherit", "pipe", "pipe"], // Enable stdin pipe if needed
             cwd, // Pass the working directory
         });
+        let forceKillTimeout: ReturnType<typeof setTimeout> | undefined;
+        const unregisterCancel =
+            options?.deploymentId
+                ? registerDeploymentCancelHandler(options.deploymentId, () => {
+                    try {
+                        child.kill("SIGTERM");
+                    } catch {}
+                    forceKillTimeout = setTimeout(() => {
+                        try {
+                            child.kill("SIGKILL");
+                        } catch {}
+                    }, 2500);
+                    forceKillTimeout.unref?.();
+                })
+                : () => {};
 
         let stdout = "";
         let stderr = "";
@@ -48,6 +69,8 @@ export async function runCommand(
         });
 
         child.on("close", (code) => {
+            if (forceKillTimeout) clearTimeout(forceKillTimeout);
+            unregisterCancel();
             resolve({
                 stdout,
                 stderr,
@@ -56,6 +79,8 @@ export async function runCommand(
         });
 
         child.on("error", (err) => {
+            if (forceKillTimeout) clearTimeout(forceKillTimeout);
+            unregisterCancel();
             reject(
                 new Error(
                     `Failed to start command "${cmdToExecute} ${argsToExecute.join(" ")}": ${err.message}`

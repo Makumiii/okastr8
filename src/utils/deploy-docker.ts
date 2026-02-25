@@ -101,7 +101,7 @@ export async function deployWithDocker(
     options: DeployFromPathOptions,
     config: DeployConfig
 ): Promise<DeployResult> {
-    const { appName, releasePath, versionId, onProgress } = options;
+    const { appName, releasePath, versionId, onProgress, deploymentId } = options;
     const log = onProgress || ((msg: string) => console.log(msg));
 
     // 1. Handle Environment Variables
@@ -144,7 +144,7 @@ export async function deployWithDocker(
     for (const composePath of composeFiles) {
         if (existsSync(composePath)) {
             log("Stopping existing Compose services...");
-            await composeDown(composePath, appName).catch(() => {});
+            await composeDown(composePath, appName, deploymentId).catch(() => {});
             break; // Only need to stop once
         }
     }
@@ -169,7 +169,15 @@ export async function deployWithDocker(
     log(`Docker strategy: ${strategy}`);
 
     if (strategy === "user-compose" || strategy === "auto-compose") {
-        return await deployWithCompose(appName, releasePath, config, strategy, envFilePath, log);
+        return await deployWithCompose(
+            appName,
+            releasePath,
+            config,
+            strategy,
+            envFilePath,
+            log,
+            deploymentId
+        );
     } else {
         return await deployWithDockerfile(
             appName,
@@ -178,7 +186,8 @@ export async function deployWithDocker(
             versionId,
             strategy,
             envFilePath,
-            log
+            log,
+            deploymentId
         );
     }
 }
@@ -192,7 +201,8 @@ async function deployWithCompose(
     config: DeployConfig,
     strategy: "auto-compose" | "user-compose",
     envFilePath: string | undefined,
-    log: (msg: string) => void
+    log: (msg: string) => void,
+    deploymentId?: string
 ): Promise<DeployResult> {
     let composePath: string;
     let overridePath: string | undefined;
@@ -262,7 +272,8 @@ async function deployWithCompose(
     // For now, proceed with single file deployment
     const upResult = await composeUp(
         overridePath ? [composePath, overridePath] : composePath,
-        appName
+        appName,
+        deploymentId
     );
 
     if (!upResult.success) {
@@ -305,7 +316,8 @@ async function deployWithDockerfile(
     versionId: number,
     strategy: "auto-dockerfile" | "user-dockerfile",
     envFilePath: string | undefined,
-    log: (msg: string) => void
+    log: (msg: string) => void,
+    deploymentId?: string
 ): Promise<DeployResult> {
     if (strategy === "auto-dockerfile") {
         log("Generating Dockerfile...");
@@ -320,7 +332,7 @@ async function deployWithDockerfile(
     log(`Building Docker image: ${tag}...`);
     const dockerfileName = strategy === "auto-dockerfile" ? "Dockerfile.generated" : "Dockerfile";
     const dockerfilePath = join(releasePath, dockerfileName);
-    const buildResult = await buildImage(appName, tag, releasePath, dockerfilePath);
+    const buildResult = await buildImage(appName, tag, releasePath, dockerfilePath, deploymentId);
 
     if (!buildResult.success) {
         return {
@@ -332,7 +344,14 @@ async function deployWithDockerfile(
 
     // Run new container
     log("Starting new container...");
-    const runResult = await runContainer(appName, tag, config.port!, undefined, envFilePath);
+    const runResult = await runContainer(
+        appName,
+        tag,
+        config.port!,
+        undefined,
+        envFilePath,
+        deploymentId
+    );
 
     if (!runResult.success) {
         return {
