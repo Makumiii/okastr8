@@ -4,7 +4,6 @@ import { homedir } from "os";
 import { readFile, writeFile, mkdir, rm } from "fs/promises";
 import { existsSync } from "fs";
 import { runCommand } from "../utils/command";
-import { randomBytes } from "crypto";
 import { randomUUID } from "crypto";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -49,7 +48,6 @@ export interface ImportOptions {
     buildSteps?: string[];
     startCommand?: string;
     autoDetect?: boolean;
-    setupWebhook?: boolean;
     env?: Record<string, string>;
 }
 
@@ -1128,89 +1126,4 @@ export async function getConnectionStatus(): Promise<{
         };
     }
     return { connected: false };
-}
-
-// Webhook Helpers
-export async function ensureWebhookSecret(): Promise<string> {
-    const config = await getSystemConfig();
-    if (config.manager?.github?.webhook_secret) {
-        return config.manager.github.webhook_secret;
-    }
-
-    // Generate new secret
-    const secret = randomBytes(32).toString("hex");
-    await saveSystemConfig({
-        manager: {
-            github: { webhook_secret: secret },
-        },
-    });
-    return secret;
-}
-
-export async function createWebhook(repoFullName: string, accessToken: string): Promise<boolean> {
-    try {
-        const config = await getSystemConfig();
-        const baseUrl = config.tunnel?.url;
-
-        if (!baseUrl) {
-            console.error(
-                "Cannot create webhook: Tunnel URL not configured in system.yaml (tunnel.url)"
-            );
-            return false;
-        }
-
-        const webhookUrl = `${baseUrl}/api/github/webhook`;
-        const secret = await ensureWebhookSecret();
-
-        // Check existing hooks
-        const hooksRes = await fetch(`${GITHUB_API}/repos/${repoFullName}/hooks`, {
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                Accept: "application/vnd.github.v3+json",
-            },
-        });
-
-        if (hooksRes.ok) {
-            const hooks = (await hooksRes.json()) as any[];
-            const exists = hooks.find((h: any) => h.config.url === webhookUrl);
-            if (exists) {
-                console.log("Webhook already exists");
-                return true;
-            }
-        }
-
-        console.log(`Creating webhook for ${webhookUrl}...`);
-
-        // Create Hook
-        const res = await fetch(`${GITHUB_API}/repos/${repoFullName}/hooks`, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                name: "web",
-                active: true,
-                events: ["push"],
-                config: {
-                    url: webhookUrl,
-                    content_type: "json",
-                    secret: secret,
-                    insecure_ssl: "0",
-                },
-            }),
-        });
-
-        if (!res.ok) {
-            const err = await res.text();
-            console.error("Failed to create webhook:", err);
-            return false;
-        }
-
-        console.log("Webhook created successfully");
-        return true;
-    } catch (e) {
-        console.error("Webhook creation error:", e);
-        return false;
-    }
 }

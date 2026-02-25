@@ -37,4 +37,25 @@ describe("CLI smoke", () => {
         expect(result.exitCode).toBe(1);
         expect(stderr).toContain("unknown command");
     });
+
+    it("does not expose unsupported deploy trigger flags", () => {
+        const result = runCli(["deploy", "trigger", "--help"]);
+        const output = new TextDecoder().decode(result.stdout);
+
+        expect(result.exitCode).toBe(0);
+        expect(output).not.toContain("--build");
+        expect(output).not.toContain("--health-method");
+        expect(output).not.toContain("--health-target");
+        expect(output).not.toContain("--health-timeout");
+        expect(output).not.toContain("--skip-health");
+        expect(output).not.toContain("--branch");
+    });
+
+    it("does not expose unsupported github import webhook toggle", () => {
+        const result = runCli(["github", "import", "--help"]);
+        const output = new TextDecoder().decode(result.stdout);
+
+        expect(result.exitCode).toBe(0);
+        expect(output).not.toContain("--no-webhook");
+    });
 });

@@ -393,15 +393,9 @@ export function addGitHubCommands(program: Command) {
         .option("--env <vars...>", "Environment variables (KEY=VALUE)")
         .option("--env-file <path>", "Path to .env file")
         .option("--no-interactive", "Disable guided wizard prompts")
-        .option("--no-webhook", "Don't setup webhook for auto-deploys")
         .action(async (repo, options) => {
             try {
                 await requireAdminCli();
-                if (options.webhook === false) {
-                    console.log(
-                        "Note: webhook setup toggle is not yet applied in the wizard deploy path."
-                    );
-                }
                 const result = await runGithubImportWizard({
                     repo,
                     branch: options.branch,
