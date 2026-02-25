@@ -234,8 +234,23 @@
         return message;
     }
 
+    async function readEnvFile(file: File) {
+        if (!file) {
+            throw new Error("No file selected.");
+        }
+        if (file.size === 0) {
+            throw new Error("Selected file is empty or inaccessible.");
+        }
+        try {
+            return await file.text();
+        } catch {
+            const bytes = await file.arrayBuffer();
+            return new TextDecoder().decode(bytes);
+        }
+    }
+
     async function handleEnvFile(file: File) {
-        const text = await file.text();
+        const text = await readEnvFile(file);
         const parsed = parseEnvText(text);
         if (Object.keys(parsed).length === 0) {
             throw new Error("No valid KEY=VALUE lines found in the provided file.");
@@ -811,7 +826,7 @@
                                 Import .env
                                 <input
                                     type="file"
-                                    accept=".env,.txt,text/plain,*/*"
+                                    accept=".env,.env.*,text/plain,.txt"
                                     class="hidden"
                                     disabled={deployState === "loading" || deployState === "deploying"}
                                     onchange={async (event) => {
