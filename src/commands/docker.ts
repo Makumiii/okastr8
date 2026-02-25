@@ -4,6 +4,7 @@ import { existsSync } from "fs";
 const ALLOWED_DOCKER_SUBCOMMANDS = new Set([
     "--version",
     "build",
+    "buildx",
     "image",
     "inspect",
     "pull",
@@ -227,12 +228,22 @@ export async function buildImage(
     dockerfilePath: string = "Dockerfile"
 ): Promise<{ success: boolean; message: string }> {
     try {
-        const result = await dockerCommand(["build", "-t", tag, "-f", dockerfilePath, context]);
+        const dockerPath = getDockerPath();
+        const buildxCheck = await runCommand(dockerPath, ["buildx", "version"]);
+        const canUseBuildx = buildxCheck.exitCode === 0;
+
+        const result = canUseBuildx
+            ? await runCommand(
+                dockerPath,
+                ["buildx", "build", "--load", "-t", tag, "-f", dockerfilePath, context]
+            )
+            : await dockerCommand(["build", "-t", tag, "-f", dockerfilePath, context]);
 
         if (result.exitCode !== 0) {
+            const details = `${result.stderr || ""}\n${result.stdout || ""}`.trim();
             return {
                 success: false,
-                message: `Docker build failed: ${result.stderr}`,
+                message: `Docker build failed: ${details || "Unknown docker build error"}`,
             };
         }
 

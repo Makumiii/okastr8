@@ -51,10 +51,10 @@ fi
 # --- Docker Installation ---
 echo "🐳 Installing Docker runtime..."
 if [[ "$USE_FEDORA" == true ]]; then
-  sudo dnf install -y docker docker-compose-plugin || sudo dnf install -y docker
+  sudo dnf install -y docker docker-compose-plugin docker-buildx-plugin || sudo dnf install -y docker
 else
   sudo apt update
-  if ! sudo apt install -y docker.io docker-compose-plugin; then
+  if ! sudo apt install -y docker.io docker-compose-plugin docker-buildx-plugin; then
     echo "docker-compose-plugin unavailable, falling back to docker-compose package..."
     sudo apt install -y docker.io docker-compose
   fi
