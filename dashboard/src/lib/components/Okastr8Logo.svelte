@@ -14,7 +14,7 @@
         />
     {:else}
         <img
-            src="/okastr8-wordmark-light.svg"
+            src="/okastr8-wordmark-dark.svg"
             alt="Okastr8"
             class="h-7 w-auto max-w-[170px]"
             loading="eager"
