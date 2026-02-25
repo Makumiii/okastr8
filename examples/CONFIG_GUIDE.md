@@ -2,6 +2,13 @@
 
 okastr8 uses **YAML** for all configuration. There are two main files you need to know about.
 
+Quick start templates:
+
+- Minimal system template: `examples/system.minimal.yaml`
+- Minimal app template: `examples/okastr8.minimal.yaml`
+- Full system template: `examples/system.example.yaml`
+- Full app template: `examples/okastr8.yaml`
+
 ## 1. System Config (`system.yaml`)
 
 **Scope**: Server/Manager Level.
@@ -39,12 +46,11 @@ tunnel:
 ## 2. Repository Config (`okastr8.yaml`)
 
 **Scope**: Repository Level.
-**Location**: Git Root (`okastr8.yaml` or `okastr8.json`)
+**Location**: Git Root (`okastr8.yaml` or `okastr8.yml`)
 **Purpose**: Defines how to build and run your application.
 
 | Field     | Type     | Description                                              |
 | --------- | -------- | -------------------------------------------------------- |
-| `name`    | string   | App name override.                                       |
 | `runtime` | string   | Required runtime: `node`, `python`, `go`, `bun`, `deno`. |
 | `build`   | string[] | List of build commands.                                  |
 | `start`   | string   | Start command (e.g. `npm start`).                        |
@@ -52,12 +58,10 @@ tunnel:
 | `domain`         | string   | Public domain name.                                      |
 | `tunnel_routing` | boolean  | Use Cloudflare Tunnel sidecar (bypasses Caddy).          |
 | `publish_image`  | object   | Opt-in publish of built git deployment image to registry. |
-| `env`            | object   | Environment variables (KEY: VALUE).                      |
 
 **Example:**
 
 ```yaml
-name: my-app
 runtime: node
 build:
     - npm install
@@ -69,15 +73,13 @@ publish_image:
     enabled: true
     image: ghcr.io/your-org/my-app:latest
     registry_credential: ghcr-main
-env:
-    NODE_ENV: production
 ```
 
 ---
 
 ## 3. Runtime Environments
 
-okastr8 automatically detects installed runtimes and stores them in `system.yaml`.
+okastr8 detects app runtime from repository files during import/deploy (for example `package.json`, `pyproject.toml`, `go.mod`, `bun.lockb`, `deno.json`).
 
 **Supported Runtimes:**
 
@@ -87,25 +89,10 @@ okastr8 automatically detects installed runtimes and stores them in `system.yaml
 - `bun` - Bun runtime
 - `deno` - Deno runtime
 
-**Scan for runtimes:**
-
-```bash
-okastr8 env scan
-```
-
 **How it works:**
 
 1. During deploy, okastr8 reads the `runtime` field from your `okastr8.yaml`
 2. It checks if that runtime is installed on the server
-3. If missing, the deploy fails with helpful install instructions
+3. If missing or unsupported, deployment fails with actionable diagnostics.
 
-**Example output when runtime is missing:**
-
-```
-❌ Runtime 'python' is required but not installed.
-
-To install python:
-  sudo dnf install python3
-
-After installing, run: okastr8 env scan
-```
+Environment variables should be provided through dashboard deploy forms or CLI env commands (`okastr8 app env ...`), not embedded in repository config.

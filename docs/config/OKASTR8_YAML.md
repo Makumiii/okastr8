@@ -135,7 +135,7 @@ okastr8 deploy trigger myapp --env NODE_ENV=production --env API_KEY=secret
 okastr8 deploy trigger myapp --env-file .env.production
 ```
 
-Environment variables are stored securely in `/var/okastr8/apps/{appName}/.env.production` with restricted permissions (mode 0600).
+Environment variables are stored securely in `~/.okastr8/apps/{appName}/.env.production` with restricted permissions (mode 0600).
 
 ## Managed Services
 

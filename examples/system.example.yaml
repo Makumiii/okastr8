@@ -108,7 +108,7 @@ notifications:
             ram_threshold: 85
             disk_threshold: 90
 
-# Runtime environments (auto-detected via 'okastr8 env scan')
+# Runtime environments (auto-detected during setup/deploy workflows)
 environments:
     node:
         installed: true
