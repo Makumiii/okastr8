@@ -1,6 +1,6 @@
 # Okastr8
 
-![Okastr8 Logo](assets/logo-light.jpg)
+![Okastr8 Wordmark](assets/okastr8-wordmark-light.svg)
 
 **The Open-Source PaaS for Your Own Servers**
 
