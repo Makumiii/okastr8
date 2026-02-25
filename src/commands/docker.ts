@@ -1,6 +1,10 @@
 import { runCommand } from "../utils/command";
 import { existsSync } from "fs";
 
+type DockerCommandOptions = {
+    deploymentId?: string;
+};
+
 const ALLOWED_DOCKER_SUBCOMMANDS = new Set([
     "--version",
     "build",
@@ -133,12 +137,12 @@ function isComposeCommandUnavailable(text: string): boolean {
 /**
  * Run a docker command with sudo for permission handling
  */
-async function dockerCommand(args: string[], cwd?: string) {
+async function dockerCommand(args: string[], cwd?: string, options?: DockerCommandOptions) {
     assertAllowedDockerArgs(args);
     const dockerPath = getDockerPath();
 
     try {
-        const direct = await runCommand(dockerPath, args, cwd);
+        const direct = await runCommand(dockerPath, args, cwd, undefined, options);
         if (direct.exitCode === 0) {
             return direct;
         }
@@ -159,7 +163,30 @@ async function dockerCommand(args: string[], cwd?: string) {
         };
     }
 
-    return runCommand("sudo", ["-n", dockerPath, ...args], cwd);
+    return runCommand("sudo", ["-n", dockerPath, ...args], cwd, undefined, options);
+}
+
+/**
+ * Run docker build/buildx commands with non-interactive sudo fallback.
+ * Build operations are used by trusted deployment internals.
+ */
+async function dockerBuildCommand(args: string[], cwd?: string, options?: DockerCommandOptions) {
+    assertAllowedDockerArgs(args);
+    const dockerPath = getDockerPath();
+
+    try {
+        const direct = await runCommand(dockerPath, args, cwd, undefined, options);
+        if (direct.exitCode === 0) {
+            return direct;
+        }
+        if (!isDockerPermissionError(`${direct.stdout}\n${direct.stderr}`)) {
+            return direct;
+        }
+    } catch {
+        // Fall through to sudo execution.
+    }
+
+    return runCommand("sudo", ["-n", dockerPath, ...args], cwd, undefined, options);
 }
 
 function directSafeOutput(stdout: string, stderr: string): string {
@@ -169,13 +196,19 @@ function directSafeOutput(stdout: string, stderr: string): string {
 /**
  * Run a docker-compose command with sudo for permission handling
  */
-async function composeCommand(args: string[], cwd?: string) {
+async function composeCommand(args: string[], cwd?: string, options?: DockerCommandOptions) {
     assertAllowedComposeArgs(args);
     const dockerPath = getDockerPath();
     const composeBinary = getComposePath();
 
     try {
-        const directPlugin = await runCommand(dockerPath, ["compose", ...args], cwd);
+        const directPlugin = await runCommand(
+            dockerPath,
+            ["compose", ...args],
+            cwd,
+            undefined,
+            options
+        );
         if (directPlugin.exitCode === 0) {
             return directPlugin;
         }
@@ -189,7 +222,13 @@ async function composeCommand(args: string[], cwd?: string) {
         }
 
         if (pluginPermissionError || pluginUnavailable) {
-            const sudoPlugin = await runCommand("sudo", ["-n", dockerPath, "compose", ...args], cwd);
+            const sudoPlugin = await runCommand(
+                "sudo",
+                ["-n", dockerPath, "compose", ...args],
+                cwd,
+                undefined,
+                options
+            );
             if (sudoPlugin.exitCode === 0) {
                 return sudoPlugin;
             }
@@ -204,7 +243,7 @@ async function composeCommand(args: string[], cwd?: string) {
     }
 
     try {
-        const directBinary = await runCommand(composeBinary, args, cwd);
+        const directBinary = await runCommand(composeBinary, args, cwd, undefined, options);
         if (directBinary.exitCode === 0) {
             return directBinary;
         }
@@ -215,7 +254,7 @@ async function composeCommand(args: string[], cwd?: string) {
         // Fall through to sudo binary fallback.
     }
 
-    return runCommand("sudo", ["-n", composeBinary, ...args], cwd);
+    return runCommand("sudo", ["-n", composeBinary, ...args], cwd, undefined, options);
 }
 
 /**
@@ -225,19 +264,30 @@ export async function buildImage(
     appName: string,
     tag: string,
     context: string,
-    dockerfilePath: string = "Dockerfile"
+    dockerfilePath: string = "Dockerfile",
+    deploymentId?: string
 ): Promise<{ success: boolean; message: string }> {
     try {
         const dockerPath = getDockerPath();
-        const buildxCheck = await runCommand(dockerPath, ["buildx", "version"]);
+        const buildxCheck = await runCommand(dockerPath, ["buildx", "version"], undefined, undefined, {
+            deploymentId,
+        });
         const canUseBuildx = buildxCheck.exitCode === 0;
 
         const result = canUseBuildx
-            ? await runCommand(
-                dockerPath,
-                ["buildx", "build", "--load", "-t", tag, "-f", dockerfilePath, context]
-            )
-            : await dockerCommand(["build", "-t", tag, "-f", dockerfilePath, context]);
+            ? await dockerBuildCommand([
+                "buildx",
+                "build",
+                "--load",
+                "-t",
+                tag,
+                "-f",
+                dockerfilePath,
+                context,
+            ], undefined, { deploymentId })
+            : await dockerBuildCommand(["build", "-t", tag, "-f", dockerfilePath, context], undefined, {
+                deploymentId,
+            });
 
         if (result.exitCode !== 0) {
             const details = `${result.stderr || ""}\n${result.stdout || ""}`.trim();
@@ -423,7 +473,8 @@ export async function runContainer(
     image: string,
     port: number,
     containerPort: number = port,
-    envFilePath?: string
+    envFilePath?: string,
+    deploymentId?: string
 ): Promise<{ success: boolean; message: string }> {
     try {
         // Container name = app name (no prefix for simplicity)
@@ -451,7 +502,7 @@ export async function runContainer(
 
         args.push(image);
 
-        const result = await dockerCommand(args);
+        const result = await dockerCommand(args, undefined, { deploymentId });
 
         if (result.exitCode !== 0) {
             return {
@@ -494,7 +545,8 @@ export async function startContainer(
  */
 export async function composeUp(
     composePaths: string | string[],
-    projectName: string
+    projectName: string,
+    deploymentId?: string
 ): Promise<{ success: boolean; message: string }> {
     try {
         const paths = Array.isArray(composePaths) ? composePaths : [composePaths];
@@ -502,7 +554,8 @@ export async function composeUp(
 
         const result = await composeCommand(
             [...fileArgs, "-p", projectName, "up", "-d", "--build"],
-            process.cwd()
+            process.cwd(),
+            { deploymentId }
         );
 
         if (result.exitCode !== 0) {
@@ -529,12 +582,14 @@ export async function composeUp(
  */
 export async function composeDown(
     composePath: string,
-    projectName: string
+    projectName: string,
+    deploymentId?: string
 ): Promise<{ success: boolean; message: string }> {
     try {
         const result = await composeCommand(
             ["-f", composePath, "-p", projectName, "down"],
-            process.cwd()
+            process.cwd(),
+            { deploymentId }
         );
 
         if (result.exitCode !== 0) {
