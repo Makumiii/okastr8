@@ -342,7 +342,7 @@
     }
 
     function openConfirm() {
-        if (deployState !== "idle") return;
+        if (deployState === "loading" || deployState === "deploying") return;
         if (hasEnvIssues) {
             toasts.error("Fix environment variable errors before deploying.");
             return;
@@ -941,7 +941,7 @@
                         <Button
                             class="w-full"
                             onclick={openConfirm}
-                            disabled={!selectedBranch || deployState !== "idle"}
+                            disabled={!selectedBranch}
                         >
                             <Rocket size={16} class="mr-2" /> Confirm Deployment
                         </Button>
