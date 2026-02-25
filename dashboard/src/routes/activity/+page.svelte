@@ -39,8 +39,6 @@
     let isLoadingLog = $state(false);
     let interval: ReturnType<typeof setInterval> | null = null;
     let activityAbort = $state<AbortController | null>(null);
-    let activityRequestId = $state(0);
-    let activityInFlight = $state(false);
 
     onMount(() => {
         loadActivity();
@@ -53,30 +51,26 @@
     });
 
     async function loadActivity(cancelPrevious = false) {
-        if (activityInFlight && !cancelPrevious) return;
+        if (activityAbort && !cancelPrevious) return;
 
-        let url =
+        const url =
             filter === "all"
                 ? `/activity/list?limit=100&date=${selectedDate}`
                 : `/activity/list?limit=100&type=${filter}&date=${selectedDate}`;
 
-        const requestId = ++activityRequestId;
         if (cancelPrevious && activityAbort) {
             activityAbort.abort();
             activityAbort = null;
         }
-        if (activityInFlight) return;
 
         const controller = new AbortController();
         activityAbort = controller;
-        activityInFlight = true;
         const timeoutId = setTimeout(() => controller.abort(), 20000);
 
         try {
             const res = await get<ActivityEntry[]>(url, {
                 signal: controller.signal,
             });
-            if (requestId !== activityRequestId) return;
             if (res.success && res.data) {
                 activities = res.data;
             }
@@ -87,10 +81,10 @@
             console.error("Failed to load activity:", err);
         } finally {
             clearTimeout(timeoutId);
-            activityInFlight = false;
-            if (requestId === activityRequestId) {
-                isLoading = false;
+            if (activityAbort === controller) {
+                activityAbort = null;
             }
+            isLoading = false;
         }
     }
 
@@ -141,13 +135,19 @@
         isLoadingLog = true;
         logContent = null;
 
-        const res = await get<DeployLogResponse>(`/activity/log/${id}`);
-        if (res.success && res.data) {
-            logContent = res.data.log;
-        } else {
+        try {
+            const res = await get<DeployLogResponse>(`/activity/log/${id}`);
+            if (res.success && res.data) {
+                logContent = res.data.log;
+            } else {
+                logContent = "Failed to load logs or log file missing.";
+            }
+        } catch (err) {
+            console.error("Failed to load activity log:", err);
             logContent = "Failed to load logs or log file missing.";
+        } finally {
+            isLoadingLog = false;
         }
-        isLoadingLog = false;
     }
 
     function formatTime(iso: string) {
