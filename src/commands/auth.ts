@@ -6,7 +6,7 @@
 import { homedir } from "os";
 import { join } from "path";
 import { existsSync } from "fs";
-import { readFile, writeFile, mkdir } from "fs/promises";
+import { readFile, writeFile, mkdir, chmod } from "fs/promises";
 import { randomBytes, createHmac } from "crypto";
 import { writeUnifiedEntry } from "../utils/structured-logger";
 
@@ -78,9 +78,10 @@ export async function loadAuthData(): Promise<AuthData> {
 export async function saveAuthData(data: AuthData): Promise<void> {
     const dir = join(homedir(), ".okastr8");
     if (!existsSync(dir)) {
-        await mkdir(dir, { recursive: true });
+        await mkdir(dir, { recursive: true, mode: 0o700 });
     }
     await writeFile(AUTH_FILE, JSON.stringify(data, null, 2));
+    await chmod(AUTH_FILE, 0o600).catch(() => {});
 }
 
 // ============ Token Management ============

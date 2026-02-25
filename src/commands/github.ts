@@ -83,9 +83,13 @@ export async function saveGitHubConfig(github: GitHubConfig): Promise<void> {
 
 // OAuth Functions
 export function getAuthUrl(clientId: string, callbackUrl: string, statePrefix?: string): string {
-    const scopes = ["repo", "read:user", "admin:repo_hook", "admin:public_key"];
     const randomState = Math.random().toString(36).substring(7);
     const state = statePrefix ? `${statePrefix}_${randomState}` : randomState;
+    return getAuthUrlWithState(clientId, callbackUrl, state);
+}
+
+export function getAuthUrlWithState(clientId: string, callbackUrl: string, state: string): string {
+    const scopes = ["repo", "read:user", "admin:repo_hook", "admin:public_key"];
     const params = new URLSearchParams({
         client_id: clientId,
         redirect_uri: callbackUrl,

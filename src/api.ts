@@ -42,6 +42,110 @@ const apiResponse = (success: boolean, message: string, data?: any) => ({
     data,
 });
 
+const RATE_LIMIT_RULES: Record<string, { windowMs: number; max: number }> = {
+    "/auth/github": { windowMs: 60_000, max: 10 },
+    "/github/callback": { windowMs: 60_000, max: 30 },
+    "/github/webhook": { windowMs: 60_000, max: 120 },
+};
+const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
+
+function getRequestProtocol(c: any): string {
+    const forwardedProto = c.req.header("x-forwarded-proto");
+    if (forwardedProto) {
+        return forwardedProto.split(",")[0]?.trim().toLowerCase() || "http";
+    }
+    try {
+        const url = new URL(c.req.url);
+        return url.protocol.replace(":", "").toLowerCase();
+    } catch {
+        return "http";
+    }
+}
+
+function getClientIp(c: any): string {
+    const forwarded = c.req.header("x-forwarded-for");
+    if (forwarded) return forwarded.split(",")[0]?.trim() || "unknown";
+    return c.req.header("x-real-ip") || "unknown";
+}
+
+function checkRateLimit(c: any, path: string): { limited: boolean; retryAfter?: number } {
+    const rule = RATE_LIMIT_RULES[path];
+    if (!rule) return { limited: false };
+
+    const now = Date.now();
+    const ip = getClientIp(c);
+    const key = `${path}:${ip}`;
+    const current = rateLimitStore.get(key);
+
+    if (!current || now - current.windowStart >= rule.windowMs) {
+        rateLimitStore.set(key, { count: 1, windowStart: now });
+        return { limited: false };
+    }
+
+    current.count += 1;
+    rateLimitStore.set(key, current);
+    if (current.count <= rule.max) {
+        return { limited: false };
+    }
+
+    const elapsed = now - current.windowStart;
+    const retryAfter = Math.max(1, Math.ceil((rule.windowMs - elapsed) / 1000));
+    return { limited: true, retryAfter };
+}
+
+function normalizeBaseUrl(url: string): string | null {
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+            return null;
+        }
+        return `${parsed.protocol}//${parsed.host}`;
+    } catch {
+        return null;
+    }
+}
+
+function getCookieOptions(c: any, maxAgeSeconds: number): string {
+    const protocol = getRequestProtocol(c);
+    const opts = ["Path=/", "HttpOnly", "SameSite=Strict", `Max-Age=${maxAgeSeconds}`];
+    if (protocol === "https") {
+        opts.push("Secure");
+    }
+    return opts.join("; ");
+}
+
+async function resolveOAuthBaseUrl(c: any): Promise<string> {
+    const { getSystemConfig } = await import("./config");
+    const systemConfig = await getSystemConfig();
+    const configured =
+        normalizeBaseUrl(systemConfig.manager?.public_url || "") ||
+        normalizeBaseUrl(systemConfig.tunnel?.url || "");
+    if (configured) return configured;
+
+    const host = c.req.header("host") || "localhost:41788";
+    const protocol = getRequestProtocol(c);
+    return `${protocol}://${host}`;
+}
+
+async function isAllowedOAuthOrigin(c: any): Promise<boolean> {
+    const { getSystemConfig } = await import("./config");
+    const systemConfig = await getSystemConfig();
+    const allowedOrigins = [systemConfig.manager?.public_url, systemConfig.tunnel?.url]
+        .map((url) => (url ? normalizeBaseUrl(url) : null))
+        .filter((url): url is string => Boolean(url));
+
+    if (allowedOrigins.length === 0) {
+        return true;
+    }
+
+    const host = c.req.header("host");
+    if (!host) return false;
+    const protocol = getRequestProtocol(c);
+    const requestOrigin = normalizeBaseUrl(`${protocol}://${host}`);
+    if (!requestOrigin) return false;
+    return allowedOrigins.includes(requestOrigin);
+}
+
 // ============ Request Logging ============
 api.use("*", async (c, next) => {
     const start = Date.now();
@@ -105,8 +209,22 @@ const PUBLIC_ROUTES = [
 ];
 
 api.use("*", async (c, next) => {
+    const path = c.req.path.replace("/api", "");
+    const rateLimit = checkRateLimit(c, path);
+    if (rateLimit.limited) {
+        if (rateLimit.retryAfter) {
+            c.header("Retry-After", String(rateLimit.retryAfter));
+        }
+        if (path === "/auth/github") {
+            return c.redirect("/login?error=rate_limited");
+        }
+        if (path === "/github/webhook") {
+            return c.text("Rate limit exceeded", 429);
+        }
+        return c.json(apiResponse(false, "Rate limit exceeded"), 429);
+    }
+
     const method = c.req.method;
-    const path = c.req.path.replace("/api", ""); // Remove /api prefix
     const routeKey = `${method}:${path}`;
 
     // Skip auth for public routes
@@ -993,7 +1111,8 @@ api.get("/github/auth-url", async (c) => {
     try {
         const adminCheck = await enforceAdmin(c);
         if (adminCheck) return adminCheck;
-        const { getGitHubConfig, getAuthUrl } = await import("./commands/github");
+        const { getGitHubConfig, getAuthUrlWithState } = await import("./commands/github");
+        const { issueOAuthState } = await import("./utils/oauth-state");
         const config = await getGitHubConfig();
 
         if (!config.clientId) {
@@ -1002,12 +1121,11 @@ api.get("/github/auth-url", async (c) => {
             );
         }
 
-        // Build callback URL from request
-        const host = c.req.header("host") || "localhost:41788";
-        const protocol = c.req.header("x-forwarded-proto") || "http";
-        const callbackUrl = `${protocol}://${host}/api/github/callback`;
+        const baseUrl = await resolveOAuthBaseUrl(c);
+        const callbackUrl = `${baseUrl}/api/github/callback`;
+        const state = await issueOAuthState("connect");
 
-        const authUrl = getAuthUrl(config.clientId, callbackUrl, "connect");
+        const authUrl = getAuthUrlWithState(config.clientId, callbackUrl, state);
         return c.json(apiResponse(true, "Auth URL generated", { authUrl, callbackUrl }));
     } catch (error: any) {
         console.error("API: /github/auth-url error:", error);
@@ -1017,7 +1135,8 @@ api.get("/github/auth-url", async (c) => {
 
 api.get("/auth/github", async (c) => {
     try {
-        const { getGitHubConfig, getAuthUrl } = await import("./commands/github");
+        const { getGitHubConfig, getAuthUrlWithState } = await import("./commands/github");
+        const { issueOAuthState } = await import("./utils/oauth-state");
         const { getSystemConfig } = await import("./config");
         const config = await getGitHubConfig();
         const systemConfig = await getSystemConfig();
@@ -1031,11 +1150,11 @@ api.get("/auth/github", async (c) => {
             return c.redirect("/login?error=github_admin_not_set");
         }
 
-        const host = c.req.header("host") || "localhost:41788";
-        const protocol = c.req.header("x-forwarded-proto") || "http";
-        const callbackUrl = `${protocol}://${host}/api/github/callback`;
+        const baseUrl = await resolveOAuthBaseUrl(c);
+        const callbackUrl = `${baseUrl}/api/github/callback`;
+        const state = await issueOAuthState("login");
 
-        const authUrl = getAuthUrl(config.clientId, callbackUrl, "login");
+        const authUrl = getAuthUrlWithState(config.clientId, callbackUrl, state);
         return c.redirect(authUrl);
     } catch (error: any) {
         console.error("API: /auth/github error:", error);
@@ -1051,6 +1170,14 @@ api.get("/github/callback", async (c) => {
         const state = c.req.query("state") || "";
         isLoginFlow = state.startsWith("login_");
 
+        if (!(await isAllowedOAuthOrigin(c))) {
+            return c.redirect(
+                isLoginFlow
+                    ? "/login?error=invalid_callback_origin"
+                    : "/github?error=invalid_callback_origin"
+            );
+        }
+
         if (error) {
             // Redirect to UI with error
             return c.redirect(
@@ -1062,6 +1189,16 @@ api.get("/github/callback", async (c) => {
 
         if (!code) {
             return c.redirect(isLoginFlow ? "/login?error=no_code" : "/github?error=no_code");
+        }
+
+        if (!state) {
+            return c.redirect(isLoginFlow ? "/login?error=missing_state" : "/github?error=missing_state");
+        }
+        const { consumeOAuthState } = await import("./utils/oauth-state");
+        const flow = isLoginFlow ? "login" : "connect";
+        const stateValid = await consumeOAuthState(state, flow);
+        if (!stateValid) {
+            return c.redirect(isLoginFlow ? "/login?error=invalid_state" : "/github?error=invalid_state");
         }
 
         const {
@@ -1115,7 +1252,7 @@ api.get("/github/callback", async (c) => {
             });
 
             const { token } = await generateToken(`github:${userProfile.id}`);
-            const cookieOpts = "Path=/; HttpOnly; SameSite=Strict; Max-Age=86400";
+            const cookieOpts = getCookieOptions(c, 86400);
             c.header("Set-Cookie", `okastr8_session=${token}; ${cookieOpts}`);
 
             return c.redirect("/");
@@ -1936,7 +2073,7 @@ api.get("/auth/me", async (c) => {
 
 // Logout (clear session cookie)
 api.post("/auth/logout", async (c) => {
-    c.header("Set-Cookie", "okastr8_session=; Path=/; HttpOnly; Max-Age=0");
+    c.header("Set-Cookie", `okastr8_session=; ${getCookieOptions(c, 0)}`);
     return c.json(apiResponse(true, "Logged out"));
 });
 

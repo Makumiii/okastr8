@@ -87,8 +87,10 @@ export function addGitHubCommands(program: Command) {
                 // Use manager's callback (requires manager to be running)
                 const callbackUrl = `http://localhost:41788/api/github/callback`;
 
-                const { getAuthUrl } = await import("./github");
-                const authUrl = getAuthUrl(config.clientId, callbackUrl, "connect");
+                const { getAuthUrlWithState } = await import("./github");
+                const { issueOAuthState } = await import("../utils/oauth-state");
+                const state = await issueOAuthState("connect");
+                const authUrl = getAuthUrlWithState(config.clientId, callbackUrl, state);
 
                 console.log("\nOpen this URL in your browser:\n");
                 console.log(`   ${authUrl}\n`);
