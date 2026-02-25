@@ -3,6 +3,8 @@ import { existsSync } from "fs";
 
 type DockerCommandOptions = {
     deploymentId?: string;
+    onStdout?: (chunk: string) => void;
+    onStderr?: (chunk: string) => void;
 };
 
 const ALLOWED_DOCKER_SUBCOMMANDS = new Set([
@@ -265,29 +267,32 @@ export async function buildImage(
     tag: string,
     context: string,
     dockerfilePath: string = "Dockerfile",
-    deploymentId?: string
+    deploymentId?: string,
+    onOutput?: (line: string) => void
 ): Promise<{ success: boolean; message: string }> {
     try {
         const dockerPath = getDockerPath();
+        const emitBuildChunk = (chunk: string) => {
+            if (!onOutput) return;
+            for (const line of chunk.split(/\r?\n/)) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                onOutput(trimmed);
+            }
+        };
         const buildxCheck = await runCommand(dockerPath, ["buildx", "version"], undefined, undefined, {
             deploymentId,
         });
         const canUseBuildx = buildxCheck.exitCode === 0;
+        const buildArgs = canUseBuildx
+            ? ["buildx", "build", "--progress=plain", "--load", "-t", tag, "-f", dockerfilePath, context]
+            : ["build", "-t", tag, "-f", dockerfilePath, context];
 
-        const result = canUseBuildx
-            ? await dockerBuildCommand([
-                "buildx",
-                "build",
-                "--load",
-                "-t",
-                tag,
-                "-f",
-                dockerfilePath,
-                context,
-            ], undefined, { deploymentId })
-            : await dockerBuildCommand(["build", "-t", tag, "-f", dockerfilePath, context], undefined, {
-                deploymentId,
-            });
+        const result = await dockerBuildCommand(buildArgs, undefined, {
+            deploymentId,
+            onStdout: emitBuildChunk,
+            onStderr: emitBuildChunk,
+        });
 
         if (result.exitCode !== 0) {
             const details = `${result.stderr || ""}\n${result.stdout || ""}`.trim();
