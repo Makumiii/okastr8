@@ -586,6 +586,173 @@ export async function updateImageAppConfig(
     }
 }
 
+async function getEnquirer() {
+    return (await import("enquirer")).default as any;
+}
+
+async function runImageWizard() {
+    const Enquirer = await getEnquirer();
+    const { apps } = await listApps();
+    const imageApps = apps.filter((app: any) => (app.deployStrategy || "git") === "image");
+    const { listRegistryCredentialSummaries } = await import("./registry");
+    const credentials = await listRegistryCredentialSummaries();
+
+    const modeRes = await Enquirer.prompt({
+        type: "select",
+        name: "mode",
+        message: "Container flow:",
+        choices: ["Create new image app", "Update existing image app"],
+    });
+    const mode = String(modeRes.mode || "");
+
+    const defaultAppName = "my-image-app";
+    let appName: string;
+    if (mode === "Update existing image app") {
+        if (imageApps.length === 0) {
+            throw new Error("No image apps found. Create one first.");
+        }
+        const appRes = await Enquirer.prompt({
+            type: "select",
+            name: "appName",
+            message: "Select app:",
+            choices: imageApps.map((app: any) => app.name),
+        });
+        appName = String(appRes.appName || "");
+    } else {
+        const appRes = await Enquirer.prompt({
+            type: "input",
+            name: "appName",
+            message: "App name:",
+            initial: defaultAppName,
+        });
+        appName = String(appRes.appName || defaultAppName).trim();
+    }
+
+    const current = mode === "Update existing image app" ? await getAppMetadata(appName) : null;
+    const providerInitial = current?.registryProvider || "ghcr";
+    const providerRes = await Enquirer.prompt({
+        type: "select",
+        name: "provider",
+        message: "Registry provider:",
+        choices: ["ghcr", "dockerhub", "ecr", "generic"],
+        initial: providerInitial,
+    });
+    const provider = String(providerRes.provider || providerInitial);
+
+    const matchingCreds = credentials.filter(
+        (credential) => credential.provider === provider || credential.provider === "generic"
+    );
+    const credentialIdInitial =
+        current?.registryCredentialId || matchingCreds[0]?.id || credentials[0]?.id || "";
+
+    const imageRes = await Enquirer.prompt([
+        {
+            type: "input",
+            name: "imageRef",
+            message: "Image reference:",
+            initial: current?.imageRef || "",
+        },
+        {
+            type: "input",
+            name: "port",
+            message: "Public app port:",
+            initial: String(current?.port || 8080),
+        },
+        {
+            type: "input",
+            name: "containerPort",
+            message: "Container internal port:",
+            initial: String(current?.containerPort || current?.port || 80),
+        },
+        {
+            type: "select",
+            name: "pullPolicy",
+            message: "Pull policy:",
+            choices: ["always", "if-not-present"],
+            initial: current?.pullPolicy || "always",
+        },
+    ]);
+
+    let selectedCredential = credentialIdInitial;
+    if (matchingCreds.length > 0) {
+        const credentialRes = await Enquirer.prompt({
+            type: "select",
+            name: "credentialId",
+            message: "Registry credential:",
+            choices: matchingCreds.map((credential) => ({
+                name: credential.id,
+                message: `${credential.id} (${credential.provider} @ ${credential.server})`,
+            })),
+            initial: credentialIdInitial,
+        });
+        selectedCredential = String(credentialRes.credentialId || credentialIdInitial);
+    }
+
+    if (mode === "Create new image app") {
+        const releaseRetentionRes = await Enquirer.prompt({
+            type: "input",
+            name: "releaseRetention",
+            message: "Image release history retention:",
+            initial: "50",
+        });
+        const releaseRetention = Number.parseInt(String(releaseRetentionRes.releaseRetention), 10);
+        const port = Number.parseInt(String(imageRes.port), 10) || 8080;
+        const containerPort = Number.parseInt(String(imageRes.containerPort), 10) || port;
+        const result = await createApp({
+            name: appName,
+            description: `Container deploy (${provider})`,
+            execStart: "docker run",
+            workingDirectory: "",
+            user: "root",
+            port,
+            containerPort,
+            deployStrategy: "image",
+            imageRef: String(imageRes.imageRef || "").trim(),
+            pullPolicy: imageRes.pullPolicy === "if-not-present" ? "if-not-present" : "always",
+            registryCredentialId: selectedCredential || undefined,
+            registryProvider: provider as "ghcr" | "dockerhub" | "ecr" | "generic",
+            registryServer: resolveRegistryServer(String(imageRes.imageRef || "").trim()),
+            imageReleaseRetention:
+                Number.isNaN(releaseRetention) || releaseRetention <= 0 ? 50 : releaseRetention,
+            webhookAutoDeploy: false,
+        });
+        if (!result.success) {
+            throw new Error(result.message);
+        }
+    } else {
+        const updateResult = await updateImageAppConfig(appName, {
+            imageRef: String(imageRes.imageRef || "").trim(),
+            pullPolicy: imageRes.pullPolicy === "if-not-present" ? "if-not-present" : "always",
+            port: Number.parseInt(String(imageRes.port), 10) || 8080,
+            containerPort: Number.parseInt(String(imageRes.containerPort), 10) || 80,
+            registryCredentialId: selectedCredential || undefined,
+            registryProvider: provider as "ghcr" | "dockerhub" | "ecr" | "generic",
+            registryServer: resolveRegistryServer(String(imageRes.imageRef || "").trim()),
+        });
+        if (!updateResult.success) {
+            throw new Error(updateResult.message);
+        }
+    }
+
+    const deployRes = await Enquirer.prompt({
+        type: "confirm",
+        name: "deployNow",
+        message: "Deploy now?",
+        initial: true,
+    });
+
+    if (deployRes.deployNow) {
+        const { deployApp } = await import("./deploy");
+        const result = await deployApp({ appName });
+        if (!result.success) {
+            throw new Error(result.message);
+        }
+        console.log(result.message);
+    } else {
+        console.log(`Saved configuration for ${appName}.`);
+    }
+}
+
 // Commander Integration
 export function addAppCommands(program: Command) {
     const app = program.command("app").description("Manage okastr8 applications");
@@ -709,6 +876,71 @@ export function addAppCommands(program: Command) {
                 console.log(`Image app created at ${result.appDir}`);
             } catch (error: any) {
                 console.error(`Failed to create image app:`, error.message);
+                process.exit(1);
+            }
+        });
+
+    app.command("image")
+        .description("Guided container deployment wizard (create/update image app)")
+        .action(async () => {
+            try {
+                await runImageWizard();
+            } catch (error: any) {
+                if (error?.name === "ExitPromptError") {
+                    console.log("Cancelled.");
+                    return;
+                }
+                console.error(`Failed image wizard: ${error.message}`);
+                process.exit(1);
+            }
+        });
+
+    app.command("update-image")
+        .description("Update image app configuration")
+        .argument("<name>", "Application name")
+        .argument("<image_ref>", "Container image reference")
+        .option("-p, --port <port>", "Application port")
+        .option("--container-port <port>", "Container internal port")
+        .option("--pull-policy <policy>", "Image pull policy: always or if-not-present")
+        .option("--registry-credential <id>", "Registry credential id from `okastr8 registry add`")
+        .option(
+            "--registry-provider <provider>",
+            "Registry provider: ghcr|dockerhub|ecr|generic"
+        )
+        .option("--registry-server <server>", "Registry server override (e.g., ghcr.io)")
+        .option("--deploy", "Trigger deployment after update")
+        .action(async (name: string, imageRef: string, options: any) => {
+            try {
+                const pullPolicy =
+                    options.pullPolicy === "if-not-present" || options.pullPolicy === "always"
+                        ? options.pullPolicy
+                        : undefined;
+                const result = await updateImageAppConfig(name, {
+                    imageRef,
+                    pullPolicy,
+                    port: options.port ? Number.parseInt(options.port, 10) : undefined,
+                    containerPort: options.containerPort
+                        ? Number.parseInt(options.containerPort, 10)
+                        : undefined,
+                    registryCredentialId: options.registryCredential,
+                    registryProvider: options.registryProvider,
+                    registryServer: options.registryServer || resolveRegistryServer(imageRef),
+                });
+                if (!result.success) {
+                    throw new Error(result.message);
+                }
+                console.log(result.message);
+
+                if (options.deploy) {
+                    const { deployApp } = await import("./deploy");
+                    const deployResult = await deployApp({ appName: name });
+                    if (!deployResult.success) {
+                        throw new Error(deployResult.message);
+                    }
+                    console.log(deployResult.message);
+                }
+            } catch (error: any) {
+                console.error(`Failed to update image app: ${error.message}`);
                 process.exit(1);
             }
         });
@@ -937,6 +1169,53 @@ export function addAppCommands(program: Command) {
                 }
             } catch (error: any) {
                 console.error(` Failed:`, error.message);
+                process.exit(1);
+            }
+        });
+
+    app.command("rollback")
+        .description("Rollback app to a previous version")
+        .argument("<name>", "Application name")
+        .option("-v, --version <id>", "Version id to rollback to")
+        .action(async (name: string, options: { version?: string }) => {
+            try {
+                let targetVersion = options.version ? Number.parseInt(options.version, 10) : NaN;
+                if (Number.isNaN(targetVersion)) {
+                    const { getVersions } = await import("./version");
+                    const versions = await getVersions(name);
+                    if (!versions.versions.length) {
+                        throw new Error("No versions found.");
+                    }
+
+                    const Enquirer = await getEnquirer();
+                    const response = await Enquirer.prompt({
+                        type: "select",
+                        name: "versionId",
+                        message: "Select version to rollback to:",
+                        choices: versions.versions
+                            .slice()
+                            .sort((a, b) => b.id - a.id)
+                            .map((version) => ({
+                                name: String(version.id),
+                                message: `v${version.id} ${version.branch ? `(${version.branch})` : ""} ${version.commit ? version.commit.slice(0, 7) : ""} ${version.status || ""}`.trim(),
+                            })),
+                    });
+                    targetVersion = Number.parseInt(String(response.versionId), 10);
+                }
+
+                const { rollback } = await import("./version");
+                const result = await rollback(name, targetVersion);
+                if (!result.success) {
+                    throw new Error(result.message);
+                }
+                await restartApp(name);
+                console.log(result.message);
+            } catch (error: any) {
+                if (error?.name === "ExitPromptError") {
+                    console.log("Cancelled.");
+                    return;
+                }
+                console.error(`Rollback failed: ${error.message}`);
                 process.exit(1);
             }
         });
