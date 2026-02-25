@@ -44,7 +44,7 @@
         <div class="flex flex-col items-center gap-6">
             <!-- Logo -->
             <div class="flex items-center gap-3">
-                <Okastr8Logo className="text-2xl" />
+                <Okastr8Logo />
             </div>
 
             <div class="w-full space-y-4">

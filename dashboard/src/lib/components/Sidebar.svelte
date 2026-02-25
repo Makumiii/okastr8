@@ -31,10 +31,7 @@
                 isCollapsed ? "justify-center px-3" : "px-6",
             )}
         >
-            <Okastr8Logo
-                compact={isCollapsed}
-                className={isCollapsed ? "text-base" : "text-lg"}
-            />
+            <Okastr8Logo compact={isCollapsed} />
         </div>
 
         <!-- Navigation -->
