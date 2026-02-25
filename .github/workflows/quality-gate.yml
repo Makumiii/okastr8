@@ -26,14 +26,19 @@ jobs:
 
       - name: Bun Audit (if available)
         run: |
-          if bun pm audit --help >/dev/null 2>&1; then
+          if bun pm --help 2>/dev/null | grep -q "audit"; then
             bun pm audit
           else
             echo "bun pm audit unavailable in this Bun version; skipping"
           fi
 
       - name: NPM Audit (production deps)
-        run: npm audit --omit=dev
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm audit --omit=dev
+          else
+            echo "No npm lockfile found; skipping npm audit"
+          fi
 
   live-e2e:
     if: github.event_name == 'workflow_dispatch'
