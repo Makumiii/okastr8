@@ -55,6 +55,7 @@
     let publishImage = $state(false);
     let publishImageRef = $state("");
     let publishRegistryCredentialId = $state("");
+    let isEnvDragActive = $state(false);
     interface RegistryCredentialSummary {
         id: string;
         provider: "ghcr" | "dockerhub" | "ecr" | "generic";
@@ -227,14 +228,71 @@
     async function handleEnvFile(file: File) {
         const text = await file.text();
         const parsed = parseEnvText(text);
+        if (Object.keys(parsed).length === 0) {
+            throw new Error("No valid KEY=VALUE lines found in the provided file.");
+        }
         const merged = { ...entriesToEnv(envEntries), ...parsed };
         setEntriesFromEnv(merged);
+        toasts.success(`Imported ${Object.keys(parsed).length} env variable(s).`);
+    }
+
+    function handleEnvDragEnter(event: DragEvent) {
+        event.preventDefault();
+        event.stopPropagation();
+        isEnvDragActive = true;
+    }
+
+    function handleEnvDragOver(event: DragEvent) {
+        event.preventDefault();
+        event.stopPropagation();
+        isEnvDragActive = true;
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = "copy";
+        }
+    }
+
+    function handleEnvDragLeave(event: DragEvent) {
+        event.preventDefault();
+        event.stopPropagation();
+        isEnvDragActive = false;
     }
 
     async function handleEnvDrop(event: DragEvent) {
         event.preventDefault();
-        if (!event.dataTransfer?.files?.length) return;
-        await handleEnvFile(event.dataTransfer.files[0]);
+        event.stopPropagation();
+        isEnvDragActive = false;
+        try {
+            const items = event.dataTransfer?.items;
+            if (items?.length) {
+                for (const item of items) {
+                    if (item.kind === "file") {
+                        const file = item.getAsFile();
+                        if (file) {
+                            await handleEnvFile(file);
+                            return;
+                        }
+                    }
+                }
+            }
+            if (event.dataTransfer?.files?.length) {
+                await handleEnvFile(event.dataTransfer.files[0]);
+                return;
+            }
+            const text = event.dataTransfer?.getData("text/plain")?.trim();
+            if (text) {
+                const parsed = parseEnvText(text);
+                if (Object.keys(parsed).length === 0) {
+                    throw new Error("Dropped text did not contain valid KEY=VALUE lines.");
+                }
+                const merged = { ...entriesToEnv(envEntries), ...parsed };
+                setEntriesFromEnv(merged);
+                toasts.success(`Imported ${Object.keys(parsed).length} env variable(s).`);
+                return;
+            }
+            toasts.error("No file detected. Drop a .env file or paste KEY=VALUE content.");
+        } catch (error: any) {
+            toasts.error(error?.message || "Failed to import environment file.");
+        }
     }
 
     function handleEnvPaste(event: ClipboardEvent) {
@@ -684,9 +742,15 @@
                     <div
                         role="region"
                         aria-labelledby="env-vars-label"
-                        class="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] p-3"
+                        class={`rounded-[var(--radius-md)] border bg-[var(--bg-card)] p-3 transition-colors ${
+                            isEnvDragActive
+                                ? "border-[var(--primary)] ring-1 ring-[var(--primary)]"
+                                : "border-[var(--border)]"
+                        }`}
                         ondrop={handleEnvDrop}
-                        ondragover={(event) => event.preventDefault()}
+                        ondragenter={handleEnvDragEnter}
+                        ondragover={handleEnvDragOver}
+                        ondragleave={handleEnvDragLeave}
                         onpaste={handleEnvPaste}
                     >
                         <div class="grid gap-3">
