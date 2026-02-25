@@ -97,10 +97,10 @@ Now that your tunnel is running and Okastr8 knows your public URL, you can conne
 2.  **Import a Repo**:
 
     ```bash
-    okastr8 github import <owner>/<repo> --setup-webhook
+    okastr8 github import <owner>/<repo> --branch main
     ```
 
-    - Or, if you already imported an app, toggle the webhook:\*
+    - Or, if you already imported an app, toggle the webhook:
 
     ```bash
     okastr8 app webhook <app-name> on

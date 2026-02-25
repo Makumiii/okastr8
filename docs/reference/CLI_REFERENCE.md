@@ -32,8 +32,13 @@ okastr8 app create <name> <exec_start> [options]
 #   -w, --working-dir <dir>     Working directory
 #   -p, --port <port>           Application port
 #   --domain <domain>           Domain for reverse proxy
+#   --tunnel-routing            Use Cloudflare Tunnel instead of Caddy routing
 #   --git-repo <url>            Git repository URL
 #   --git-branch <branch>       Git branch (default: main)
+#   --database <type:version>   Database service (e.g., 'postgres:15')
+#   --cache <type:version>      Cache service (e.g., 'redis:7')
+#   --env <vars...>             Environment variables (KEY=VALUE)
+#   --env-file <path>           Path to .env file
 
 # Example:
 okastr8 app create myapp "bun run start" -p 3000 --domain myapp.example.com
@@ -46,14 +51,18 @@ okastr8 app create-image <name> <image_ref> [options]
 
 # Options:
 #   -p, --port <port>             Container port (e.g. 80)
+#   --container-port <port>       Container internal port (default: same as --port)
 #   --domain <domain>             Domain for reverse proxy
 #   --tunnel-routing              Use Cloudflare Tunnel instead of Caddy for routing
 #   --database <type:version>     Managed database (e.g., 'postgres:15')
 #   --cache <type:version>        Managed cache (e.g., 'redis:7')
 #   --env <vars...>               Environment variables (KEY=VALUE)
 #   --env-file <path>             Path to .env file
-#   --pull-policy <policy>        Image pull policy (always, missing)
+#   --pull-policy <policy>        Image pull policy (always, if-not-present)
 #   --registry-credential <id>    Credential ID for private registries
+#   --registry-server <server>    Registry server override (e.g., ghcr.io)
+#   --registry-provider <type>    Provider: ghcr|dockerhub|ecr|generic
+#   --release-retention <count>   Number of image releases to keep
 
 # Example:
 okastr8 app create-image myapp nginx:latest -p 80 --domain myapp.example.com --database postgres:15
@@ -100,12 +109,13 @@ okastr8 app restart <name>
 ### Webhook toggle
 
 ```bash
-okastr8 app webhook <name> [on|off]
+okastr8 app webhook <name> [state]
 
 # Examples:
 okastr8 app webhook myapp        # Show current status
 okastr8 app webhook myapp on     # Enable auto-deploy
 okastr8 app webhook myapp off    # Disable auto-deploy
+okastr8 app webhook myapp --branch main
 ```
 
 ---
@@ -145,10 +155,10 @@ okastr8 app env import myapp -f .env.production
 okastr8 app env export <appName> [options]
 
 # Options:
-#   -o, --output <path>   Output file path
+#   -f, --file <path>   Output file path
 
 # Example:
-okastr8 app env export myapp -o backup.env
+okastr8 app env export myapp -f backup.env
 ```
 
 ### Unset variable
@@ -241,7 +251,7 @@ okastr8 github connect
 okastr8 github repos [options]
 
 # Options:
-#   -p, --page <n>   Page number
+#   --plain          Plain list output (no interactive mode)
 ```
 
 ### Import repository
@@ -251,11 +261,14 @@ okastr8 github import <repo> [options]
 
 # Options:
 #   -b, --branch <branch>   Branch (default: main)
-#   -p, --port <port>       App port
+#   --env <vars...>         Environment variables (KEY=VALUE)
+#   --env-file <path>       Path to .env file
+#   --no-interactive        Disable guided wizard prompts
 
 # Examples:
 okastr8 github import owner/repo
-okastr8 github import owner/repo -b develop -p 8080
+okastr8 github import owner/repo -b develop
+okastr8 github import owner/repo --env NODE_ENV=production
 ```
 
 ### Setup SSH deploy key
@@ -286,8 +299,7 @@ okastr8 setup full
 okastr8 setup ssh-harden [options]
 
 # Options:
-#   --disable-password    Disable password auth
-#   --disable-root        Disable root login
+#   -p, --port <port>    Optionally change SSH port
 ```
 
 ### Change SSH port
@@ -305,7 +317,7 @@ okastr8 setup ssh-port 2222
 okastr8 setup firewall [options]
 
 # Options:
-#   --allow <ports>   Comma-separated ports to allow
+#   -p, --ssh-port <port>   SSH port to allow (default: 2222)
 ```
 
 ### Setup fail2ban
@@ -326,7 +338,7 @@ okastr8 setup sudoers
 
 Securely expose your instance to the internet for remote dashboard access and GitHub webhooks using Cloudflare Tunnel.
 
-See [TUNNEL_SETUP.md](./TUNNEL_SETUP.md) for a complete setup guide.
+See [TUNNEL_SETUP.md](../networking/TUNNEL_SETUP.md) for a complete setup guide.
 
 ### Setup Tunnel
 

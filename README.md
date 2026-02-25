@@ -143,7 +143,8 @@ tunnel:
   url: "https://okastr8.yourdomain.com"
 ```
 
-Reference template: [`examples/system.example.yaml`](examples/system.example.yaml)
+Copy-first minimal template: [`examples/system.minimal.yaml`](examples/system.minimal.yaml)  
+Full template: [`examples/system.example.yaml`](examples/system.example.yaml)
 
 ### `okastr8.yaml` (app-level)
 
@@ -172,7 +173,8 @@ publish_image:
   registry_credential: "ghcr-main"
 ```
 
-Full reference: [`OKASTR8_YAML.md`](OKASTR8_YAML.md)
+Full reference: [`OKASTR8_YAML.md`](docs/config/OKASTR8_YAML.md)
+Minimal template: [`examples/okastr8.minimal.yaml`](examples/okastr8.minimal.yaml)
 
 ### App Environment Variables
 
@@ -184,7 +186,7 @@ Use CLI/UI env management:
 okastr8 app env set myapp KEY=value
 okastr8 app env import myapp --file .env.production
 okastr8 app env list myapp
-okastr8 app env export myapp --output backup.env
+okastr8 app env export myapp --file backup.env
 okastr8 app env unset myapp OLD_KEY
 ```
 
@@ -207,7 +209,7 @@ okastr8 tunnel status
 
 4. Set `tunnel.url` in `~/.okastr8/system.yaml`.
 
-Detailed guide: [`TUNNEL_SETUP.md`](TUNNEL_SETUP.md)
+Detailed guide: [`TUNNEL_SETUP.md`](docs/networking/TUNNEL_SETUP.md)
 
 ### 2. GitHub OAuth App
 
@@ -361,7 +363,7 @@ okastr8 deploy rollback <app>
 okastr8 metrics --once
 ```
 
-Full command reference: [`CLI_REFERENCE.md`](CLI_REFERENCE.md)
+Full command reference: [`CLI_REFERENCE.md`](docs/reference/CLI_REFERENCE.md)
 
 ## Routing Modes (Caddy vs Tunnel Routing)
 
@@ -429,7 +431,7 @@ Before production cutover:
 7. App logs/metrics verified
 8. `okastr8-manager` running under `systemd` in production mode
 
-Security baseline document: [`SECURITY_MODEL.md`](SECURITY_MODEL.md)
+Security baseline document: [`SECURITY_MODEL.md`](docs/security/SECURITY_MODEL.md)
 
 Extended checklist: [`docs/testing/PROD_READINESS_CHECKLIST.md`](docs/testing/PROD_READINESS_CHECKLIST.md)
 
@@ -479,12 +481,14 @@ okastr8 github import owner/repo --branch <branch>
 
 ## Additional Documentation
 
-- `OKASTR8_YAML.md` — Full app config reference
-- `CLI_REFERENCE.md` — Command-by-command reference
-- `TUNNEL_SETUP.md` — Cloudflare tunnel setup and app tunnel routing
-- `SECURITY_MODEL.md` — Security trust boundaries and controls
-- `examples/system.example.yaml` — System config template
-- `examples/okastr8.yaml` — App config example
+- `docs/config/OKASTR8_YAML.md` — Full app config reference
+- `docs/reference/CLI_REFERENCE.md` — Command-by-command reference
+- `docs/networking/TUNNEL_SETUP.md` — Cloudflare tunnel setup and app tunnel routing
+- `docs/security/SECURITY_MODEL.md` — Security trust boundaries and controls
+- `examples/system.minimal.yaml` — Minimal required `system.yaml` entries to fill
+- `examples/system.example.yaml` — Full system config template
+- `examples/okastr8.minimal.yaml` — Minimal app deployment config
+- `examples/okastr8.yaml` — Full app config example
 
 ## Development and Contribution
 

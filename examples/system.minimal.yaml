@@ -1,0 +1,22 @@
+# Minimal system.yaml template for first production setup
+# Location: ~/.okastr8/system.yaml
+#
+# Fill the values marked REQUIRED.
+
+manager:
+  port: 41788
+
+  # REQUIRED for GitHub OAuth login
+  github:
+    client_id: "REQUIRED_GITHUB_OAUTH_CLIENT_ID"
+    client_secret: "REQUIRED_GITHUB_OAUTH_CLIENT_SECRET"
+
+  # Optional but recommended in production when not using tunnel.url
+  # public_url: "https://okastr8.yourdomain.com"
+
+tunnel:
+  # REQUIRED if you expose via Cloudflare Tunnel and/or rely on webhooks through tunnel URL
+  url: "REQUIRED_PUBLIC_URL_IF_USING_TUNNEL"
+
+  # Filled automatically by: okastr8 tunnel setup <token>
+  # auth_token: ""

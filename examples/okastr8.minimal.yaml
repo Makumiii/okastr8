@@ -1,0 +1,17 @@
+# Minimal okastr8.yaml template
+# Place in your app repository root as okastr8.yaml
+#
+# For auto-generated Docker deployments, keep at least:
+#   - port
+#   - start (when no user Dockerfile/compose is present)
+
+port: 3000
+start: "npm run start"
+
+# Optional:
+# runtime: "node:22"
+# build:
+#   - "npm ci"
+#   - "npm run build"
+# domain: "app.yourdomain.com"
+# tunnel_routing: false
