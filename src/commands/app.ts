@@ -295,8 +295,12 @@ export async function startApp(appName: string) {
     // But if it was never built, we can't just "start" it without deployment info.
     // Assuming the container exists but is stopped:
     try {
-        await runCommand("sudo", ["docker", "start", appName]);
-        return { success: true, message: "Container started" };
+        const { startContainer } = await import("./docker");
+        const result = await startContainer(appName);
+        return {
+            success: result.success,
+            message: result.message,
+        };
     } catch (e) {
         return { success: false, message: "Failed to start container: " + e };
     }

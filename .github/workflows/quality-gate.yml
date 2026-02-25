@@ -40,6 +40,15 @@ jobs:
             echo "No npm lockfile found; skipping npm audit"
           fi
 
+      - name: Trivy Filesystem Scan (HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
   live-e2e:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

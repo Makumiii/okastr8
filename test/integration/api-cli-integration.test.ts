@@ -132,4 +132,37 @@ describe("API/CLI integration", () => {
         expect(data.apiStatus).toBe(200);
         expect(data.apiBody).toMatchObject({ success: true, message: "Session valid" });
     });
+
+    it("fails closed for oauth redirect base URL in production when public URL is missing", () => {
+        const home = createTempHome();
+        const result = runIsolatedScript(
+            home,
+            `
+        process.env.NODE_ENV = 'production';
+        const config = await import('./src/config.ts');
+        await config.saveSystemConfig({
+          manager: {
+            github: {
+              client_id: 'dummy-client',
+              client_secret: 'dummy-secret',
+            },
+            auth: {
+              github_admin_id: '12345',
+            },
+          },
+        });
+        const api = (await import('./src/api.ts')).default;
+        const response = await api.request('/auth/github', { method: 'GET' });
+        console.log(JSON.stringify({
+          status: response.status,
+          location: response.headers.get('location') || ''
+        }));
+      `
+        );
+
+        expect(result.exitCode).toBe(0);
+        const data = JSON.parse(result.stdout);
+        expect(data.status).toBe(302);
+        expect(data.location).toContain("error=oauth_public_url_missing");
+    });
 });

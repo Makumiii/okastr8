@@ -6,10 +6,13 @@ describe("docker command guards", () => {
         expect(() => assertAllowedDockerArgs(["pull", "nginx:latest"])).not.toThrow();
         expect(() => assertAllowedDockerArgs(["ps", "-a"])).not.toThrow();
         expect(() => assertAllowedDockerArgs(["run", "-d", "--name", "x", "nginx:latest"])).not.toThrow();
+        expect(() => assertAllowedDockerArgs(["start", "myapp"])).not.toThrow();
+        expect(() => assertAllowedDockerArgs(["system", "df", "-v"])).not.toThrow();
     });
 
     test("blocks unsupported docker subcommands", () => {
         expect(() => assertAllowedDockerArgs(["container", "prune", "-f"])).toThrow();
+        expect(() => assertAllowedDockerArgs(["system", "prune", "-f"])).toThrow();
     });
 
     test("blocks dangerous docker run privilege flags", () => {

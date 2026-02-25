@@ -32,6 +32,7 @@ import {
 } from "./commands/setup";
 import { validateToken, isUserAdmin } from "./commands/auth";
 import { writeUnifiedEntry } from "./utils/structured-logger";
+import { checkAndBumpRateLimit } from "./utils/rate-limit-store";
 
 const api = new Hono();
 
@@ -47,7 +48,6 @@ const RATE_LIMIT_RULES: Record<string, { windowMs: number; max: number }> = {
     "/github/callback": { windowMs: 60_000, max: 30 },
     "/github/webhook": { windowMs: 60_000, max: 120 },
 };
-const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
 
 function getRequestProtocol(c: any): string {
     const forwardedProto = c.req.header("x-forwarded-proto");
@@ -68,29 +68,17 @@ function getClientIp(c: any): string {
     return c.req.header("x-real-ip") || "unknown";
 }
 
-function checkRateLimit(c: any, path: string): { limited: boolean; retryAfter?: number } {
+async function checkRateLimit(c: any, path: string): Promise<{ limited: boolean; retryAfter?: number }> {
     const rule = RATE_LIMIT_RULES[path];
     if (!rule) return { limited: false };
 
-    const now = Date.now();
     const ip = getClientIp(c);
     const key = `${path}:${ip}`;
-    const current = rateLimitStore.get(key);
-
-    if (!current || now - current.windowStart >= rule.windowMs) {
-        rateLimitStore.set(key, { count: 1, windowStart: now });
-        return { limited: false };
-    }
-
-    current.count += 1;
-    rateLimitStore.set(key, current);
-    if (current.count <= rule.max) {
-        return { limited: false };
-    }
-
-    const elapsed = now - current.windowStart;
-    const retryAfter = Math.max(1, Math.ceil((rule.windowMs - elapsed) / 1000));
-    return { limited: true, retryAfter };
+    return checkAndBumpRateLimit({
+        key,
+        windowMs: rule.windowMs,
+        max: rule.max,
+    });
 }
 
 function normalizeBaseUrl(url: string): string | null {
@@ -122,6 +110,11 @@ async function resolveOAuthBaseUrl(c: any): Promise<string> {
         normalizeBaseUrl(systemConfig.tunnel?.url || "");
     if (configured) return configured;
 
+    const strictPublicUrl = process.env.NODE_ENV === "production";
+    if (strictPublicUrl) {
+        throw new Error("oauth_public_url_missing");
+    }
+
     const host = c.req.header("host") || "localhost:41788";
     const protocol = getRequestProtocol(c);
     return `${protocol}://${host}`;
@@ -135,7 +128,7 @@ async function isAllowedOAuthOrigin(c: any): Promise<boolean> {
         .filter((url): url is string => Boolean(url));
 
     if (allowedOrigins.length === 0) {
-        return true;
+        return process.env.NODE_ENV !== "production";
     }
 
     const host = c.req.header("host");
@@ -210,7 +203,7 @@ const PUBLIC_ROUTES = [
 
 api.use("*", async (c, next) => {
     const path = c.req.path.replace("/api", "");
-    const rateLimit = checkRateLimit(c, path);
+    const rateLimit = await checkRateLimit(c, path);
     if (rateLimit.limited) {
         if (rateLimit.retryAfter) {
             c.header("Retry-After", String(rateLimit.retryAfter));
@@ -1129,6 +1122,15 @@ api.get("/github/auth-url", async (c) => {
         return c.json(apiResponse(true, "Auth URL generated", { authUrl, callbackUrl }));
     } catch (error: any) {
         console.error("API: /github/auth-url error:", error);
+        if (error?.message === "oauth_public_url_missing") {
+            return c.json(
+                apiResponse(
+                    false,
+                    "Public URL is required for OAuth in production (set manager.public_url or tunnel.url)."
+                ),
+                400
+            );
+        }
         return c.json(apiResponse(false, error.message || "Internal Server Error"));
     }
 });
@@ -1158,6 +1160,9 @@ api.get("/auth/github", async (c) => {
         return c.redirect(authUrl);
     } catch (error: any) {
         console.error("API: /auth/github error:", error);
+        if (error?.message === "oauth_public_url_missing") {
+            return c.redirect("/login?error=oauth_public_url_missing");
+        }
         return c.redirect("/login?error=github_auth_failed");
     }
 });

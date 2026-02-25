@@ -236,11 +236,12 @@ async function getContainerDiskUsage(): Promise<Record<string, number>> {
 
     const result: Record<string, number> = {};
     try {
-        const dfResult = await runCommand("sudo", ["docker", "system", "df", "-v"]);
-        if (dfResult.exitCode === 0 && dfResult.stdout) {
+        const { systemDfVerbose } = await import("./docker");
+        const dfResult = await systemDfVerbose();
+        if (dfResult.success && dfResult.output) {
             // ... (Re-use previous parsing logic) ...
             // Simplified for brevity in this tool call, assume standard parsing
-            const lines = dfResult.stdout.split("\n");
+            const lines = dfResult.output.split("\n");
             let inContainers = false;
             for (const line of lines) {
                 if (line.includes("Containers space usage:")) {

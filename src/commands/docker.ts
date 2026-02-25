@@ -10,6 +10,7 @@ const ALLOWED_DOCKER_SUBCOMMANDS = new Set([
     "push",
     "tag",
     "run",
+    "start",
     "stop",
     "rm",
     "restart",
@@ -17,6 +18,7 @@ const ALLOWED_DOCKER_SUBCOMMANDS = new Set([
     "logs",
     "login",
     "logout",
+    "system",
 ]);
 
 const BLOCKED_DOCKER_RUN_FLAGS = new Set([
@@ -53,6 +55,13 @@ export function assertAllowedDockerArgs(args: string[]): void {
         const blocked = hasBlockedFlag(args.slice(1), BLOCKED_DOCKER_RUN_FLAGS);
         if (blocked) {
             throw new Error(`Blocked docker run flag '${blocked}'`);
+        }
+    }
+
+    if (sub === "system") {
+        const op = args[1];
+        if (op !== "df") {
+            throw new Error(`Blocked docker system operation '${op || "<empty>"}'`);
         }
     }
 }
@@ -139,7 +148,21 @@ async function dockerCommand(args: string[], cwd?: string) {
         // Fall through to sudo execution.
     }
 
+    // High-impact operations should not auto-escalate to sudo.
+    if (args[0] === "run" || args[0] === "build" || args[0] === "login") {
+        return {
+            stdout: directSafeOutput("", ""),
+            stderr:
+                "Docker permission denied for high-impact operation. Ensure user is in docker group.",
+            exitCode: 1,
+        };
+    }
+
     return runCommand("sudo", ["-n", dockerPath, ...args], cwd);
+}
+
+function directSafeOutput(stdout: string, stderr: string): string {
+    return stdout || stderr;
 }
 
 /**
@@ -438,6 +461,23 @@ export async function runContainer(
     }
 }
 
+export async function startContainer(
+    containerName: string
+): Promise<{ success: boolean; message: string }> {
+    try {
+        const result = await dockerCommand(["start", containerName]);
+        if (result.exitCode !== 0) {
+            return {
+                success: false,
+                message: `Failed to start container: ${result.stderr || result.stdout}`,
+            };
+        }
+        return { success: true, message: `Container ${containerName} started` };
+    } catch (error: any) {
+        return { success: false, message: `Start error: ${error.message}` };
+    }
+}
+
 /**
  * Run docker-compose up
  */
@@ -641,6 +681,20 @@ export async function containerStatus(
     }
 }
 
+export async function inspectContainer(
+    containerName: string
+): Promise<{ success: boolean; output: string }> {
+    try {
+        const result = await dockerCommand(["inspect", containerName]);
+        if (result.exitCode !== 0) {
+            return { success: false, output: result.stderr || result.stdout };
+        }
+        return { success: true, output: result.stdout || "" };
+    } catch (error: any) {
+        return { success: false, output: String(error?.message || error) };
+    }
+}
+
 /**
  * Start an app-specific Cloudflare Tunnel sidecar container
  */
@@ -759,6 +813,18 @@ export async function listContainers(): Promise<
         });
     } catch (error: any) {
         return [];
+    }
+}
+
+export async function systemDfVerbose(): Promise<{ success: boolean; output: string }> {
+    try {
+        const result = await dockerCommand(["system", "df", "-v"]);
+        if (result.exitCode !== 0) {
+            return { success: false, output: result.stderr || result.stdout };
+        }
+        return { success: true, output: result.stdout || "" };
+    } catch (error: any) {
+        return { success: false, output: String(error?.message || error) };
     }
 }
 
