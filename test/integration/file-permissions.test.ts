@@ -42,4 +42,24 @@ describe("security file permissions", () => {
         const data = JSON.parse(result.stdout);
         expect(data.mode).toBe(0o600);
     });
+
+    it("auto-heals insecure system.yaml permissions on load", () => {
+        const home = createTempHome();
+        const result = runIsolatedScript(
+            home,
+            `
+        const config = await import('./src/config.ts');
+        const { chmodSync, statSync } = await import('fs');
+        await config.saveSystemConfig({ manager: { port: 41788 } });
+        chmodSync(config.CONFIG_FILE, 0o644);
+        await config.reloadSystemConfig();
+        const mode = statSync(config.CONFIG_FILE).mode & 0o777;
+        console.log(JSON.stringify({ mode }));
+      `
+        );
+
+        expect(result.exitCode).toBe(0);
+        const data = JSON.parse(result.stdout);
+        expect(data.mode).toBe(0o600);
+    });
 });

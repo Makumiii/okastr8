@@ -59,6 +59,7 @@ async function logAuthEvent(options: {
 export async function loadAuthData(): Promise<AuthData> {
     try {
         if (existsSync(AUTH_FILE)) {
+            await chmod(AUTH_FILE, 0o600).catch(() => {});
             const content = await readFile(AUTH_FILE, "utf-8");
             return JSON.parse(content);
         }

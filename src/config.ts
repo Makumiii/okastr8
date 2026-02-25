@@ -140,6 +140,7 @@ export async function loadSystemConfig(): Promise<SystemConfig> {
             configCache = {};
             return configCache;
         }
+        await chmod(CONFIG_FILE, 0o600).catch(() => {});
         const content = await readFile(CONFIG_FILE, "utf-8");
         configCache = (load(content) as SystemConfig) || {};
         return configCache;

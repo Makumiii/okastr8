@@ -41,3 +41,5 @@ This plan establishes a pragmatic testing pyramid for the CLI, API, dashboard, a
 - Phase 5 now also includes a real app webhook branch-mismatch drill and restart-under-active-load probe.
 - Phase 6 started with security/recovery drills: signed webhook replay checks, auth edge-case hardening validation, and repeated restart consistency measurements.
 - Phase 6 now includes bounded CPU/disk pressure drills with live API responsiveness measurements.
+- Phase 7 implemented with production gate scripts and CI workflow enforcement for push/PR checks.
+- Phase 8 started with staging/ops drill run on February 25, 2026 (service status, token recovery, backup/restore integrity, rollback contract).
