@@ -218,6 +218,16 @@ Okastr8 relies on running certain system commands (like systemd, docker, or cadd
 sudo bun run src/main.ts setup sudoers
 ```
 
+### 4. Production-Readiness Gate
+
+Before shipping changes, run the quality gate:
+
+```bash
+bun run gate:prod:no-scan
+```
+
+This runs typecheck, lint, unit/smoke/integration, and e2e tests in one flow.
+
 _You only need to run this once._
 
 ### 4. Build the Dashboard

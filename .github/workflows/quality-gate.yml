@@ -1,0 +1,61 @@
+name: Quality Gate
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run Production Gate (CI-safe)
+        run: bun run gate:prod:no-e2e
+
+      - name: Bun Audit (if available)
+        run: |
+          if bun pm audit --help >/dev/null 2>&1; then
+            bun pm audit
+          else
+            echo "bun pm audit unavailable in this Bun version; skipping"
+          fi
+
+      - name: NPM Audit (production deps)
+        run: npm audit --omit=dev
+
+  live-e2e:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run Live E2E
+        env:
+          OKASTR8_BASE_URL: ${{ secrets.OKASTR8_BASE_URL }}
+        run: |
+          if [ -z "${OKASTR8_BASE_URL}" ]; then
+            echo "OKASTR8_BASE_URL secret is required for live-e2e."
+            exit 1
+          fi
+          bun run test:e2e

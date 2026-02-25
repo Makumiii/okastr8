@@ -45,7 +45,7 @@ if [[ "$RUN_SCANNERS" == "1" ]]; then
   log "Security scanners (optional)"
 
   if command -v bun >/dev/null 2>&1; then
-    if bun pm audit --help >/dev/null 2>&1; then
+    if bun pm --help 2>/dev/null | grep -q "audit"; then
       run_optional_scanner "bun audit" bun pm audit || SCANNER_FAILURE=1
     else
       log "Skip: bun pm audit unavailable in this Bun version"
@@ -53,7 +53,11 @@ if [[ "$RUN_SCANNERS" == "1" ]]; then
   fi
 
   if command -v npm >/dev/null 2>&1; then
-    run_optional_scanner "npm audit (prod deps)" npm audit --omit=dev || SCANNER_FAILURE=1
+    if [[ -f package-lock.json || -f npm-shrinkwrap.json ]]; then
+      run_optional_scanner "npm audit (prod deps)" npm audit --omit=dev || SCANNER_FAILURE=1
+    else
+      log "Skip: npm audit requires package-lock.json or npm-shrinkwrap.json"
+    fi
   else
     log "Skip: npm not installed"
   fi
