@@ -225,6 +225,15 @@
         invalidEnvKeys.length > 0 || duplicateEnvKeys.length > 0,
     );
 
+    function envImportErrorMessage(error: unknown) {
+        const message =
+            error instanceof Error ? error.message : "Failed to import environment file.";
+        if (message.toLowerCase().includes("requested file or directory could not be found")) {
+            return "The dropped file is no longer available. Re-select it with Import .env and try again.";
+        }
+        return message;
+    }
+
     async function handleEnvFile(file: File) {
         const text = await file.text();
         const parsed = parseEnvText(text);
@@ -262,21 +271,26 @@
         event.stopPropagation();
         isEnvDragActive = false;
         try {
+            if (event.dataTransfer?.files?.length) {
+                await handleEnvFile(event.dataTransfer.files[0]);
+                return;
+            }
             const items = event.dataTransfer?.items;
             if (items?.length) {
                 for (const item of items) {
                     if (item.kind === "file") {
-                        const file = item.getAsFile();
+                        let file: File | null = null;
+                        try {
+                            file = item.getAsFile();
+                        } catch {
+                            // Ignore and continue trying other sources.
+                        }
                         if (file) {
                             await handleEnvFile(file);
                             return;
                         }
                     }
                 }
-            }
-            if (event.dataTransfer?.files?.length) {
-                await handleEnvFile(event.dataTransfer.files[0]);
-                return;
             }
             const text = event.dataTransfer?.getData("text/plain")?.trim();
             if (text) {
@@ -291,16 +305,25 @@
             }
             toasts.error("No file detected. Drop a .env file or paste KEY=VALUE content.");
         } catch (error: any) {
-            toasts.error(error?.message || "Failed to import environment file.");
+            toasts.error(envImportErrorMessage(error));
         }
     }
 
     function handleEnvPaste(event: ClipboardEvent) {
-        const text = event.clipboardData?.getData("text");
-        if (!text) return;
-        const parsed = parseEnvText(text);
-        const merged = { ...entriesToEnv(envEntries), ...parsed };
-        setEntriesFromEnv(merged);
+        try {
+            const text = event.clipboardData?.getData("text");
+            if (!text) return;
+            const parsed = parseEnvText(text);
+            if (Object.keys(parsed).length === 0) {
+                toasts.error("Pasted content did not contain valid KEY=VALUE lines.");
+                return;
+            }
+            const merged = { ...entriesToEnv(envEntries), ...parsed };
+            setEntriesFromEnv(merged);
+            toasts.success(`Imported ${Object.keys(parsed).length} env variable(s).`);
+        } catch (error: any) {
+            toasts.error(envImportErrorMessage(error));
+        }
     }
 
     function openConfirm() {
@@ -788,13 +811,19 @@
                                 Import .env
                                 <input
                                     type="file"
-                                    accept=".env,text/plain"
+                                    accept=".env,.txt,text/plain,*/*"
                                     class="hidden"
                                     disabled={deployState === "loading" || deployState === "deploying"}
                                     onchange={async (event) => {
-                                        const file = event.currentTarget.files?.[0];
-                                        if (file) await handleEnvFile(file);
-                                        event.currentTarget.value = "";
+                                        const input = event.currentTarget;
+                                        const file = input.files?.[0];
+                                        try {
+                                            if (file) await handleEnvFile(file);
+                                        } catch (error: any) {
+                                            toasts.error(envImportErrorMessage(error));
+                                        } finally {
+                                            input.value = "";
+                                        }
                                     }}
                                 />
                             </label>
