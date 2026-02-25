@@ -43,6 +43,11 @@ describe("CLI smoke", () => {
         const output = new TextDecoder().decode(result.stdout);
 
         expect(result.exitCode).toBe(0);
+        expect(output).toContain("--env");
+        expect(output).toContain("--env-file");
+        expect(output).toContain("--push-image");
+        expect(output).toContain("--push-image-ref");
+        expect(output).toContain("--push-registry-credential");
         expect(output).not.toContain("--build");
         expect(output).not.toContain("--health-method");
         expect(output).not.toContain("--health-target");
@@ -56,6 +61,18 @@ describe("CLI smoke", () => {
         const output = new TextDecoder().decode(result.stdout);
 
         expect(result.exitCode).toBe(0);
+        expect(output).toContain("--branch");
+        expect(output).toContain("--env");
+        expect(output).toContain("--env-file");
         expect(output).not.toContain("--no-webhook");
+    });
+
+    it("exposes dual rollback targeting for git and image strategies", () => {
+        const result = runCli(["deploy", "rollback", "--help"]);
+        const output = new TextDecoder().decode(result.stdout);
+
+        expect(result.exitCode).toBe(0);
+        expect(output).toContain("--commit");
+        expect(output).toContain("--target");
     });
 });
