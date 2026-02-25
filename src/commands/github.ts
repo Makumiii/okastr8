@@ -51,6 +51,55 @@ export interface ImportOptions {
     env?: Record<string, string>;
 }
 
+type AppMetadataReconcileResult = {
+    nextMeta: Record<string, any>;
+    dirty: boolean;
+};
+
+export function reconcileImportAppMetadata(
+    existingMeta: Record<string, any>,
+    repoCloneUrl: string,
+    branch: string
+): AppMetadataReconcileResult {
+    const nextMeta: Record<string, any> = { ...existingMeta };
+    let dirty = false;
+
+    const hadValidRepo =
+        typeof nextMeta.gitRepo === "string" &&
+        nextMeta.gitRepo.includes("://") &&
+        nextMeta.gitRepo.trim().length > 0;
+    if (!hadValidRepo) {
+        nextMeta.gitRepo = repoCloneUrl;
+        dirty = true;
+    }
+
+    const previousBranch = String(nextMeta.gitBranch || nextMeta.branch || "").trim();
+    if (previousBranch !== branch) {
+        nextMeta.gitBranch = branch;
+        nextMeta.branch = branch;
+        dirty = true;
+    } else {
+        if (!nextMeta.gitBranch) {
+            nextMeta.gitBranch = branch;
+            dirty = true;
+        }
+        if (!nextMeta.branch) {
+            nextMeta.branch = branch;
+            dirty = true;
+        }
+    }
+
+    const currentWebhookBranch = String(nextMeta.webhookBranch || "").trim();
+    const shouldAlignWebhook =
+        !currentWebhookBranch || !previousBranch || currentWebhookBranch === previousBranch;
+    if (shouldAlignWebhook && currentWebhookBranch !== branch) {
+        nextMeta.webhookBranch = branch;
+        dirty = true;
+    }
+
+    return { nextMeta, dirty };
+}
+
 // Config helpers
 // Note: We now use the Unified Config Manager
 import { getSystemConfig, saveSystemConfig, reloadSystemConfig } from "../config";
@@ -623,21 +672,9 @@ export async function prepareRepoImport(
         } else {
             try {
                 const meta = JSON.parse(await readFile(appMetaPath, "utf-8"));
-                let dirty = false;
-                if (!meta.gitRepo || typeof meta.gitRepo !== "string" || !meta.gitRepo.includes("://")) {
-                    meta.gitRepo = repo.clone_url;
-                    dirty = true;
-                }
-                if (!meta.gitBranch) {
-                    meta.gitBranch = branch;
-                    dirty = true;
-                }
-                if (!meta.webhookBranch) {
-                    meta.webhookBranch = branch;
-                    dirty = true;
-                }
+                const { nextMeta, dirty } = reconcileImportAppMetadata(meta, repo.clone_url, branch);
                 if (dirty) {
-                    await writeFile(appMetaPath, JSON.stringify(meta, null, 2));
+                    await writeFile(appMetaPath, JSON.stringify(nextMeta, null, 2));
                 }
             } catch {
                 // Best effort only; deployment can proceed without this repair.
