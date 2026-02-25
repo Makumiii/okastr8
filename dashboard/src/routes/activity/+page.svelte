@@ -40,10 +40,11 @@
     let interval: any;
     let activityAbort: AbortController | null = null;
     let activityRequestId = 0;
+    let activityInFlight = false;
 
     onMount(() => {
         loadActivity();
-        interval = setInterval(loadActivity, 10000); // Polling every 10s
+        interval = setInterval(() => loadActivity(false), 10000); // Polling every 10s
     });
 
     onDestroy(() => {
@@ -51,16 +52,25 @@
         if (activityAbort) activityAbort.abort();
     });
 
-    async function loadActivity() {
+    async function loadActivity(cancelPrevious = false) {
+        if (activityInFlight && !cancelPrevious) return;
+
         let url =
             filter === "all"
                 ? `/activity/list?limit=100&date=${selectedDate}`
                 : `/activity/list?limit=100&type=${filter}&date=${selectedDate}`;
 
         const requestId = ++activityRequestId;
-        if (activityAbort) activityAbort.abort();
+        if (cancelPrevious && activityAbort) {
+            activityAbort.abort();
+            activityAbort = null;
+        }
+        if (activityInFlight) return;
+
         const controller = new AbortController();
         activityAbort = controller;
+        activityInFlight = true;
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
 
         try {
             const res = await get<ActivityEntry[]>(url, {
@@ -76,6 +86,8 @@
             }
             console.error("Failed to load activity:", err);
         } finally {
+            clearTimeout(timeoutId);
+            activityInFlight = false;
             if (requestId === activityRequestId) {
                 isLoading = false;
             }
@@ -86,14 +98,14 @@
         filter = f;
         isLoading = true;
         activities = [];
-        loadActivity();
+        loadActivity(true);
     }
 
     function setDate(date: string) {
         selectedDate = date;
         isLoading = true;
         activities = [];
-        loadActivity();
+        loadActivity(true);
     }
 
     // Generate past 7 days

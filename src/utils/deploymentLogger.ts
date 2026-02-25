@@ -8,6 +8,9 @@ export interface DeploymentStream {
     callbacks: Set<(message: string) => void>;
     createdAt: number;
     cancelled: boolean;
+    ended: boolean;
+    endedAt?: number;
+    history: string[];
 }
 
 // Store active deployment streams
@@ -27,6 +30,8 @@ export function startDeploymentStream(deploymentId: string): void {
         callbacks: new Set(),
         createdAt: Date.now(),
         cancelled: false,
+        ended: false,
+        history: [],
     });
     console.log(`[DeploymentLogger] Started stream: ${deploymentId}`);
 }
@@ -37,6 +42,10 @@ export function startDeploymentStream(deploymentId: string): void {
 export function streamLog(deploymentId: string, message: string): void {
     const stream = deploymentStreams.get(deploymentId);
     if (stream) {
+        stream.history.push(message);
+        if (stream.history.length > 500) {
+            stream.history = stream.history.slice(-500);
+        }
         // Send to all connected clients
         stream.callbacks.forEach((callback) => {
             try {
@@ -69,6 +78,26 @@ export function subscribe(deploymentId: string, callback: (message: string) => v
     const stream = deploymentStreams.get(deploymentId);
     if (!stream) {
         console.warn(`[DeploymentLogger] Stream not found: ${deploymentId}`);
+        try {
+            callback("⚠️ Deployment stream not found. It may have expired.");
+            callback("[DEPLOYMENT_STREAM_END]");
+        } catch {}
+        return () => {};
+    }
+
+    // Replay buffered logs for late subscribers.
+    for (const line of stream.history) {
+        try {
+            callback(line);
+        } catch {
+            // Ignore callback errors during replay.
+        }
+    }
+
+    if (stream.ended) {
+        try {
+            callback("[DEPLOYMENT_STREAM_END]");
+        } catch {}
         return () => {};
     }
 
@@ -88,6 +117,9 @@ export function subscribe(deploymentId: string, callback: (message: string) => v
 export function endDeploymentStream(deploymentId: string): void {
     const stream = deploymentStreams.get(deploymentId);
     if (stream) {
+        if (stream.ended) return;
+        stream.ended = true;
+        stream.endedAt = Date.now();
         // Notify all subscribers that stream is ending
         stream.callbacks.forEach((callback) => {
             try {
@@ -96,8 +128,7 @@ export function endDeploymentStream(deploymentId: string): void {
                 console.error(`[DeploymentLogger] End callback error:`, error);
             }
         });
-
-        deploymentStreams.delete(deploymentId);
+        stream.callbacks.clear();
         console.log(`[DeploymentLogger] Ended stream: ${deploymentId}`);
     }
 }
@@ -108,9 +139,10 @@ export function endDeploymentStream(deploymentId: string): void {
 export function cleanupOldStreams(): void {
     const now = Date.now();
     for (const [id, stream] of deploymentStreams.entries()) {
-        if (now - stream.createdAt > STREAM_TIMEOUT) {
+        const anchor = stream.endedAt ?? stream.createdAt;
+        if (now - anchor > STREAM_TIMEOUT) {
             console.log(`[DeploymentLogger] Cleaning up old stream: ${id}`);
-            endDeploymentStream(id);
+            deploymentStreams.delete(id);
         }
     }
 }
@@ -123,7 +155,11 @@ cleanupInterval.unref();
  * Get active stream count (for debugging)
  */
 export function getActiveStreamCount(): number {
-    return deploymentStreams.size;
+    let count = 0;
+    for (const stream of deploymentStreams.values()) {
+        if (!stream.ended) count += 1;
+    }
+    return count;
 }
 
 /**
