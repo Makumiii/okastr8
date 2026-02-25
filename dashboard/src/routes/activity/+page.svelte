@@ -194,7 +194,7 @@
                 <select
                     class="h-9 w-40 appearance-none rounded-lg border border-[var(--border)] bg-[var(--surface-dark)] pl-9 pr-8 text-sm font-medium text-[var(--text-primary)] focus:border-[var(--primary)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]"
                     value={selectedDate}
-                    on:change={(e) => setDate(e.currentTarget.value)}
+                    onchange={(e) => setDate((e.currentTarget as HTMLSelectElement).value)}
                 >
                     {#each getPast7Days() as date}
                         <option value={date}>{formatDateLabel(date)}</option>
@@ -228,7 +228,7 @@
                     'all'
                         ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-sm'
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
-                    on:click={() => setFilter("all")}
+                    onclick={() => setFilter("all")}
                 >
                     All
                 </button>
@@ -237,7 +237,7 @@
                     'deploy'
                         ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-sm'
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
-                    on:click={() => setFilter("deploy")}
+                    onclick={() => setFilter("deploy")}
                 >
                     Deploys
                 </button>
@@ -246,7 +246,7 @@
                     'login'
                         ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-sm'
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
-                    on:click={() => setFilter("login")}
+                    onclick={() => setFilter("login")}
                 >
                     Logins
                 </button>
@@ -255,7 +255,7 @@
                     'resource'
                         ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-sm'
                         : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}"
-                    on:click={() => setFilter("resource")}
+                    onclick={() => setFilter("resource")}
                 >
                     Resources
                 </button>
@@ -275,6 +275,7 @@
             </div>
         {:else}
             {#each activities as item (item.id)}
+                {@const Icon = getIcon(item.type)}
                 <Card
                     class="flex flex-col gap-4 !p-4 transition-all hover:bg-[var(--surface-dark)]"
                 >
@@ -285,10 +286,7 @@
                                 item.data,
                             )}"
                         >
-                            <svelte:component
-                                this={getIcon(item.type)}
-                                size={20}
-                            />
+                            <Icon size={20} />
                         </div>
 
                         <div class="flex-1">
@@ -350,7 +348,7 @@
                                 <div class="mt-3">
                                     <button
                                         class="flex items-center gap-1 text-xs font-medium text-[var(--primary-strong)] hover:underline"
-                                        on:click={() =>
+                                        onclick={() =>
                                             toggleLog(item.data.id || item.id)}
                                     >
                                         <Terminal size={12} />
