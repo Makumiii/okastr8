@@ -1,6 +1,6 @@
 # Okastr8
 
-![Okastr8 Wordmark](assets/okastr8-wordmark-light.svg)
+![Okastr8 Wordmark](assets/okastr8-wordmark-dark.svg)
 
 Self-hosted PaaS workflows for Linux servers you control.
 
