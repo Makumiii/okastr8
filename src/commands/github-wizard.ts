@@ -333,7 +333,11 @@ export async function runGithubImportWizard(options: {
 
     await configureDeploymentConfig(enquirer, deployConfig, prep.detectedRuntime, interactive);
     await maybeConfigurePublishImage(enquirer, deployConfig, interactive);
-    env = await promptForEnv(enquirer, { ...deployConfig.env, ...env });
+    if (interactive) {
+        env = await promptForEnv(enquirer, { ...deployConfig.env, ...env });
+    } else {
+        env = { ...deployConfig.env, ...env };
+    }
     deployConfig.env = env;
 
     if (interactive) {

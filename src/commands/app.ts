@@ -886,7 +886,7 @@ export function addAppCommands(program: Command) {
             try {
                 await runImageWizard();
             } catch (error: any) {
-                if (error?.name === "ExitPromptError") {
+                if (error?.name === "ExitPromptError" || !error?.message) {
                     console.log("Cancelled.");
                     return;
                 }
@@ -1176,10 +1176,10 @@ export function addAppCommands(program: Command) {
     app.command("rollback")
         .description("Rollback app to a previous version")
         .argument("<name>", "Application name")
-        .option("-v, --version <id>", "Version id to rollback to")
-        .action(async (name: string, options: { version?: string }) => {
+        .option("--version-id <id>", "Version id to rollback to")
+        .action(async (name: string, options: { versionId?: string }) => {
             try {
-                let targetVersion = options.version ? Number.parseInt(options.version, 10) : NaN;
+                let targetVersion = options.versionId ? Number.parseInt(options.versionId, 10) : NaN;
                 if (Number.isNaN(targetVersion)) {
                     const { getVersions } = await import("./version");
                     const versions = await getVersions(name);

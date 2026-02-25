@@ -608,7 +608,9 @@ export async function prepareRepoImport(
                     {
                         name: appName,
                         repo: repo.full_name,
+                        gitRepo: repo.clone_url,
                         branch: branch,
+                        gitBranch: branch,
                         webhookBranch: branch,
                         created_at: new Date().toISOString(),
                     },
@@ -616,6 +618,28 @@ export async function prepareRepoImport(
                     2
                 )
             );
+        } else {
+            try {
+                const meta = JSON.parse(await readFile(appMetaPath, "utf-8"));
+                let dirty = false;
+                if (!meta.gitRepo || typeof meta.gitRepo !== "string" || !meta.gitRepo.includes("://")) {
+                    meta.gitRepo = repo.clone_url;
+                    dirty = true;
+                }
+                if (!meta.gitBranch) {
+                    meta.gitBranch = branch;
+                    dirty = true;
+                }
+                if (!meta.webhookBranch) {
+                    meta.webhookBranch = branch;
+                    dirty = true;
+                }
+                if (dirty) {
+                    await writeFile(appMetaPath, JSON.stringify(meta, null, 2));
+                }
+            } catch {
+                // Best effort only; deployment can proceed without this repair.
+            }
         }
 
         log(`Preparing deployment for ${repo.full_name} (${branch})...`);
