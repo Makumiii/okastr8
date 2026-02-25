@@ -789,9 +789,7 @@ export async function listContainers(): Promise<
     Array<{ name: string; status: string; state: string; ports: string }>
 > {
     try {
-        const result = await runCommand("sudo", [
-            "-n",
-            getDockerPath(),
+        const result = await dockerCommand([
             "ps",
             "-a",
             "--format",
