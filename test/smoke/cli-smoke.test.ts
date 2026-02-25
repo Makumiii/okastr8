@@ -75,4 +75,13 @@ describe("CLI smoke", () => {
         expect(output).toContain("--commit");
         expect(output).toContain("--target");
     });
+
+    it("fails fast when --push-image is missing required companion options", () => {
+        const result = runCli(["deploy", "trigger", "dummy-app", "--push-image"]);
+        const stderr = new TextDecoder().decode(result.stderr);
+
+        expect(result.exitCode).toBe(1);
+        expect(stderr).toContain("--push-image-ref");
+        expect(stderr).toContain("--push-registry-credential");
+    });
 });

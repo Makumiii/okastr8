@@ -50,4 +50,24 @@ test.describe("live container deploy UI", () => {
         await expect(page.locator("#publish-image-ref")).toBeVisible();
         await expect(page.locator("#publish-credential")).toBeVisible();
     });
+
+    test("github deploy page surfaces env validation errors before deploy", async ({
+        context,
+        page,
+    }) => {
+        const token = createLiveTestToken("e2e-github-env-validation-user");
+        await setSessionCookie(context, token, BASE_URL);
+
+        await page.goto(`${BASE_URL}/github/deploy/Makumiii%2Fokastr8-test-app`);
+        await expect(page.getByRole("heading", { name: /deploy okastr8-test-app/i })).toBeVisible();
+
+        const keyInputs = page.locator('input[placeholder="KEY"]');
+        await keyInputs.first().fill("1INVALID_KEY");
+        await expect(page.getByText(/invalid keys/i)).toBeVisible();
+
+        await keyInputs.first().fill("DUP_KEY");
+        await page.getByRole("button", { name: /\+ add variable/i }).click();
+        await keyInputs.nth(1).fill("DUP_KEY");
+        await expect(page.getByText(/duplicate keys/i)).toBeVisible();
+    });
 });
