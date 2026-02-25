@@ -30,17 +30,17 @@
     }
 
     // State
-    let activities: ActivityEntry[] = [];
-    let isLoading = true;
-    let filter: ActivityType | "all" = "all";
-    let selectedDate: string = new Date().toISOString().split("T")[0]; // Default today (YYYY-MM-DD)
-    let expandedLogId: string | null = null;
-    let logContent: string | null = null;
-    let isLoadingLog = false;
-    let interval: any;
-    let activityAbort: AbortController | null = null;
-    let activityRequestId = 0;
-    let activityInFlight = false;
+    let activities = $state<ActivityEntry[]>([]);
+    let isLoading = $state(true);
+    let filter = $state<ActivityType | "all">("all");
+    let selectedDate = $state<string>(new Date().toISOString().split("T")[0]); // Default today (YYYY-MM-DD)
+    let expandedLogId = $state<string | null>(null);
+    let logContent = $state<string | null>(null);
+    let isLoadingLog = $state(false);
+    let interval: ReturnType<typeof setInterval> | null = null;
+    let activityAbort = $state<AbortController | null>(null);
+    let activityRequestId = $state(0);
+    let activityInFlight = $state(false);
 
     onMount(() => {
         loadActivity();

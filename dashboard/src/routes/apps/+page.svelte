@@ -13,6 +13,7 @@
         gitRepo?: string;
         gitBranch?: string;
         port?: number;
+        domain?: string;
     }
     // ... existing code ...
     let apps = $state<App[]>([]);
@@ -161,6 +162,17 @@
                             >
                                 <Globe size={16} />
                                 <span>Port {app.port}</span>
+                            </div>
+                        {/if}
+
+                        {#if app.domain}
+                            <div
+                                class="mt-2 flex items-center gap-2 text-sm text-[var(--text-muted)]"
+                            >
+                                <Globe size={16} />
+                                <span class="truncate" title={app.domain}>
+                                    {app.domain}
+                                </span>
                             </div>
                         {/if}
 
