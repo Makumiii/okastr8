@@ -89,6 +89,7 @@ COMMANDS=(
   "/usr/bin/docker-compose"
   "/usr/local/bin/docker"
   "/usr/local/bin/docker-compose"
+  "/usr/local/lib/docker/cli-plugins/docker-compose"
 )
 
 echo "Configuring sudoers for user: $TARGET_USER"
@@ -111,10 +112,8 @@ done
 echo ""
 echo "Adding system commands..."
 for CMD in "${COMMANDS[@]}"; do
-  if [ -f "$CMD" ]; then
-    SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $CMD *\n"
-    echo "  - Added: $CMD"
-  fi
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $CMD *\n"
+  echo "  - Added: $CMD"
 done
 
 # Write the content to the sudoers.d file

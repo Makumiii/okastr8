@@ -27,18 +27,91 @@ function getComposePath(): string {
     return "docker-compose"; // Fallback
 }
 
+function isDockerPermissionError(text: string): boolean {
+    const value = text.toLowerCase();
+    return (
+        value.includes("permission denied") ||
+        value.includes("cannot connect to the docker daemon") ||
+        value.includes("got permission denied while trying to connect") ||
+        value.includes("superuser privileges")
+    );
+}
+
+function isComposeCommandUnavailable(text: string): boolean {
+    const value = text.toLowerCase();
+    return value.includes("is not a docker command") || value.includes("unknown command");
+}
+
 /**
  * Run a docker command with sudo for permission handling
  */
 async function dockerCommand(args: string[], cwd?: string) {
-    return runCommand("sudo", ["-n", getDockerPath(), ...args], cwd);
+    const dockerPath = getDockerPath();
+
+    try {
+        const direct = await runCommand(dockerPath, args, cwd);
+        if (direct.exitCode === 0) {
+            return direct;
+        }
+        if (!isDockerPermissionError(`${direct.stdout}\n${direct.stderr}`)) {
+            return direct;
+        }
+    } catch {
+        // Fall through to sudo execution.
+    }
+
+    return runCommand("sudo", ["-n", dockerPath, ...args], cwd);
 }
 
 /**
  * Run a docker-compose command with sudo for permission handling
  */
 async function composeCommand(args: string[], cwd?: string) {
-    return runCommand("sudo", ["-n", getComposePath(), ...args], cwd);
+    const dockerPath = getDockerPath();
+    const composeBinary = getComposePath();
+
+    try {
+        const directPlugin = await runCommand(dockerPath, ["compose", ...args], cwd);
+        if (directPlugin.exitCode === 0) {
+            return directPlugin;
+        }
+
+        const pluginOutput = `${directPlugin.stdout}\n${directPlugin.stderr}`;
+        const pluginUnavailable = isComposeCommandUnavailable(pluginOutput);
+        const pluginPermissionError = isDockerPermissionError(pluginOutput);
+
+        if (!pluginUnavailable && !pluginPermissionError) {
+            return directPlugin;
+        }
+
+        if (pluginPermissionError || pluginUnavailable) {
+            const sudoPlugin = await runCommand("sudo", ["-n", dockerPath, "compose", ...args], cwd);
+            if (sudoPlugin.exitCode === 0) {
+                return sudoPlugin;
+            }
+
+            const sudoPluginOutput = `${sudoPlugin.stdout}\n${sudoPlugin.stderr}`;
+            if (!isComposeCommandUnavailable(sudoPluginOutput)) {
+                return sudoPlugin;
+            }
+        }
+    } catch {
+        // Fall through to docker-compose binary fallback.
+    }
+
+    try {
+        const directBinary = await runCommand(composeBinary, args, cwd);
+        if (directBinary.exitCode === 0) {
+            return directBinary;
+        }
+        if (!isDockerPermissionError(`${directBinary.stdout}\n${directBinary.stderr}`)) {
+            return directBinary;
+        }
+    } catch {
+        // Fall through to sudo binary fallback.
+    }
+
+    return runCommand("sudo", ["-n", composeBinary, ...args], cwd);
 }
 
 /**
@@ -153,12 +226,25 @@ export async function dockerLogin(
     passwordOrToken: string
 ): Promise<{ success: boolean; message: string }> {
     try {
-        const result = await runCommand(
-            "sudo",
-            ["-n", getDockerPath(), "login", server, "-u", username, "--password-stdin"],
+        const dockerPath = getDockerPath();
+        let result = await runCommand(
+            dockerPath,
+            ["login", server, "-u", username, "--password-stdin"],
             undefined,
             passwordOrToken
         );
+
+        if (
+            result.exitCode !== 0 &&
+            isDockerPermissionError(`${result.stdout}\n${result.stderr}`)
+        ) {
+            result = await runCommand(
+                "sudo",
+                ["-n", dockerPath, "login", server, "-u", username, "--password-stdin"],
+                undefined,
+                passwordOrToken
+            );
+        }
 
         if (result.exitCode !== 0) {
             return {
