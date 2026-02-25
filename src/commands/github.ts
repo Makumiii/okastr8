@@ -950,9 +950,16 @@ export async function finalizeRepoImport(
 
         await updateVersionStatus(appName, versionId, "building", "Building application");
 
-        // 2. Validate Runtime
+        // 2. Validate Runtime (skip when deployment is Dockerfile/Compose driven)
+        const hasDockerManagedBuild =
+            existsSync(join(releasePath, "Dockerfile")) ||
+            existsSync(join(releasePath, "docker-compose.yml")) ||
+            existsSync(join(releasePath, "docker-compose.yaml")) ||
+            existsSync(join(releasePath, "compose.yml")) ||
+            existsSync(join(releasePath, "compose.yaml"));
+
         const supportedRuntimes = ["node", "python", "go", "bun", "deno"];
-        if (supportedRuntimes.includes(config.runtime)) {
+        if (!hasDockerManagedBuild && supportedRuntimes.includes(config.runtime)) {
             const { checkRuntimeInstalled, formatMissingRuntimeError } = await import("./env");
             const isInstalled = await checkRuntimeInstalled(config.runtime);
             if (!isInstalled) {
@@ -972,6 +979,8 @@ export async function finalizeRepoImport(
                     message: formatMissingRuntimeError(config.runtime as any),
                 };
             }
+        } else if (hasDockerManagedBuild) {
+            log("Dockerfile/Compose detected. Skipping host runtime validation.");
         }
 
         log(`Detected runtime: ${config.runtime}`);
