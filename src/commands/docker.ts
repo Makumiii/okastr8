@@ -1,6 +1,84 @@
 import { runCommand } from "../utils/command";
 import { existsSync } from "fs";
 
+const ALLOWED_DOCKER_SUBCOMMANDS = new Set([
+    "--version",
+    "build",
+    "image",
+    "inspect",
+    "pull",
+    "push",
+    "tag",
+    "run",
+    "stop",
+    "rm",
+    "restart",
+    "ps",
+    "logs",
+    "login",
+    "logout",
+]);
+
+const BLOCKED_DOCKER_RUN_FLAGS = new Set([
+    "--privileged",
+    "--pid",
+    "--ipc",
+    "--uts",
+    "--device",
+    "--cap-add",
+    "--security-opt",
+    "--mount",
+    "-v",
+    "--volume",
+]);
+
+function hasBlockedFlag(args: string[], blocked: Set<string>): string | null {
+    for (const arg of args) {
+        const key = arg.includes("=") ? arg.split("=")[0] : arg;
+        if (key && blocked.has(key)) return key;
+    }
+    return null;
+}
+
+export function assertAllowedDockerArgs(args: string[]): void {
+    if (!args.length) {
+        throw new Error("Docker command args cannot be empty");
+    }
+    const sub = args[0];
+    if (!sub || !ALLOWED_DOCKER_SUBCOMMANDS.has(sub)) {
+        throw new Error(`Blocked docker subcommand '${sub || "<empty>"}'`);
+    }
+
+    if (sub === "run") {
+        const blocked = hasBlockedFlag(args.slice(1), BLOCKED_DOCKER_RUN_FLAGS);
+        if (blocked) {
+            throw new Error(`Blocked docker run flag '${blocked}'`);
+        }
+    }
+}
+
+export function assertAllowedComposeArgs(args: string[]): void {
+    if (!args.length) {
+        throw new Error("Compose command args cannot be empty");
+    }
+    if (args[0] === "--version") {
+        return;
+    }
+
+    // Allow compose up/down with optional -f/-p flags only.
+    const operation = args.find((arg) => ["up", "down"].includes(arg));
+    if (!operation) {
+        throw new Error("Blocked compose operation");
+    }
+
+    const blocked = args.find((arg) =>
+        ["run", "exec", "cp", "buildx", "create", "kill", "attach"].includes(arg)
+    );
+    if (blocked) {
+        throw new Error(`Blocked compose token '${blocked}'`);
+    }
+}
+
 /**
  * Get absolute path to docker binary to match sudoers NOPASSWD rules
  */
@@ -46,6 +124,7 @@ function isComposeCommandUnavailable(text: string): boolean {
  * Run a docker command with sudo for permission handling
  */
 async function dockerCommand(args: string[], cwd?: string) {
+    assertAllowedDockerArgs(args);
     const dockerPath = getDockerPath();
 
     try {
@@ -67,6 +146,7 @@ async function dockerCommand(args: string[], cwd?: string) {
  * Run a docker-compose command with sudo for permission handling
  */
 async function composeCommand(args: string[], cwd?: string) {
+    assertAllowedComposeArgs(args);
     const dockerPath = getDockerPath();
     const composeBinary = getComposePath();
 

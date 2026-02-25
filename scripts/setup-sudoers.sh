@@ -83,11 +83,14 @@ SCRIPTS=(
   "scripts/tunnel.sh"
 )
 
-# Additional system commands to allow without password
-COMMANDS=(
+# Docker/Compose binaries (scoped sudo rules are generated below)
+DOCKER_BINARIES=(
   "/usr/bin/docker"
-  "/usr/bin/docker-compose"
   "/usr/local/bin/docker"
+)
+
+COMPOSE_BINARIES=(
+  "/usr/bin/docker-compose"
   "/usr/local/bin/docker-compose"
   "/usr/local/lib/docker/cli-plugins/docker-compose"
 )
@@ -108,12 +111,36 @@ for SCRIPT in "${SCRIPTS[@]}"; do
   fi
 done
 
-# Add system commands (like docker)
+# Add scoped docker/compose command rules
 echo ""
-echo "Adding system commands..."
-for CMD in "${COMMANDS[@]}"; do
-  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $CMD *\n"
-  echo "  - Added: $CMD"
+echo "Adding scoped docker/compose commands..."
+for DOCKER_CMD in "${DOCKER_BINARIES[@]}"; do
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD --version\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD ps *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD inspect *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD image inspect *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD logs *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD pull *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD push *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD tag *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD build *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD run *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD stop *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD rm *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD restart *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD login *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD logout *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD compose --version\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD compose * up *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $DOCKER_CMD compose * down *\n"
+  echo "  - Added scoped rules for: $DOCKER_CMD"
+done
+
+for COMPOSE_CMD in "${COMPOSE_BINARIES[@]}"; do
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $COMPOSE_CMD --version\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $COMPOSE_CMD * up *\n"
+  SUDOERS_CONTENT+="$TARGET_USER ALL=(root) NOPASSWD: $COMPOSE_CMD * down *\n"
+  echo "  - Added scoped rules for: $COMPOSE_CMD"
 done
 
 # Write the content to the sudoers.d file
