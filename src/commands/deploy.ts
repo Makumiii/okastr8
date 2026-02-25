@@ -1,11 +1,9 @@
 import { Command } from "commander";
-import { runCommand } from "../utils/command";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { homedir } from "os";
-import { readFile, writeFile, mkdir } from "fs/promises";
+import { runCommand } from "../utils/command";
+import { readFile } from "fs/promises";
 import { existsSync } from "fs";
-import type { DeploymentRecord, DeploysMetadata } from "../types";
 import { resolveDeployStrategy } from "../utils/deploy-strategy";
 
 // Get the directory of this file (works in Bun and Node ESM)
@@ -15,31 +13,14 @@ const __dirname = dirname(__filename);
 // Project root is two levels up from src/commands/
 const PROJECT_ROOT = join(__dirname, "..", "..");
 
-// Paths
-import { OKASTR8_HOME } from "../config";
-const APPS_DIR = join(OKASTR8_HOME, "apps");
-const DEPLOYMENT_FILE = join(OKASTR8_HOME, "deployment.json");
-
 // Scripts
 const SCRIPTS = {
-    gitPull: join(PROJECT_ROOT, "scripts", "git", "pull.sh"),
-    gitRollback: join(PROJECT_ROOT, "scripts", "git", "rollback.sh"),
     healthCheck: join(PROJECT_ROOT, "scripts", "deploy", "health-check.sh"),
     restart: join(PROJECT_ROOT, "scripts", "systemd", "restart.sh"),
-    stop: join(PROJECT_ROOT, "scripts", "systemd", "stop.sh"),
-    start: join(PROJECT_ROOT, "scripts", "systemd", "start.sh"),
 };
 
 export interface DeployOptions {
     appName: string;
-    branch?: string;
-    buildSteps?: string[];
-    healthCheck?: {
-        method: "http" | "process" | "port" | "command";
-        target: string;
-        timeout?: number;
-    };
-    skipHealthCheck?: boolean;
     env?: Record<string, string>;
     publishImage?: {
         imageRef: string;
@@ -47,11 +28,41 @@ export interface DeployOptions {
     };
 }
 
-// Core Functions
-export async function gitPull(repoPath: string, branch?: string) {
-    const args = [SCRIPTS.gitPull, repoPath];
-    if (branch) args.push(branch);
-    return await runCommand("bash", args);
+export interface GitRollbackVersion {
+    id: number;
+    commit?: string;
+    status?: string;
+}
+
+export interface DeployHistoryItem {
+    gitHash: string;
+    timeStamp: Date;
+    ssh_url: string;
+}
+
+export function resolveGitRollbackTarget(
+    versions: GitRollbackVersion[],
+    currentVersionId: number | null,
+    target?: string
+): number | null {
+    const sorted = versions.slice().sort((a, b) => b.id - a.id);
+    if (sorted.length === 0) {
+        return null;
+    }
+
+    if (target) {
+        const numeric = Number.parseInt(target, 10);
+        if (!Number.isNaN(numeric) && String(numeric) === target.trim()) {
+            return numeric;
+        }
+        const match = sorted.find((version) => version.commit && version.commit.startsWith(target));
+        return match?.id ?? null;
+    }
+
+    const fallback = sorted.find(
+        (version) => version.id !== currentVersionId && version.status !== "failed"
+    );
+    return fallback?.id ?? null;
 }
 
 export async function runHealthCheck(method: string, target: string, timeout: number = 30) {
@@ -59,52 +70,12 @@ export async function runHealthCheck(method: string, target: string, timeout: nu
 }
 
 export async function deployApp(options: DeployOptions) {
-    const { appName, branch, skipHealthCheck, env, publishImage } = options;
+    const { appName, env, publishImage } = options;
 
     console.log(`Starting deployment for ${appName}...`);
 
     try {
-        // Check for branch mismatch and warn user
-        const { getAppMetadata, updateApp } = await import("./app");
-
-        if (branch) {
-            try {
-                const metadata = await getAppMetadata(appName);
-                if (metadata.gitBranch && metadata.gitBranch !== branch) {
-                    console.log(`\nWarning: Branch change detected!`);
-                    console.log(`   Current branch: ${metadata.gitBranch}`);
-                    console.log(`   Requested branch: ${branch}`);
-                    const webhookBranch = metadata.webhookBranch || metadata.gitBranch;
-                    if (webhookBranch && webhookBranch !== branch) {
-                        console.log(`   Auto-deploy will keep using: ${webhookBranch}`);
-                        console.log(`   You can change this in the app settings or via CLI.\n`);
-                    } else {
-                        console.log(`   Auto-deploy will follow this branch.\n`);
-                    }
-
-                    // Ask for confirmation
-                    const readline = await import("readline");
-                    const rl = readline.createInterface({
-                        input: process.stdin,
-                        output: process.stdout,
-                    });
-
-                    const answer = await new Promise<string>((resolve) => {
-                        rl.question("Continue with branch change? (y/N): ", resolve);
-                    });
-                    rl.close();
-
-                    if (answer.toLowerCase() !== "y" && answer.toLowerCase() !== "yes") {
-                        console.log("Deployment cancelled.");
-                        return { success: false, message: "Deployment cancelled by user" };
-                    }
-
-                    console.log(`Proceeding with deployment to ${branch}...`);
-                }
-            } catch {
-                // App doesn't exist yet, no warning needed
-            }
-        }
+        const { updateApp } = await import("./app");
 
         // Use V2 immutable deployment logic (same as webhook/API)
         // This creates a new release, clones fresh, builds, and switches symlink
@@ -122,7 +93,7 @@ export async function deployApp(options: DeployOptions) {
             await sendDeploymentAlertEmail(
                 appName,
                 "success",
-                `Deployment to ${branch || "default branch"} successful.\nRelease ID: ${releaseId}`
+                `Deployment successful.\nRelease ID: ${releaseId}`
             );
 
             // Update Caddy Routing
@@ -152,71 +123,11 @@ export async function deployApp(options: DeployOptions) {
     }
 }
 
-async function recordDeployment(appName: string) {
-    try {
-        const appDir = join(APPS_DIR, appName);
-        const repoDir = join(appDir, "repo");
-
-        // Get current git hash
-        const hashResult = await runCommand("git", ["-C", repoDir, "rev-parse", "HEAD"]);
-        const gitHash = hashResult.stdout?.trim() || "unknown";
-
-        // Get remote URL
-        const remoteResult = await runCommand("git", [
-            "-C",
-            repoDir,
-            "remote",
-            "get-url",
-            "origin",
-        ]);
-        const sshUrl = remoteResult.stdout?.trim() || "unknown";
-
-        const deployment: DeploysMetadata = {
-            gitHash,
-            timeStamp: new Date(),
-            ssh_url: sshUrl,
-        };
-
-        // Read/create deployment record
-        let record: DeploymentRecord = { deployments: [] };
-        try {
-            const content = await readFile(DEPLOYMENT_FILE, "utf-8");
-            record = JSON.parse(content);
-        } catch {
-            // File doesn't exist, use empty record
-        }
-
-        // Find or create entry for this app
-        let entry = record.deployments.find((d) => d.serviceName === appName);
-        if (!entry) {
-            entry = {
-                serviceName: appName,
-                gitRemoteName: sshUrl.split("/").pop()?.replace(".git", "") || appName,
-                deploys: [],
-                lastSuccessfulDeploy: null,
-            };
-            record.deployments.push(entry);
-        }
-
-        entry.deploys.push(deployment);
-        entry.lastSuccessfulDeploy = deployment;
-
-        await mkdir(dirname(DEPLOYMENT_FILE), { recursive: true });
-        await writeFile(DEPLOYMENT_FILE, JSON.stringify(record, null, 2));
-    } catch (error) {
-        console.error("Failed to record deployment:", error);
-        // Non-fatal - don't fail deployment if recording fails
-    }
-}
-
 export async function rollbackApp(appName: string, commitHash?: string) {
-    const appDir = join(APPS_DIR, appName);
-    const repoDir = join(appDir, "repo");
-
     console.log(`⏪ Rolling back ${appName}...`);
 
     try {
-        const { getAppMetadata } = await import("./app");
+        const { getAppMetadata, restartApp } = await import("./app");
         const metadata = await getAppMetadata(appName);
         const strategy = resolveDeployStrategy(metadata);
 
@@ -225,51 +136,63 @@ export async function rollbackApp(appName: string, commitHash?: string) {
             return await rollbackImageApp(appName, commitHash);
         }
 
-        // If no hash provided, get from last successful deployment
-        if (!commitHash) {
-            const content = await readFile(DEPLOYMENT_FILE, "utf-8");
-            const record: DeploymentRecord = JSON.parse(content);
-            const entry = record.deployments.find((d) => d.serviceName === appName);
-
-            if (!entry || !entry.lastSuccessfulDeploy) {
-                throw new Error(`No previous successful deployment found for ${appName}`);
+        const { getVersions, rollback } = await import("./version");
+        const versions = await getVersions(appName);
+        if (versions.versions.length === 0) {
+            throw new Error(`No previous successful deployment found for ${appName}`);
+        }
+        const targetVersionId = resolveGitRollbackTarget(
+            versions.versions,
+            versions.current,
+            commitHash
+        );
+        if (targetVersionId === null) {
+            if (commitHash) {
+                throw new Error(`No deployment version found for '${commitHash}'`);
             }
-            commitHash = entry.lastSuccessfulDeploy.gitHash;
+            throw new Error(`No previous successful deployment found for ${appName}`);
         }
 
-        // Checkout the specific commit
-        console.log(`  → Checking out ${commitHash}...`);
-        const checkoutResult = await runCommand("git", ["-C", repoDir, "checkout", commitHash]);
-        if (checkoutResult.exitCode !== 0) {
-            throw new Error(`Git checkout failed: ${checkoutResult.stderr}`);
+        const result = await rollback(appName, targetVersionId);
+        if (!result.success) {
+            throw new Error(result.message);
         }
 
-        // Restart service
-        console.log(`  → Restarting service...`);
-        const restartResult = await runCommand("sudo", [SCRIPTS.restart, appName]);
-        if (restartResult.exitCode !== 0) {
-            throw new Error(`Service restart failed: ${restartResult.stderr}`);
-        }
-
-        console.log(` Rolled back ${appName} to ${commitHash}`);
-        return { success: true, message: `Rolled back to ${commitHash}` };
+        await restartApp(appName);
+        console.log(` Rolled back ${appName} to v${targetVersionId}`);
+        return { success: true, message: `Rolled back to v${targetVersionId}` };
     } catch (error: any) {
         console.error(` Rollback failed: ${error.message}`);
         return { success: false, message: error.message };
     }
 }
 
-async function autoRollback(appName: string) {
-    console.log(`Auto-rollback initiated for ${appName}...`);
-    return await rollbackApp(appName);
-}
-
 export async function getDeploymentHistory(appName: string) {
     try {
-        const content = await readFile(DEPLOYMENT_FILE, "utf-8");
-        const record: DeploymentRecord = JSON.parse(content);
-        const entry = record.deployments.find((d) => d.serviceName === appName);
-        return { success: true, history: entry?.deploys || [] };
+        const { getAppMetadata } = await import("./app");
+        const metadata = await getAppMetadata(appName);
+        const strategy = resolveDeployStrategy(metadata);
+
+        if (strategy === "image") {
+            const imageReleases = Array.isArray((metadata as any).imageReleases)
+                ? (metadata as any).imageReleases
+                : [];
+            const history: DeployHistoryItem[] = imageReleases.map((release: any) => ({
+                gitHash: release.imageDigest || release.imageRef || String(release.id),
+                timeStamp: new Date(release.deployedAt),
+                ssh_url: metadata.gitRepo || (metadata as any).repo || "",
+            }));
+            return { success: true, history };
+        }
+
+        const { getVersions } = await import("./version");
+        const versions = await getVersions(appName);
+        const history: DeployHistoryItem[] = versions.versions.map((version) => ({
+            gitHash: version.commit || `v${version.id}`,
+            timeStamp: new Date(version.timestamp),
+            ssh_url: metadata.gitRepo || (metadata as any).repo || "",
+        }));
+        return { success: true, history };
     } catch {
         return { success: true, history: [] };
     }
@@ -283,12 +206,6 @@ export function addDeployCommands(program: Command) {
         .command("trigger")
         .description("Trigger a deployment for an app")
         .argument("<app>", "Application name")
-        .option("-b, --branch <branch>", "Git branch to deploy")
-        .option("--build <steps>", "Build steps (comma-separated)")
-        .option("--health-method <method>", "Health check method (http, process, port, command)")
-        .option("--health-target <target>", "Health check target")
-        .option("--health-timeout <seconds>", "Health check timeout", "30")
-        .option("--skip-health", "Skip health check")
         .option("--env <vars...>", "Environment variables (KEY=VALUE)")
         .option("--env-file <path>", "Path to .env file")
         .option(
@@ -301,18 +218,6 @@ export function addDeployCommands(program: Command) {
             "Registry credential id from `okastr8 registry add`"
         )
         .action(async (app, options) => {
-            const buildSteps = options.build
-                ? options.build.split(",").map((s: string) => s.trim())
-                : [];
-            const healthCheck =
-                options.healthMethod && options.healthTarget
-                    ? {
-                          method: options.healthMethod,
-                          target: options.healthTarget,
-                          timeout: parseInt(options.healthTimeout, 10),
-                      }
-                    : undefined;
-
             let env: Record<string, string> = {};
 
             // Parse --env-file
@@ -360,10 +265,6 @@ export function addDeployCommands(program: Command) {
 
             const result = await deployApp({
                 appName: app,
-                branch: options.branch,
-                buildSteps,
-                healthCheck,
-                skipHealthCheck: options.skipHealth,
                 env: Object.keys(env).length > 0 ? env : undefined,
                 publishImage,
             });
@@ -377,7 +278,10 @@ export function addDeployCommands(program: Command) {
         .command("rollback")
         .description("Rollback an app to a previous version")
         .argument("<app>", "Application name")
-        .option("-c, --commit <hash>", "Specific commit hash to rollback to")
+        .option(
+            "-c, --commit <hash>",
+            "Specific commit hash prefix or git version id to rollback to"
+        )
         .option("-t, --target <target>", "Image rollback target (release id, image ref, or digest)")
         .action(async (app, options) => {
             if (options.commit && options.target) {
