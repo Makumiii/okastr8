@@ -975,18 +975,6 @@ api.post("/deploy/history", async (c) => {
     }
 });
 
-api.post("/deploy/health", async (c) => {
-    try {
-        const { runHealthCheck } = await import("./commands/deploy");
-        const { method, target, timeout } = await c.req.json();
-        const result = await runHealthCheck(method, target, timeout || 30);
-        return c.json(apiResponse(result.exitCode === 0, result.stdout || result.stderr));
-    } catch (error: any) {
-        console.error("API: /deploy/health error:", error);
-        return c.json(apiResponse(false, error.message || "Internal Server Error"));
-    }
-});
-
 // GitHub routes
 api.get("/github/status", async (c) => {
     try {
