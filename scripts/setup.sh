@@ -18,10 +18,6 @@ DEBIAN_PACKAGES=(
   curl
   git
   ufw
-  git
-  ufw
-  unzip
-  gnupg
   unzip
   gnupg
   xclip # For copying ngrok URL to clipboard
@@ -31,9 +27,6 @@ FEDORA_PACKAGES=(
   curl
   git
   firewalld
-  firewalld
-  unzip
-  gnupg2
   unzip
   gnupg2
   xclip # For copying ngrok URL to clipboard
@@ -53,9 +46,23 @@ else
   sudo rm -f /etc/apt/sources.list.d/caddy-stable.list
   sudo apt update
   sudo apt install -y "${DEBIAN_PACKAGES[@]}"
-  sudo apt update
-  sudo apt install -y "${DEBIAN_PACKAGES[@]}"
 fi
+
+# --- Docker Installation ---
+echo "🐳 Installing Docker runtime..."
+if [[ "$USE_FEDORA" == true ]]; then
+  sudo dnf install -y docker docker-compose-plugin || sudo dnf install -y docker
+else
+  sudo apt update
+  if ! sudo apt install -y docker.io docker-compose-plugin; then
+    echo "docker-compose-plugin unavailable, falling back to docker-compose package..."
+    sudo apt install -y docker.io docker-compose
+  fi
+fi
+
+# Ensure Docker service is running and current user can run Docker directly.
+sudo systemctl enable --now docker || true
+sudo usermod -aG docker "${SUDO_USER:-$USER}" || true
 
 # --- Install Bun First ---
 echo "🔧 Setting up Bun..."
@@ -206,20 +213,6 @@ else
   echo "❌ Ngrok installation failed" >&2
   exit 1
 fi
-
-# Configure Ngrok authtoken from config.json
-# Configure Ngrok authtoken from system.yaml
-# duplicate removed
-FEDORA_PACKAGES=(
-  curl
-  git
-  firewalld
-  unzip
-  gnupg2
-  xclip
-)
-
-# ... (omitted primarily to keep context clean, tool handles replacement)
 
 # Configure Ngrok authtoken from config.json
 SCRIPT_DIR="$(dirname "$0")"

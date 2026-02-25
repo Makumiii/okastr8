@@ -1,6 +1,93 @@
 import { runCommand } from "../utils/command";
 import { existsSync } from "fs";
 
+const ALLOWED_DOCKER_SUBCOMMANDS = new Set([
+    "--version",
+    "build",
+    "image",
+    "inspect",
+    "pull",
+    "push",
+    "tag",
+    "run",
+    "start",
+    "stop",
+    "rm",
+    "restart",
+    "ps",
+    "logs",
+    "login",
+    "logout",
+    "system",
+]);
+
+const BLOCKED_DOCKER_RUN_FLAGS = new Set([
+    "--privileged",
+    "--pid",
+    "--ipc",
+    "--uts",
+    "--device",
+    "--cap-add",
+    "--security-opt",
+    "--mount",
+    "-v",
+    "--volume",
+]);
+
+function hasBlockedFlag(args: string[], blocked: Set<string>): string | null {
+    for (const arg of args) {
+        const key = arg.includes("=") ? arg.split("=")[0] : arg;
+        if (key && blocked.has(key)) return key;
+    }
+    return null;
+}
+
+export function assertAllowedDockerArgs(args: string[]): void {
+    if (!args.length) {
+        throw new Error("Docker command args cannot be empty");
+    }
+    const sub = args[0];
+    if (!sub || !ALLOWED_DOCKER_SUBCOMMANDS.has(sub)) {
+        throw new Error(`Blocked docker subcommand '${sub || "<empty>"}'`);
+    }
+
+    if (sub === "run") {
+        const blocked = hasBlockedFlag(args.slice(1), BLOCKED_DOCKER_RUN_FLAGS);
+        if (blocked) {
+            throw new Error(`Blocked docker run flag '${blocked}'`);
+        }
+    }
+
+    if (sub === "system") {
+        const op = args[1];
+        if (op !== "df") {
+            throw new Error(`Blocked docker system operation '${op || "<empty>"}'`);
+        }
+    }
+}
+
+export function assertAllowedComposeArgs(args: string[]): void {
+    if (!args.length) {
+        throw new Error("Compose command args cannot be empty");
+    }
+    if (args[0] === "--version") {
+        return;
+    }
+
+    // Allow compose up/down with optional -f/-p flags only.
+    const operation = args.find((arg) => ["up", "down"].includes(arg));
+    if (!operation) {
+        throw new Error("Blocked compose operation");
+    }
+
+    const blocked = args.find((arg) =>
+        ["run", "exec", "cp", "buildx", "create", "kill", "attach"].includes(arg)
+    );
+    if (blocked) {
+        throw new Error(`Blocked compose token '${blocked}'`);
+    }
+}
+
 /**
  * Get absolute path to docker binary to match sudoers NOPASSWD rules
  */
@@ -27,18 +114,107 @@ function getComposePath(): string {
     return "docker-compose"; // Fallback
 }
 
+function isDockerPermissionError(text: string): boolean {
+    const value = text.toLowerCase();
+    return (
+        value.includes("permission denied") ||
+        value.includes("cannot connect to the docker daemon") ||
+        value.includes("got permission denied while trying to connect") ||
+        value.includes("superuser privileges")
+    );
+}
+
+function isComposeCommandUnavailable(text: string): boolean {
+    const value = text.toLowerCase();
+    return value.includes("is not a docker command") || value.includes("unknown command");
+}
+
 /**
  * Run a docker command with sudo for permission handling
  */
 async function dockerCommand(args: string[], cwd?: string) {
-    return runCommand("sudo", ["-n", getDockerPath(), ...args], cwd);
+    assertAllowedDockerArgs(args);
+    const dockerPath = getDockerPath();
+
+    try {
+        const direct = await runCommand(dockerPath, args, cwd);
+        if (direct.exitCode === 0) {
+            return direct;
+        }
+        if (!isDockerPermissionError(`${direct.stdout}\n${direct.stderr}`)) {
+            return direct;
+        }
+    } catch {
+        // Fall through to sudo execution.
+    }
+
+    // High-impact operations should not auto-escalate to sudo.
+    if (args[0] === "run" || args[0] === "build" || args[0] === "login") {
+        return {
+            stdout: directSafeOutput("", ""),
+            stderr:
+                "Docker permission denied for high-impact operation. Ensure user is in docker group.",
+            exitCode: 1,
+        };
+    }
+
+    return runCommand("sudo", ["-n", dockerPath, ...args], cwd);
+}
+
+function directSafeOutput(stdout: string, stderr: string): string {
+    return stdout || stderr;
 }
 
 /**
  * Run a docker-compose command with sudo for permission handling
  */
 async function composeCommand(args: string[], cwd?: string) {
-    return runCommand("sudo", ["-n", getComposePath(), ...args], cwd);
+    assertAllowedComposeArgs(args);
+    const dockerPath = getDockerPath();
+    const composeBinary = getComposePath();
+
+    try {
+        const directPlugin = await runCommand(dockerPath, ["compose", ...args], cwd);
+        if (directPlugin.exitCode === 0) {
+            return directPlugin;
+        }
+
+        const pluginOutput = `${directPlugin.stdout}\n${directPlugin.stderr}`;
+        const pluginUnavailable = isComposeCommandUnavailable(pluginOutput);
+        const pluginPermissionError = isDockerPermissionError(pluginOutput);
+
+        if (!pluginUnavailable && !pluginPermissionError) {
+            return directPlugin;
+        }
+
+        if (pluginPermissionError || pluginUnavailable) {
+            const sudoPlugin = await runCommand("sudo", ["-n", dockerPath, "compose", ...args], cwd);
+            if (sudoPlugin.exitCode === 0) {
+                return sudoPlugin;
+            }
+
+            const sudoPluginOutput = `${sudoPlugin.stdout}\n${sudoPlugin.stderr}`;
+            if (!isComposeCommandUnavailable(sudoPluginOutput)) {
+                return sudoPlugin;
+            }
+        }
+    } catch {
+        // Fall through to docker-compose binary fallback.
+    }
+
+    try {
+        const directBinary = await runCommand(composeBinary, args, cwd);
+        if (directBinary.exitCode === 0) {
+            return directBinary;
+        }
+        if (!isDockerPermissionError(`${directBinary.stdout}\n${directBinary.stderr}`)) {
+            return directBinary;
+        }
+    } catch {
+        // Fall through to sudo binary fallback.
+    }
+
+    return runCommand("sudo", ["-n", composeBinary, ...args], cwd);
 }
 
 /**
@@ -153,12 +329,25 @@ export async function dockerLogin(
     passwordOrToken: string
 ): Promise<{ success: boolean; message: string }> {
     try {
-        const result = await runCommand(
-            "sudo",
-            ["-n", getDockerPath(), "login", server, "-u", username, "--password-stdin"],
+        const dockerPath = getDockerPath();
+        let result = await runCommand(
+            dockerPath,
+            ["login", server, "-u", username, "--password-stdin"],
             undefined,
             passwordOrToken
         );
+
+        if (
+            result.exitCode !== 0 &&
+            isDockerPermissionError(`${result.stdout}\n${result.stderr}`)
+        ) {
+            result = await runCommand(
+                "sudo",
+                ["-n", dockerPath, "login", server, "-u", username, "--password-stdin"],
+                undefined,
+                passwordOrToken
+            );
+        }
 
         if (result.exitCode !== 0) {
             return {
@@ -269,6 +458,23 @@ export async function runContainer(
             success: false,
             message: `Run error: ${error.message}`,
         };
+    }
+}
+
+export async function startContainer(
+    containerName: string
+): Promise<{ success: boolean; message: string }> {
+    try {
+        const result = await dockerCommand(["start", containerName]);
+        if (result.exitCode !== 0) {
+            return {
+                success: false,
+                message: `Failed to start container: ${result.stderr || result.stdout}`,
+            };
+        }
+        return { success: true, message: `Container ${containerName} started` };
+    } catch (error: any) {
+        return { success: false, message: `Start error: ${error.message}` };
     }
 }
 
@@ -475,6 +681,20 @@ export async function containerStatus(
     }
 }
 
+export async function inspectContainer(
+    containerName: string
+): Promise<{ success: boolean; output: string }> {
+    try {
+        const result = await dockerCommand(["inspect", containerName]);
+        if (result.exitCode !== 0) {
+            return { success: false, output: result.stderr || result.stdout };
+        }
+        return { success: true, output: result.stdout || "" };
+    } catch (error: any) {
+        return { success: false, output: String(error?.message || error) };
+    }
+}
+
 /**
  * Start an app-specific Cloudflare Tunnel sidecar container
  */
@@ -593,6 +813,18 @@ export async function listContainers(): Promise<
         });
     } catch (error: any) {
         return [];
+    }
+}
+
+export async function systemDfVerbose(): Promise<{ success: boolean; output: string }> {
+    try {
+        const result = await dockerCommand(["system", "df", "-v"]);
+        if (result.exitCode !== 0) {
+            return { success: false, output: result.stderr || result.stdout };
+        }
+        return { success: true, output: result.stdout || "" };
+    } catch (error: any) {
+        return { success: false, output: String(error?.message || error) };
     }
 }
 

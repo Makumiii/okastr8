@@ -170,17 +170,17 @@ okastr8 app env unset myapp OLD_VAR
 okastr8 deploy trigger <app> [options]
 
 # Options:
-#   -b, --branch <branch>         Git branch to deploy
-#   --build <steps>               Build steps (comma-separated)
-#   --health-method <method>      Health check: http, process, port, command
-#   --health-target <target>      Health check target
-#   --health-timeout <seconds>    Timeout (default: 30)
-#   --skip-health                 Skip health check
+#   --env <vars...>                     Environment variables (KEY=VALUE)
+#   --env-file <path>                   Path to .env file
+#   --push-image                        Push image to registry after successful deployment
+#   --push-image-ref <ref>              Target image ref (e.g., ghcr.io/org/app:tag)
+#   --push-registry-credential <id>     Registry credential id
 
 # Examples:
 okastr8 deploy trigger myapp
-okastr8 deploy trigger myapp -b develop
-okastr8 deploy trigger myapp --skip-health
+okastr8 deploy trigger myapp --env NODE_ENV=production
+okastr8 deploy trigger myapp --env-file .env.prod
+okastr8 deploy trigger myapp --push-image --push-image-ref ghcr.io/acme/myapp:latest --push-registry-credential ghcr-main
 ```
 
 ### Rollback
@@ -189,11 +189,13 @@ okastr8 deploy trigger myapp --skip-health
 okastr8 deploy rollback <app> [options]
 
 # Options:
-#   -c, --commit <hash>   Specific commit to rollback to
+#   -c, --commit <hash>   Specific commit hash prefix or git version id
+#   -t, --target <target> Image rollback target (release id, image ref, or digest)
 
 # Examples:
 okastr8 deploy rollback myapp
 okastr8 deploy rollback myapp -c abc1234
+okastr8 deploy rollback myapp -t sha256:abc123...
 ```
 
 ### View history

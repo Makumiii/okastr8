@@ -7,8 +7,59 @@ const SCRIPT_BASE_PATH = path.join(process.cwd(), "scripts", "systemd");
 // Core Functions
 // Core Functions
 
+const SERVICE_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$/;
+const LINUX_USER_PATTERN = /^[a-z_][a-z0-9_-]{0,31}$/;
+const TARGET_PATTERN = /^[A-Za-z0-9_.@-]{1,64}$/;
+
+export function assertValidServiceName(service_name: string): void {
+    if (!SERVICE_NAME_PATTERN.test(service_name)) {
+        throw new Error(
+            `Invalid service name '${service_name}'. Use only letters, numbers, '.', '_', '@', '-'`
+        );
+    }
+}
+
+function assertSingleLine(value: string, field: string): void {
+    if (value.includes("\n") || value.includes("\r") || value.includes("\0")) {
+        throw new Error(`Invalid ${field}: control characters are not allowed`);
+    }
+}
+
+export function assertValidCreateServiceInputs(input: {
+    service_name: string;
+    description: string;
+    exec_start: string;
+    working_directory: string;
+    user: string;
+    wanted_by: string;
+}): void {
+    assertValidServiceName(input.service_name);
+    assertSingleLine(input.description, "description");
+    assertSingleLine(input.exec_start, "exec_start");
+    assertSingleLine(input.working_directory, "working_directory");
+    assertSingleLine(input.user, "user");
+    assertSingleLine(input.wanted_by, "wanted_by");
+
+    if (!input.working_directory.startsWith("/")) {
+        throw new Error("Invalid working_directory: must be an absolute path");
+    }
+    if (!LINUX_USER_PATTERN.test(input.user)) {
+        throw new Error(`Invalid user '${input.user}'`);
+    }
+    if (!TARGET_PATTERN.test(input.wanted_by)) {
+        throw new Error(`Invalid wanted_by target '${input.wanted_by}'`);
+    }
+    if (input.description.length === 0 || input.description.length > 200) {
+        throw new Error("Invalid description length (must be 1..200)");
+    }
+    if (input.exec_start.length === 0 || input.exec_start.length > 1000) {
+        throw new Error("Invalid exec_start length (must be 1..1000)");
+    }
+}
+
 // Helper to check if service exists (to match script behavior of failing if not found)
 async function serviceExists(service_name: string): Promise<boolean> {
+    assertValidServiceName(service_name);
     const serviceFile = `/etc/systemd/system/${service_name}.service`;
     const { runCommand } = await import("../utils/command");
     // We can use 'test -f' via sudo to check existence
@@ -25,6 +76,14 @@ export async function createService(
     wanted_by: string,
     auto_start: boolean
 ) {
+    assertValidCreateServiceInputs({
+        service_name,
+        description,
+        exec_start,
+        working_directory,
+        user,
+        wanted_by,
+    });
     // create.sh does complex file writing, keeping it as script for now but guarding with existence check might be needed?
     // Actually, create.sh is likely the most problematic if not whitelisted.
     // Ideally we rewrite this to use 'tee' or similar, but let's stick to the critical fixes first.
@@ -41,6 +100,7 @@ export async function createService(
 }
 
 export async function deleteService(service_name: string) {
+    assertValidServiceName(service_name);
     // delete.sh just enables and removes file.
     // Let's do it manually to be safe.
     await stopService(service_name).catch(() => {});
@@ -57,18 +117,22 @@ export async function deleteService(service_name: string) {
 }
 
 export async function startService(service_name: string) {
+    assertValidServiceName(service_name);
     return await runCommand("sudo", ["systemctl", "start", service_name]);
 }
 
 export async function stopService(service_name: string) {
+    assertValidServiceName(service_name);
     return await runCommand("sudo", ["systemctl", "stop", service_name]);
 }
 
 export async function restartService(service_name: string) {
+    assertValidServiceName(service_name);
     return await runCommand("sudo", ["systemctl", "restart", service_name]);
 }
 
 export async function statusService(service_name: string) {
+    assertValidServiceName(service_name);
     // Replicating status.sh logic
     if (!(await serviceExists(service_name))) {
         return {
@@ -93,14 +157,17 @@ export async function statusService(service_name: string) {
 }
 
 export async function logsService(service_name: string) {
+    assertValidServiceName(service_name);
     return await runCommand("sudo", ["journalctl", "-u", service_name, "-n", "50", "--no-pager"]);
 }
 
 export async function enableService(service_name: string) {
+    assertValidServiceName(service_name);
     return await runCommand("sudo", ["systemctl", "enable", service_name]);
 }
 
 export async function disableService(service_name: string) {
+    assertValidServiceName(service_name);
     return await runCommand("sudo", ["systemctl", "disable", service_name]);
 }
 

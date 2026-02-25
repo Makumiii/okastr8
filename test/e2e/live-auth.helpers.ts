@@ -4,11 +4,6 @@ export function getBaseUrl(): string {
     return process.env.OKASTR8_BASE_URL || "http://127.0.0.1:41788";
 }
 
-function extractHostFromBaseUrl(baseUrl: string): string {
-    const url = new URL(baseUrl);
-    return url.hostname;
-}
-
 export function createLiveTestToken(userId = "e2e-live-probe"): string {
     const result = spawnSync(
         "bun",
@@ -53,16 +48,15 @@ export async function setSessionCookie(
     token: string,
     baseUrl: string
 ): Promise<void> {
-    const domain = extractHostFromBaseUrl(baseUrl);
+    const url = new URL(baseUrl);
     await context.addCookies([
         {
             name: "okastr8_session",
             value: token,
-            domain,
-            path: "/",
+            url: url.origin,
             httpOnly: true,
-            secure: false,
-            sameSite: "Lax",
+            secure: url.protocol === "https:",
+            sameSite: "Strict",
         },
     ]);
 }

@@ -17,7 +17,8 @@ export async function runCommand(
 
     if (command === "sudo") {
         cmdToExecute = "sudo";
-        argsToExecute = args;
+        const hasNonInteractiveFlag = args.includes("-n") || args.includes("--non-interactive");
+        argsToExecute = hasNonInteractiveFlag ? args : ["-n", ...args];
     } else {
         cmdToExecute = command;
         argsToExecute = args;

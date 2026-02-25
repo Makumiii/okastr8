@@ -1,6 +1,6 @@
 import { join } from "path";
 import { homedir } from "os";
-import { readFile, writeFile, mkdir } from "fs/promises";
+import { readFile, writeFile, mkdir, chmod } from "fs/promises";
 import { load, dump } from "js-yaml";
 import { existsSync } from "fs";
 
@@ -41,6 +41,7 @@ export interface SystemConfig {
     };
     manager?: {
         port?: number;
+        public_url?: string;
         api_key?: string;
         auth?: {
             github_admin_id?: string;
@@ -139,6 +140,7 @@ export async function loadSystemConfig(): Promise<SystemConfig> {
             configCache = {};
             return configCache;
         }
+        await chmod(CONFIG_FILE, 0o600).catch(() => {});
         const content = await readFile(CONFIG_FILE, "utf-8");
         configCache = (load(content) as SystemConfig) || {};
         return configCache;
@@ -160,7 +162,7 @@ export async function reloadSystemConfig(): Promise<SystemConfig> {
 }
 
 export async function saveSystemConfig(newConfig: Partial<SystemConfig>): Promise<void> {
-    await mkdir(OKASTR8_HOME, { recursive: true });
+    await mkdir(OKASTR8_HOME, { recursive: true, mode: 0o700 });
 
     // Ensure we have the latest base
     const current = await getSystemConfig();
@@ -190,4 +192,5 @@ export async function saveSystemConfig(newConfig: Partial<SystemConfig>): Promis
 
     const yamlContent = dump(updatedConfig, { indent: 2 });
     await writeFile(CONFIG_FILE, yamlContent, "utf-8");
+    await chmod(CONFIG_FILE, 0o600).catch(() => {});
 }

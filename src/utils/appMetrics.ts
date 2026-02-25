@@ -1,5 +1,4 @@
 import { readFile } from "fs/promises";
-import { runCommand } from "./command";
 import { formatUptime } from "./systemMetrics";
 
 export interface AppMetrics {
@@ -71,9 +70,10 @@ export async function getAppMetrics(
 
     try {
         // 1. Docker Inspect (State, Health, Restarts, Config)
-        const inspect = await runCommand("sudo", ["docker", "inspect", appName]);
-        if (inspect.exitCode === 0) {
-            const data = JSON.parse(inspect.stdout)[0];
+        const { inspectContainer } = await import("../commands/docker");
+        const inspect = await inspectContainer(appName);
+        if (inspect.success) {
+            const data = JSON.parse(inspect.output)[0];
             const state = data.State;
 
             // Status

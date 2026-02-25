@@ -396,4 +396,66 @@ export function addRegistryCommands(program: Command) {
             }
             console.log(result.message);
         });
+
+    const ghcr = registry.command("ghcr").description("GHCR discovery helpers");
+
+    ghcr.command("packages")
+        .description("List GHCR container packages for a credential")
+        .argument("<credential_id>", "Registry credential id")
+        .option("--owner-type <type>", "owner scope: user|org", "user")
+        .option("--owner <name>", "owner login (optional)")
+        .action(async (credentialId: string, options: { ownerType: "user" | "org"; owner?: string }) => {
+            const result = await listGhcrPackages({
+                credentialId,
+                ownerType: options.ownerType,
+                owner: options.owner,
+            });
+            if (!result.success) {
+                console.error(result.message || "Failed to list GHCR packages");
+                process.exit(1);
+            }
+            if (!result.packages?.length) {
+                console.log("No GHCR packages found.");
+                return;
+            }
+            for (const pkg of result.packages) {
+                console.log(
+                    `${pkg.name}${pkg.visibility ? ` [${pkg.visibility}]` : ""}${pkg.updatedAt ? ` updated ${pkg.updatedAt}` : ""}`
+                );
+            }
+        });
+
+    ghcr.command("tags")
+        .description("List GHCR tags/versions for a package")
+        .argument("<credential_id>", "Registry credential id")
+        .argument("<package_name>", "Container package name")
+        .option("--owner-type <type>", "owner scope: user|org", "user")
+        .option("--owner <name>", "owner login (optional)")
+        .action(
+            async (
+                credentialId: string,
+                packageName: string,
+                options: { ownerType: "user" | "org"; owner?: string }
+            ) => {
+                const result = await listGhcrPackageTags({
+                    credentialId,
+                    packageName,
+                    ownerType: options.ownerType,
+                    owner: options.owner,
+                });
+                if (!result.success) {
+                    console.error(result.message || "Failed to list GHCR tags");
+                    process.exit(1);
+                }
+                if (!result.versions?.length) {
+                    console.log("No GHCR tags found.");
+                    return;
+                }
+                for (const version of result.versions) {
+                    console.log(
+                        `${version.id}: ${version.tags.join(", ") || "(untagged)"}${version.digest ? ` [${version.digest}]` : ""}`
+                    );
+                }
+            }
+        );
 }

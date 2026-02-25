@@ -6,15 +6,14 @@ import { readFile } from "fs/promises";
 import { runCommand } from "../utils/command";
 import {
     getGitHubConfig,
-    saveGitHubConfig,
     getConnectionStatus,
     listRepos,
-    importRepo,
     disconnectGitHub,
     hasOkastr8DeployKey,
     createSSHKey,
 } from "./github";
 import { isCurrentUserAdmin, getAdminUser } from "./auth";
+import { runGithubImportWizard } from "./github-wizard";
 
 const SSH_KEY_PATH = join(homedir(), ".ssh", "okastr8_deploy_key");
 
@@ -88,8 +87,10 @@ export function addGitHubCommands(program: Command) {
                 // Use manager's callback (requires manager to be running)
                 const callbackUrl = `http://localhost:41788/api/github/callback`;
 
-                const { getAuthUrl } = await import("./github");
-                const authUrl = getAuthUrl(config.clientId, callbackUrl, "connect");
+                const { getAuthUrlWithState } = await import("./github");
+                const { issueOAuthState } = await import("../utils/oauth-state");
+                const state = await issueOAuthState("connect");
+                const authUrl = getAuthUrlWithState(config.clientId, callbackUrl, state);
 
                 console.log("\nOpen this URL in your browser:\n");
                 console.log(`   ${authUrl}\n`);
@@ -361,13 +362,12 @@ export function addGitHubCommands(program: Command) {
                     console.log(`   App: ${appName}`);
                     console.log(`   Branch: ${branch}\n`);
 
-                    // Call import function
-                    const result = await importRepo({
-                        repoFullName: repo.full_name,
-                        appName: appName,
-                        branch: branch,
-                        setupWebhook: true,
-                        env: Object.keys(env).length > 0 ? env : undefined,
+                    const envPairs = Object.entries(env).map(([key, value]) => `${key}=${value}`);
+                    const result = await runGithubImportWizard({
+                        repo: repo.full_name,
+                        branch,
+                        env: envPairs,
+                        interactive: true,
                     });
 
                     if (result.success) {
@@ -390,54 +390,20 @@ export function addGitHubCommands(program: Command) {
     github
         .command("import")
         .description("Import and deploy a GitHub repository")
-        .argument("<repo>", "Repository full name (e.g., owner/repo)")
+        .argument("[repo]", "Repository full name (e.g., owner/repo)")
         .option("-b, --branch <branch>", "Branch to deploy")
         .option("--env <vars...>", "Environment variables (KEY=VALUE)")
         .option("--env-file <path>", "Path to .env file")
-        .option("--no-webhook", "Don't setup webhook for auto-deploys")
+        .option("--no-interactive", "Disable guided wizard prompts")
         .action(async (repo, options) => {
             try {
                 await requireAdminCli();
-                const config = await getGitHubConfig();
-                if (!config.accessToken) {
-                    console.error("Not connected to GitHub. Use web UI to connect first.");
-                    process.exit(1);
-                }
-
-                let env: Record<string, string> = {};
-
-                // Parse --env-file
-                if (options.envFile) {
-                    if (existsSync(options.envFile)) {
-                        const { readFile } = await import("fs/promises");
-                        const content = await readFile(options.envFile, "utf-8");
-                        content.split("\n").forEach((line) => {
-                            line = line.trim();
-                            if (!line || line.startsWith("#")) return;
-                            const [k, ...v] = line.split("=");
-                            if (k && v.length > 0) env[k.trim()] = v.join("=").trim();
-                        });
-                    } else {
-                        console.error(` Env file not found: ${options.envFile}`);
-                        process.exit(1);
-                    }
-                }
-
-                // Parse --env flags
-                if (options.env) {
-                    options.env.forEach((pair: string) => {
-                        const [k, ...v] = pair.split("=");
-                        if (k && v.length > 0) env[k.trim()] = v.join("=").trim();
-                    });
-                }
-
-                console.log(`\nImporting ${repo}...\n`);
-
-                const result = await importRepo({
-                    repoFullName: repo,
+                const result = await runGithubImportWizard({
+                    repo,
                     branch: options.branch,
-                    setupWebhook: options.webhook !== false,
-                    env: Object.keys(env).length > 0 ? env : undefined,
+                    env: options.env,
+                    envFile: options.envFile,
+                    interactive: options.interactive !== false,
                 });
 
                 if (result.success) {

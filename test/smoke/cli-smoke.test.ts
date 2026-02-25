@@ -37,4 +37,51 @@ describe("CLI smoke", () => {
         expect(result.exitCode).toBe(1);
         expect(stderr).toContain("unknown command");
     });
+
+    it("does not expose unsupported deploy trigger flags", () => {
+        const result = runCli(["deploy", "trigger", "--help"]);
+        const output = new TextDecoder().decode(result.stdout);
+
+        expect(result.exitCode).toBe(0);
+        expect(output).toContain("--env");
+        expect(output).toContain("--env-file");
+        expect(output).toContain("--push-image");
+        expect(output).toContain("--push-image-ref");
+        expect(output).toContain("--push-registry-credential");
+        expect(output).not.toContain("--build");
+        expect(output).not.toContain("--health-method");
+        expect(output).not.toContain("--health-target");
+        expect(output).not.toContain("--health-timeout");
+        expect(output).not.toContain("--skip-health");
+        expect(output).not.toContain("--branch");
+    });
+
+    it("does not expose unsupported github import webhook toggle", () => {
+        const result = runCli(["github", "import", "--help"]);
+        const output = new TextDecoder().decode(result.stdout);
+
+        expect(result.exitCode).toBe(0);
+        expect(output).toContain("--branch");
+        expect(output).toContain("--env");
+        expect(output).toContain("--env-file");
+        expect(output).not.toContain("--no-webhook");
+    });
+
+    it("exposes dual rollback targeting for git and image strategies", () => {
+        const result = runCli(["deploy", "rollback", "--help"]);
+        const output = new TextDecoder().decode(result.stdout);
+
+        expect(result.exitCode).toBe(0);
+        expect(output).toContain("--commit");
+        expect(output).toContain("--target");
+    });
+
+    it("fails fast when --push-image is missing required companion options", () => {
+        const result = runCli(["deploy", "trigger", "dummy-app", "--push-image"]);
+        const stderr = new TextDecoder().decode(result.stderr);
+
+        expect(result.exitCode).toBe(1);
+        expect(stderr).toContain("--push-image-ref");
+        expect(stderr).toContain("--push-registry-credential");
+    });
 });

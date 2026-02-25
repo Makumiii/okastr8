@@ -40,23 +40,6 @@ export type GitWebhookPayload = {
     };
 };
 
-export type DeploysMetadata = {
-    gitHash: string; // Commit hash of the deployment
-    timeStamp: Date;
-    ssh_url: string; // Timestamp of the deployment
-};
-
-export type Deployment = {
-    serviceName: string;
-    gitRemoteName: string;
-    deploys: DeploysMetadata[];
-    lastSuccessfulDeploy: DeploysMetadata | null;
-};
-
-export type DeploymentRecord = {
-    deployments: Deployment[];
-};
-
 export type OrchestrateEnvironment = {
     createUser: {
         userName: string;

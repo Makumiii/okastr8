@@ -4,7 +4,6 @@ import { homedir } from "os";
 import { readFile, writeFile, mkdir, rm } from "fs/promises";
 import { existsSync } from "fs";
 import { runCommand } from "../utils/command";
-import { randomBytes } from "crypto";
 import { randomUUID } from "crypto";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -49,8 +48,56 @@ export interface ImportOptions {
     buildSteps?: string[];
     startCommand?: string;
     autoDetect?: boolean;
-    setupWebhook?: boolean;
     env?: Record<string, string>;
+}
+
+type AppMetadataReconcileResult = {
+    nextMeta: Record<string, any>;
+    dirty: boolean;
+};
+
+export function reconcileImportAppMetadata(
+    existingMeta: Record<string, any>,
+    repoCloneUrl: string,
+    branch: string
+): AppMetadataReconcileResult {
+    const nextMeta: Record<string, any> = { ...existingMeta };
+    let dirty = false;
+
+    const hadValidRepo =
+        typeof nextMeta.gitRepo === "string" &&
+        nextMeta.gitRepo.includes("://") &&
+        nextMeta.gitRepo.trim().length > 0;
+    if (!hadValidRepo) {
+        nextMeta.gitRepo = repoCloneUrl;
+        dirty = true;
+    }
+
+    const previousBranch = String(nextMeta.gitBranch || nextMeta.branch || "").trim();
+    if (previousBranch !== branch) {
+        nextMeta.gitBranch = branch;
+        nextMeta.branch = branch;
+        dirty = true;
+    } else {
+        if (!nextMeta.gitBranch) {
+            nextMeta.gitBranch = branch;
+            dirty = true;
+        }
+        if (!nextMeta.branch) {
+            nextMeta.branch = branch;
+            dirty = true;
+        }
+    }
+
+    const currentWebhookBranch = String(nextMeta.webhookBranch || "").trim();
+    const shouldAlignWebhook =
+        !currentWebhookBranch || !previousBranch || currentWebhookBranch === previousBranch;
+    if (shouldAlignWebhook && currentWebhookBranch !== branch) {
+        nextMeta.webhookBranch = branch;
+        dirty = true;
+    }
+
+    return { nextMeta, dirty };
 }
 
 // Config helpers
@@ -85,9 +132,13 @@ export async function saveGitHubConfig(github: GitHubConfig): Promise<void> {
 
 // OAuth Functions
 export function getAuthUrl(clientId: string, callbackUrl: string, statePrefix?: string): string {
-    const scopes = ["repo", "read:user", "admin:repo_hook", "admin:public_key"];
     const randomState = Math.random().toString(36).substring(7);
     const state = statePrefix ? `${statePrefix}_${randomState}` : randomState;
+    return getAuthUrlWithState(clientId, callbackUrl, state);
+}
+
+export function getAuthUrlWithState(clientId: string, callbackUrl: string, state: string): string {
+    const scopes = ["repo", "read:user", "admin:repo_hook", "admin:public_key"];
     const params = new URLSearchParams({
         client_id: clientId,
         redirect_uri: callbackUrl,
@@ -608,7 +659,9 @@ export async function prepareRepoImport(
                     {
                         name: appName,
                         repo: repo.full_name,
+                        gitRepo: repo.clone_url,
                         branch: branch,
+                        gitBranch: branch,
                         webhookBranch: branch,
                         created_at: new Date().toISOString(),
                     },
@@ -616,6 +669,16 @@ export async function prepareRepoImport(
                     2
                 )
             );
+        } else {
+            try {
+                const meta = JSON.parse(await readFile(appMetaPath, "utf-8"));
+                const { nextMeta, dirty } = reconcileImportAppMetadata(meta, repo.clone_url, branch);
+                if (dirty) {
+                    await writeFile(appMetaPath, JSON.stringify(nextMeta, null, 2));
+                }
+            } catch {
+                // Best effort only; deployment can proceed without this repair.
+            }
         }
 
         log(`Preparing deployment for ${repo.full_name} (${branch})...`);
@@ -1104,89 +1167,4 @@ export async function getConnectionStatus(): Promise<{
         };
     }
     return { connected: false };
-}
-
-// Webhook Helpers
-export async function ensureWebhookSecret(): Promise<string> {
-    const config = await getSystemConfig();
-    if (config.manager?.github?.webhook_secret) {
-        return config.manager.github.webhook_secret;
-    }
-
-    // Generate new secret
-    const secret = randomBytes(32).toString("hex");
-    await saveSystemConfig({
-        manager: {
-            github: { webhook_secret: secret },
-        },
-    });
-    return secret;
-}
-
-export async function createWebhook(repoFullName: string, accessToken: string): Promise<boolean> {
-    try {
-        const config = await getSystemConfig();
-        const baseUrl = config.tunnel?.url;
-
-        if (!baseUrl) {
-            console.error(
-                "Cannot create webhook: Tunnel URL not configured in system.yaml (tunnel.url)"
-            );
-            return false;
-        }
-
-        const webhookUrl = `${baseUrl}/api/github/webhook`;
-        const secret = await ensureWebhookSecret();
-
-        // Check existing hooks
-        const hooksRes = await fetch(`${GITHUB_API}/repos/${repoFullName}/hooks`, {
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                Accept: "application/vnd.github.v3+json",
-            },
-        });
-
-        if (hooksRes.ok) {
-            const hooks = (await hooksRes.json()) as any[];
-            const exists = hooks.find((h: any) => h.config.url === webhookUrl);
-            if (exists) {
-                console.log("Webhook already exists");
-                return true;
-            }
-        }
-
-        console.log(`Creating webhook for ${webhookUrl}...`);
-
-        // Create Hook
-        const res = await fetch(`${GITHUB_API}/repos/${repoFullName}/hooks`, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                name: "web",
-                active: true,
-                events: ["push"],
-                config: {
-                    url: webhookUrl,
-                    content_type: "json",
-                    secret: secret,
-                    insecure_ssl: "0",
-                },
-            }),
-        });
-
-        if (!res.ok) {
-            const err = await res.text();
-            console.error("Failed to create webhook:", err);
-            return false;
-        }
-
-        console.log("Webhook created successfully");
-        return true;
-    } catch (e) {
-        console.error("Webhook creation error:", e);
-        return false;
-    }
 }

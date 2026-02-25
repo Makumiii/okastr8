@@ -20,6 +20,8 @@
             "GitHub OAuth is missing configuration. Add client_id/client_secret to system.yaml.",
         token_exchange_failed:
             "GitHub authentication failed to exchange token. Try again.",
+        oauth_public_url_missing:
+            "Public URL is required for OAuth in production. Set manager.public_url or tunnel.url in system.yaml.",
     };
 
     function handleGitHubLogin() {

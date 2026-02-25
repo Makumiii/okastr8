@@ -6,7 +6,7 @@
 import { homedir } from "os";
 import { join } from "path";
 import { existsSync } from "fs";
-import { readFile, writeFile, mkdir } from "fs/promises";
+import { readFile, writeFile, mkdir, chmod, open, unlink } from "fs/promises";
 import { randomBytes, createHmac } from "crypto";
 import { writeUnifiedEntry } from "../utils/structured-logger";
 
@@ -28,6 +28,7 @@ export interface AuthData {
 // ============ Paths ============
 
 const AUTH_FILE = join(homedir(), ".okastr8", "auth.json");
+const AUTH_LOCK_FILE = `${AUTH_FILE}.lock`;
 
 async function logAuthEvent(options: {
     level?: "info" | "warn" | "error";
@@ -59,6 +60,7 @@ async function logAuthEvent(options: {
 export async function loadAuthData(): Promise<AuthData> {
     try {
         if (existsSync(AUTH_FILE)) {
+            await chmod(AUTH_FILE, 0o600).catch(() => {});
             const content = await readFile(AUTH_FILE, "utf-8");
             return JSON.parse(content);
         }
@@ -78,9 +80,10 @@ export async function loadAuthData(): Promise<AuthData> {
 export async function saveAuthData(data: AuthData): Promise<void> {
     const dir = join(homedir(), ".okastr8");
     if (!existsSync(dir)) {
-        await mkdir(dir, { recursive: true });
+        await mkdir(dir, { recursive: true, mode: 0o700 });
     }
     await writeFile(AUTH_FILE, JSON.stringify(data, null, 2));
+    await chmod(AUTH_FILE, 0o600).catch(() => {});
 }
 
 // ============ Token Management ============
@@ -114,64 +117,66 @@ export async function generateToken(
     userId: string,
     expiry: string = "1d"
 ): Promise<{ token: string; expiresAt: string }> {
-    const data = await loadAuthData();
-    const durationMs = parseExpiry(expiry);
-    const MAX_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+    return withAuthFileLock(async () => {
+        const data = await loadAuthData();
+        const durationMs = parseExpiry(expiry);
+        const MAX_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-    if (durationMs > MAX_DURATION_MS) {
-        throw new Error("Security restriction: Token duration cannot exceed 24 hours (1d).");
-    }
+        if (durationMs > MAX_DURATION_MS) {
+            throw new Error("Security restriction: Token duration cannot exceed 24 hours (1d).");
+        }
 
-    const tokenId = randomBytes(16).toString("hex");
-    const expiresAt = new Date(Date.now() + durationMs).toISOString();
+        const tokenId = randomBytes(16).toString("hex");
+        const expiresAt = new Date(Date.now() + durationMs).toISOString();
 
-    // Create token payload (no permissions - all tokens have full access)
-    const payload = {
-        id: tokenId,
-        sub: userId,
-        exp: expiresAt,
-    };
+        // Create token payload (no permissions - all tokens have full access)
+        const payload = {
+            id: tokenId,
+            sub: userId,
+            exp: expiresAt,
+        };
 
-    // Sign the payload
-    const payloadStr = JSON.stringify(payload);
-    const payloadB64 = Buffer.from(payloadStr).toString("base64url");
-    const signature = createHmac("sha256", data.secret).update(payloadB64).digest("base64url");
+        // Sign the payload
+        const payloadStr = JSON.stringify(payload);
+        const payloadB64 = Buffer.from(payloadStr).toString("base64url");
+        const signature = createHmac("sha256", data.secret).update(payloadB64).digest("base64url");
 
-    const token = `${payloadB64}.${signature}`;
+        const token = `${payloadB64}.${signature}`;
 
-    // 1. Strict Cleanup: Remove expired tokens globally
-    const now = new Date();
-    data.tokens = data.tokens.filter((t) => new Date(t.expiresAt) > now);
+        // 1. Strict Cleanup: Remove expired tokens globally
+        const now = new Date();
+        data.tokens = data.tokens.filter((t) => new Date(t.expiresAt) > now);
 
-    // 2. Single Token Policy: Remove ANY existing tokens for this user
-    // (A user can only have one active token at a time)
-    data.tokens = data.tokens.filter((t) => t.userId !== userId);
+        // 2. Single Token Policy: Remove ANY existing tokens for this user
+        // (A user can only have one active token at a time)
+        data.tokens = data.tokens.filter((t) => t.userId !== userId);
 
-    // 3. Add new token
-    data.tokens.push({
-        id: tokenId,
-        userId,
-        expiresAt,
-        createdAt: now.toISOString(),
+        // 3. Add new token
+        data.tokens.push({
+            id: tokenId,
+            userId,
+            expiresAt,
+            createdAt: now.toISOString(),
+        });
+
+        await saveAuthData(data);
+
+        // Log activity
+        try {
+            const { logActivity } = await import("../utils/activity");
+            await logActivity("login", { action: "token_generated", expiry }, userId);
+        } catch (e) {
+            console.error("Failed to log login activity:", e);
+        }
+        await logAuthEvent({
+            action: "token-generated",
+            message: "Token generated",
+            userId,
+            data: { tokenId, expiresAt, expiry },
+        });
+
+        return { token, expiresAt };
     });
-
-    await saveAuthData(data);
-
-    // Log activity
-    try {
-        const { logActivity } = await import("../utils/activity");
-        await logActivity("login", { action: "token_generated", expiry }, userId);
-    } catch (e) {
-        console.error("Failed to log login activity:", e);
-    }
-    await logAuthEvent({
-        action: "token-generated",
-        message: "Token generated",
-        userId,
-        data: { tokenId, expiresAt, expiry },
-    });
-
-    return { token, expiresAt };
 }
 
 /**
@@ -224,6 +229,34 @@ export async function validateToken(token: string): Promise<{
     } catch (error: any) {
         return { valid: false, error: error.message };
     }
+}
+
+async function withAuthFileLock<T>(fn: () => Promise<T>): Promise<T> {
+    const dir = join(homedir(), ".okastr8");
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    const maxAttempts = 50;
+    const retryDelayMs = 20;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        let handle: Awaited<ReturnType<typeof open>> | null = null;
+        try {
+            handle = await open(AUTH_LOCK_FILE, "wx");
+            const out = await fn();
+            await handle.close().catch(() => {});
+            await unlink(AUTH_LOCK_FILE).catch(() => {});
+            return out;
+        } catch (error: any) {
+            if (handle) {
+                await handle.close().catch(() => {});
+                await unlink(AUTH_LOCK_FILE).catch(() => {});
+            }
+            if (error?.code === "EEXIST") {
+                await Bun.sleep(retryDelayMs);
+                continue;
+            }
+            throw error;
+        }
+    }
+    throw new Error("Auth token operation timed out waiting for file lock");
 }
 
 // ============ Admin Functions ============

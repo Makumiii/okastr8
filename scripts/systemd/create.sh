@@ -42,6 +42,26 @@ fi
 
 # --- Unit File Creation (Always overwrite/create) ---
 echo "Creating/Updating systemd unit file: '$UNIT_FILE'"
+HARDENING_BLOCK=""
+if [[ "$SERVICE_NAME" == "okastr8-manager" || "$SERVICE_NAME" == "okastr8-webhook" ]]; then
+  HARDENING_BLOCK=$(cat <<EOB
+# Security hardening (manager/webhook)
+UMask=0077
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/$USER/.okastr8 /tmp /var/tmp
+EOB
+)
+fi
+
 cat > "$UNIT_FILE" << EOL
 [Unit]
 Description=$DESCRIPTION
@@ -60,6 +80,7 @@ Restart=on-failure
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
+$HARDENING_BLOCK
 
 [Install]
 WantedBy=$WANTED_BY

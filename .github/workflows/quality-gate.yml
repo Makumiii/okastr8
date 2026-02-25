@@ -1,0 +1,113 @@
+name: Quality Gate
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run Production Gate (CI-safe)
+        run: bun run gate:prod:no-e2e
+
+      - name: Bun Audit (if available)
+        run: |
+          if bun pm --help 2>/dev/null | grep -q "audit"; then
+            bun pm audit
+          else
+            echo "bun pm audit unavailable in this Bun version; skipping"
+          fi
+
+      - name: NPM Audit (production deps)
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm audit --omit=dev
+          else
+            echo "No npm lockfile found; skipping npm audit"
+          fi
+
+      - name: Trivy Filesystem Scan (HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+  dashboard-gate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install Dashboard Dependencies
+        run: npm ci
+
+      - name: Dashboard Check
+        run: npm run check
+
+      - name: Dashboard Unit Tests
+        run: npm run test:unit
+
+      - name: Dashboard Build
+        run: npm run build
+
+      - name: Dashboard NPM Audit (HIGH/CRITICAL)
+        run: npm audit --omit=dev --audit-level=high
+
+  live-e2e:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run Live E2E
+        env:
+          OKASTR8_BASE_URL: ${{ secrets.OKASTR8_BASE_URL }}
+        run: |
+          if [ -z "${OKASTR8_BASE_URL}" ]; then
+            echo "OKASTR8_BASE_URL secret is required for live-e2e."
+            exit 1
+          fi
+          bun run test:e2e
