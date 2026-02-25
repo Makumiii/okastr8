@@ -332,7 +332,14 @@ async function deployWithDockerfile(
     log(`Building Docker image: ${tag}...`);
     const dockerfileName = strategy === "auto-dockerfile" ? "Dockerfile.generated" : "Dockerfile";
     const dockerfilePath = join(releasePath, dockerfileName);
-    const buildResult = await buildImage(appName, tag, releasePath, dockerfilePath, deploymentId);
+    const buildResult = await buildImage(
+        appName,
+        tag,
+        releasePath,
+        dockerfilePath,
+        deploymentId,
+        log
+    );
 
     if (!buildResult.success) {
         return {

@@ -9,6 +9,8 @@ interface CommandResult {
 
 interface RunCommandOptions {
     deploymentId?: string;
+    onStdout?: (chunk: string) => void;
+    onStderr?: (chunk: string) => void;
 }
 
 export async function runCommand(
@@ -70,11 +72,15 @@ export async function runCommand(
         }
 
         child.stdout?.on("data", (data) => {
-            stdout += data.toString();
+            const text = data.toString();
+            stdout += text;
+            options?.onStdout?.(text);
         });
 
         child.stderr?.on("data", (data) => {
-            stderr += data.toString();
+            const text = data.toString();
+            stderr += text;
+            options?.onStderr?.(text);
         });
 
         child.on("close", (code) => {
