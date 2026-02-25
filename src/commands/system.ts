@@ -7,6 +7,7 @@ import { existsSync } from "fs";
 import * as path from "path";
 import * as os from "os";
 import * as readline from "readline";
+import { runCommand } from "../utils/command";
 
 // ============ Global Service Controls ============
 
@@ -134,6 +135,88 @@ Goodbye!
 `);
 }
 
+interface UpdateSystemOptions {
+    branch?: string;
+    installDir?: string;
+    skipDashboardBuild?: boolean;
+}
+
+function resolveHomePath(inputPath: string) {
+    if (inputPath === "~") return os.homedir();
+    if (inputPath.startsWith("~/")) return path.join(os.homedir(), inputPath.slice(2));
+    return inputPath;
+}
+
+async function runStep(label: string, command: string, args: string[], cwd?: string) {
+    console.log(`• ${label}`);
+    const result = await runCommand(command, args, cwd);
+    if (result.exitCode !== 0) {
+        const details = result.stderr.trim() || result.stdout.trim() || "Unknown error";
+        throw new Error(details);
+    }
+}
+
+async function updateOkastr8(options: UpdateSystemOptions) {
+    const branch = options.branch ?? "main";
+    const resolvedInstallDir = path.resolve(resolveHomePath(options.installDir ?? "~/okastr8"));
+    const dashboardDir = path.join(resolvedInstallDir, "dashboard");
+
+    if (!existsSync(resolvedInstallDir)) {
+        throw new Error(
+            `Install directory not found: ${resolvedInstallDir}\nUse --install-dir to point to your okastr8 source directory.`
+        );
+    }
+
+    if (!existsSync(path.join(resolvedInstallDir, ".git"))) {
+        throw new Error(
+            `Directory is not a git checkout: ${resolvedInstallDir}\nThis command expects an okastr8 git clone.`
+        );
+    }
+
+    console.log("Updating okastr8 installation...");
+    console.log(`Install directory: ${resolvedInstallDir}`);
+    console.log(`Branch: ${branch}`);
+    console.log("State directory preserved: ~/.okastr8");
+
+    await runStep("Fetching latest git refs", "git", ["fetch", "origin"], resolvedInstallDir);
+    await runStep("Checking out target branch", "git", ["checkout", branch], resolvedInstallDir);
+    await runStep(
+        "Pulling latest code (fast-forward only)",
+        "git",
+        ["pull", "--ff-only", "origin", branch],
+        resolvedInstallDir
+    );
+
+    await runStep("Installing root dependencies", "bun", ["install", "--frozen-lockfile"], resolvedInstallDir);
+
+    if (!options.skipDashboardBuild && existsSync(path.join(dashboardDir, "package.json"))) {
+        await runStep(
+            "Installing dashboard dependencies",
+            "bun",
+            ["install", "--frozen-lockfile"],
+            dashboardDir
+        );
+        await runStep("Building dashboard", "bun", ["run", "build"], dashboardDir);
+    } else if (options.skipDashboardBuild) {
+        console.log("• Skipping dashboard build (--skip-dashboard-build)");
+    }
+
+    try {
+        await runStep("Restarting manager service", "sudo", ["systemctl", "restart", "okastr8-manager"]);
+        await runStep("Checking manager service health", "sudo", [
+            "systemctl",
+            "is-active",
+            "okastr8-manager",
+        ]);
+    } catch (error: any) {
+        throw new Error(
+            `${error.message}\nIf sudo prompts for a password, configure non-interactive access with: okastr8 setup sudoers`
+        );
+    }
+
+    console.log("\nUpdate complete.");
+}
+
 // ============ Integration ============
 
 export function addSystemCommands(program: Command) {
@@ -160,4 +243,12 @@ export function addSystemCommands(program: Command) {
         .command("uninstall")
         .description("Nuke system and show uninstall instructions")
         .action(uninstallOkastr8);
+
+    system
+        .command("update")
+        .description("Update okastr8 source installation and restart manager service")
+        .option("-b, --branch <branch>", "Git branch to update from", "main")
+        .option("--install-dir <path>", "okastr8 source directory", "~/okastr8")
+        .option("--skip-dashboard-build", "Skip dashboard dependency install and build", false)
+        .action(updateOkastr8);
 }

@@ -38,6 +38,14 @@ describe("CLI smoke", () => {
         expect(stderr).toContain("unknown command");
     });
 
+    it("exposes system update command", () => {
+        const result = runCli(["system", "--help"]);
+        const output = new TextDecoder().decode(result.stdout);
+
+        expect(result.exitCode).toBe(0);
+        expect(output).toContain("update");
+    });
+
     it("does not expose unsupported deploy trigger flags", () => {
         const result = runCli(["deploy", "trigger", "--help"]);
         const output = new TextDecoder().decode(result.stdout);
