@@ -15,7 +15,10 @@
         "test:unit": "bun test test/unit",
         "test:smoke": "bun test test/smoke",
         "test:integration": "bun test test/integration",
-        "test:e2e": "playwright test"
+        "test:e2e": "playwright test",
+        "gate:prod": "bash scripts/dev/prod-gate.sh",
+        "gate:prod:no-e2e": "RUN_E2E=0 bash scripts/dev/prod-gate.sh",
+        "gate:prod:no-scan": "RUN_SCANNERS=0 bash scripts/dev/prod-gate.sh"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
