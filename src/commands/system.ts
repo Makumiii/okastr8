@@ -156,6 +156,29 @@ async function runStep(label: string, command: string, args: string[], cwd?: str
     }
 }
 
+function hasFrozenLockfileError(result: { stdout: string; stderr: string }): boolean {
+    const text = `${result.stdout}\n${result.stderr}`.toLowerCase();
+    return text.includes("lockfile had changes") && text.includes("frozen");
+}
+
+async function runDashboardInstallWithFallback(dashboardDir: string) {
+    console.log("• Installing dashboard dependencies");
+    const frozen = await runCommand("bun", ["install", "--frozen-lockfile"], dashboardDir);
+    if (frozen.exitCode === 0) return;
+
+    if (!hasFrozenLockfileError(frozen)) {
+        const details = frozen.stderr.trim() || frozen.stdout.trim() || "Unknown error";
+        throw new Error(details);
+    }
+
+    console.log("  Lockfile mismatch detected, retrying without --frozen-lockfile");
+    const fallback = await runCommand("bun", ["install"], dashboardDir);
+    if (fallback.exitCode !== 0) {
+        const details = fallback.stderr.trim() || fallback.stdout.trim() || "Unknown error";
+        throw new Error(details);
+    }
+}
+
 async function updateOkastr8(options: UpdateSystemOptions) {
     const branch = options.branch ?? "main";
     const resolvedInstallDir = path.resolve(resolveHomePath(options.installDir ?? "~/okastr8"));
@@ -190,12 +213,7 @@ async function updateOkastr8(options: UpdateSystemOptions) {
     await runStep("Installing root dependencies", "bun", ["install", "--frozen-lockfile"], resolvedInstallDir);
 
     if (!options.skipDashboardBuild && existsSync(path.join(dashboardDir, "package.json"))) {
-        await runStep(
-            "Installing dashboard dependencies",
-            "bun",
-            ["install", "--frozen-lockfile"],
-            dashboardDir
-        );
+        await runDashboardInstallWithFallback(dashboardDir);
         await runStep("Building dashboard", "bun", ["run", "build"], dashboardDir);
     } else if (options.skipDashboardBuild) {
         console.log("• Skipping dashboard build (--skip-dashboard-build)");
