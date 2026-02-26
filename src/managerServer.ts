@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { serveStatic } from "hono/bun";
 import api from "./api";
 import { startResourceMonitor } from "./services/monitor";
+import { reconcileRuntimeAfterBoot } from "./services/startup-reconcile";
 import { installConsoleLogger, logPaths } from "./utils/structured-logger";
 
 const app = new Hono();
@@ -16,6 +17,11 @@ installConsoleLogger({
 
 // Start background services
 startResourceMonitor();
+// Boot-time reconcile: ensure expected app tunnel sidecars are restored after host reboot.
+const bootReconcileTimer = setTimeout(() => {
+    void reconcileRuntimeAfterBoot();
+}, 8000);
+bootReconcileTimer.unref?.();
 
 // Mount the API
 app.route("/api", api);
