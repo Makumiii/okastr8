@@ -11,5 +11,11 @@ describe("systemd manager hardening script", () => {
         expect(script).toContain("PrivateTmp=true");
         expect(script).toContain("ProtectSystem=full");
         expect(script).toContain("ReadWritePaths=/home/$USER/.okastr8 /tmp /var/tmp");
+        expect(script).toContain(
+            "Wants=network-online.target docker.service caddy.service cloudflared.service"
+        );
+        expect(script).toContain(
+            "After=network-online.target docker.service caddy.service cloudflared.service"
+        );
     });
 });

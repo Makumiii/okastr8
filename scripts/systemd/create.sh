@@ -65,7 +65,8 @@ fi
 cat > "$UNIT_FILE" << EOL
 [Unit]
 Description=$DESCRIPTION
-After=network.target
+Wants=network-online.target docker.service caddy.service cloudflared.service
+After=network-online.target docker.service caddy.service cloudflared.service
 
 [Service]
 Type=simple
