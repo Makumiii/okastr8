@@ -183,6 +183,8 @@ async function updateOkastr8(options: UpdateSystemOptions) {
     const branch = options.branch ?? "main";
     const resolvedInstallDir = path.resolve(resolveHomePath(options.installDir ?? "~/okastr8"));
     const dashboardDir = path.join(resolvedInstallDir, "dashboard");
+    const systemdRestartScript = path.join(resolvedInstallDir, "scripts", "systemd", "restart.sh");
+    const systemdStatusScript = path.join(resolvedInstallDir, "scripts", "systemd", "status.sh");
 
     if (!existsSync(resolvedInstallDir)) {
         throw new Error(
@@ -220,12 +222,8 @@ async function updateOkastr8(options: UpdateSystemOptions) {
     }
 
     try {
-        await runStep("Restarting manager service", "sudo", ["systemctl", "restart", "okastr8-manager"]);
-        await runStep("Checking manager service health", "sudo", [
-            "systemctl",
-            "is-active",
-            "okastr8-manager",
-        ]);
+        await runStep("Restarting manager service", "sudo", [systemdRestartScript, "okastr8-manager"]);
+        await runStep("Checking manager service health", "sudo", [systemdStatusScript, "okastr8-manager"]);
     } catch (error: any) {
         throw new Error(
             `${error.message}\nIf sudo prompts for a password, configure non-interactive access with: okastr8 setup sudoers`
