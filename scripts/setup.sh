@@ -20,6 +20,7 @@ DEBIAN_PACKAGES=(
   ufw
   unzip
   gnupg
+  file  # For inspecting downloaded archives
   xclip # For copying ngrok URL to clipboard
 )
 
@@ -29,6 +30,7 @@ FEDORA_PACKAGES=(
   firewalld
   unzip
   gnupg2
+  file  # For inspecting downloaded archives
   xclip # For copying ngrok URL to clipboard
 )
 
