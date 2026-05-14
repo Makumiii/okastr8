@@ -1,7 +1,32 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
+import { login, callback } from "./auth";
 import { api } from "./_generated/api";
-import { createHmac, timingSafeEqual } from "crypto";
+
+// Use Web Crypto API (available in the Convex runtime) for HMAC verification
+async function computeHmacHex(payload: string, secret: string) {
+  const enc = new TextEncoder();
+  const keyData = enc.encode(secret);
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", cryptoKey, enc.encode(payload));
+  const bytes = new Uint8Array(sig);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function constantTimeEquals(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
 
 const http = httpRouter();
 
@@ -9,20 +34,15 @@ const http = httpRouter();
 http.route({
   path: "/api/github/login",
   method: "GET",
-  handler: httpAction(async (ctx, request) => {
-    return await ctx.runAction(api.auth.login, { request });
-  }),
+  handler: login,
 });
 
 // OAuth Callback Route
 http.route({
-    path: "/api/github/callback",
-    method: "GET",
-    handler: httpAction(async (ctx, request) => {
-        return await ctx.runAction(api.auth.callback, { request });
-    }),
+  path: "/api/github/callback",
+  method: "GET",
+  handler: callback,
 });
-
 // Webhook Secret
 const WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET!;
 
@@ -34,11 +54,11 @@ http.route({
     if (!signature) return new Response("Missing signature", { status: 401 });
 
     const payload = await request.text();
-    const hmac = createHmac("sha256", WEBHOOK_SECRET);
-    const digest = "sha256=" + hmac.update(payload).digest("hex");
+    const digestHex = await computeHmacHex(payload, WEBHOOK_SECRET);
+    const digest = `sha256=${digestHex}`;
 
-    if (!timingSafeEqual(Buffer.from(signature), Buffer.from(digest))) {
-        return new Response("Invalid signature", { status: 401 });
+    if (!constantTimeEquals(signature, digest)) {
+      return new Response("Invalid signature", { status: 401 });
     }
 
     const event = JSON.parse(payload);

@@ -15,7 +15,7 @@ test("github repo creation from template", async () => {
             html_url: "https://github.com/testuser/my-okastr8-dashboard"
         })
     });
-    global.fetch = mockFetch;
+    (global as any).fetch = mockFetch;
 
     // We need to set GITHUB_APP_ID and GITHUB_PRIVATE_KEY for the JWT generation to not throw
     // This is tricky in convex-test. 

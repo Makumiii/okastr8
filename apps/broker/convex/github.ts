@@ -1,4 +1,5 @@
 import { action } from "./_generated/server";
+import { api } from "./_generated/api";
 import { v } from "convex/values";
 import * as jose from "jose";
 
@@ -66,7 +67,7 @@ export const createDashboardRepo = action({
         userId: v.id("users"), 
         repoName: v.string() 
     },
-    handler: async (ctx, args) => {
+    handler: async (ctx, args): Promise<{ fullName: string; cloneUrl: string }> => {
         // 1. Get user's installation
         const installations = await ctx.runQuery(api.installations.getByUserId, {
             userId: args.userId
@@ -76,10 +77,10 @@ export const createDashboardRepo = action({
             throw new Error("No GitHub App installation found. Please install the App first.");
         }
 
-        const installation = installations[0]; // Use the first one for now
+        const installation = installations[0];
 
         // 2. Get Installation Token
-        const jwt = await generateAppJWT();
+        const jwt: string = await generateAppJWT();
         const tokenResponse = await fetch(
             `https://api.github.com/app/installations/${installation.githubInstallationId}/access_tokens`,
             {
@@ -95,10 +96,9 @@ export const createDashboardRepo = action({
         if (!tokenResponse.ok) {
             throw new Error("Failed to get installation token");
         }
-        const { token } = await tokenResponse.json();
+        const { token }: { token: string } = await tokenResponse.json();
 
         // 3. Create repo from template
-        // We'll use the official okastr8/dashboard-template repo
         const templateOwner = "okastr8";
         const templateRepo = "dashboard-template";
 
@@ -125,7 +125,7 @@ export const createDashboardRepo = action({
             throw new Error(`Failed to create repository: ${error.message}`);
         }
 
-        const data = await response.json();
+        const data: { full_name: string; clone_url: string } = await response.json();
         return {
             fullName: data.full_name,
             cloneUrl: data.clone_url,

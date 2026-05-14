@@ -14,7 +14,6 @@
         "test:integration": "bun test test/integration"
     },
     "dependencies": {
-        "@okastr8/core": "workspace:*",
         "@types/js-yaml": "^4.0.9",
         "commander": "^14.0.0",
         "convex": "^1.38.0",
