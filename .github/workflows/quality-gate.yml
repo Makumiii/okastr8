@@ -31,13 +31,8 @@ jobs:
             - name: Run Production Gate (CI-safe)
               run: bun run gate:prod:no-e2e
 
-            - name: Bun Audit (if available)
-              run: |
-                  if bun pm --help 2>/dev/null | grep -q "audit"; then
-                    bun pm audit
-                  else
-                    echo "bun pm audit unavailable in this Bun version; skipping"
-                  fi
+            - name: Bun Audit
+              run: bun pm audit --audit-level=high
 
             - name: NPM Audit (production deps)
               run: |
