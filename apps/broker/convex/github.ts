@@ -59,25 +59,29 @@ export const getInstallationToken = action({
 });
 
 /**
- * Gets an Installation Access Token for a repository name.
- * This is what the manager will call.
+ * Creates a new private repository from the Okastr8 Dashboard template.
  */
-export const getInstallationTokenForRepo = action({
-    args: { repoFullName: v.string() },
+export const createDashboardRepo = action({
+    args: { 
+        userId: v.id("users"), 
+        repoName: v.string() 
+    },
     handler: async (ctx, args) => {
-        // 1. Find the installation ID for this repo
-        const result = await ctx.runQuery(api.installations.getByRepoName, {
-            fullName: args.repoFullName,
+        // 1. Get user's installation
+        const installations = await ctx.runQuery(api.installations.getByUserId, {
+            userId: args.userId
         });
 
-        if (!result || !result.installation) {
-            throw new Error(`No installation found for repository: ${args.repoFullName}`);
+        if (installations.length === 0) {
+            throw new Error("No GitHub App installation found. Please install the App first.");
         }
 
-        // 2. Generate token for this installation
+        const installation = installations[0]; // Use the first one for now
+
+        // 2. Get Installation Token
         const jwt = await generateAppJWT();
-        const response = await fetch(
-            `https://api.github.com/app/installations/${result.installation.githubInstallationId}/access_tokens`,
+        const tokenResponse = await fetch(
+            `https://api.github.com/app/installations/${installation.githubInstallationId}/access_tokens`,
             {
                 method: "POST",
                 headers: {
@@ -88,12 +92,43 @@ export const getInstallationTokenForRepo = action({
             }
         );
 
+        if (!tokenResponse.ok) {
+            throw new Error("Failed to get installation token");
+        }
+        const { token } = await tokenResponse.json();
+
+        // 3. Create repo from template
+        // We'll use the official okastr8/dashboard-template repo
+        const templateOwner = "okastr8";
+        const templateRepo = "dashboard-template";
+
+        const response = await fetch(
+            `https://api.github.com/repos/${templateOwner}/${templateRepo}/generate`,
+            {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    Accept: "application/vnd.github.v3+json",
+                    "Content-Type": "application/json",
+                    "User-Agent": "okastr8-broker",
+                },
+                body: JSON.stringify({
+                    name: args.repoName,
+                    private: true,
+                    description: "My Okastr8 Dashboard",
+                }),
+            }
+        );
+
         if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`Failed to get installation token: ${error}`);
+            const error = await response.json();
+            throw new Error(`Failed to create repository: ${error.message}`);
         }
 
         const data = await response.json();
-        return data.token as string;
+        return {
+            fullName: data.full_name,
+            cloneUrl: data.clone_url,
+        };
     },
 });

@@ -1141,15 +1141,10 @@ api.get("/github/auth-url", async (c) => {
 
 api.get("/auth/github", async (c) => {
     try {
-        const { getGitHubConfig, getAuthUrlWithState } = await import("./commands/github");
+        const { getGitHubConfig } = await import("./commands/github");
         const { issueOAuthState } = await import("./utils/oauth-state");
         const { getSystemConfig } = await import("./config");
-        const config = await getGitHubConfig();
         const systemConfig = await getSystemConfig();
-
-        if (!config.clientId) {
-            return c.redirect("/login?error=github_not_configured");
-        }
 
         const githubAdminId = systemConfig.manager?.auth?.github_admin_id;
         if (!githubAdminId) {
@@ -1160,13 +1155,13 @@ api.get("/auth/github", async (c) => {
         const callbackUrl = `${baseUrl}/api/github/callback`;
         const state = await issueOAuthState("login");
 
-        const authUrl = getAuthUrlWithState(config.clientId, callbackUrl, state);
-        return c.redirect(authUrl);
+        // Use Broker as identity provider
+        const brokerUrl = process.env.NEXT_PUBLIC_CONVEX_URL || "https://rapid-wolf-687.convex.cloud";
+        const loginUrl = `${brokerUrl}/api/github/login?state=${state}&redirect_uri=${encodeURIComponent(callbackUrl)}`;
+        
+        return c.redirect(loginUrl);
     } catch (error: any) {
         console.error("API: /auth/github error:", error);
-        if (error?.message === "oauth_public_url_missing") {
-            return c.redirect("/login?error=oauth_public_url_missing");
-        }
         return c.redirect("/login?error=github_auth_failed");
     }
 });
@@ -1174,9 +1169,8 @@ api.get("/auth/github", async (c) => {
 api.get("/github/callback", async (c) => {
     let isLoginFlow = false;
     try {
-        const code = c.req.query("code");
-        const error = c.req.query("error");
-        const state = c.req.query("state") || "";
+        const userId = c.req.query("userId");
+        const state = c.req.query("state") || c.req.query("code") || "";
         isLoginFlow = state.startsWith("login_");
 
         if (!(await isAllowedOAuthOrigin(c))) {
@@ -1187,24 +1181,24 @@ api.get("/github/callback", async (c) => {
             );
         }
 
-        if (error) {
-            // Redirect to UI with error
-            return c.redirect(
-                isLoginFlow
-                    ? `/login?error=${encodeURIComponent(error)}`
-                    : `/github?error=${encodeURIComponent(error)}`
-            );
+        if (!userId) {
+            return c.redirect(isLoginFlow ? "/login?error=no_user" : "/github?error=no_user");
         }
 
-        if (!code) {
-            return c.redirect(isLoginFlow ? "/login?error=no_code" : "/github?error=no_code");
+        // Verify login with Broker
+        const { ConvexClient } = await import("convex/browser");
+        const brokerUrl = process.env.NEXT_PUBLIC_CONVEX_URL || "https://rapid-wolf-687.convex.cloud";
+        const client = new ConvexClient(brokerUrl);
+        
+        const userProfile = await client.query("auth:verifyLogin" as any, { 
+            state, 
+            userId 
+        }) as any;
+
+        if (!userProfile) {
+            return c.redirect(isLoginFlow ? "/login?error=invalid_broker_session" : "/github?error=invalid_broker_session");
         }
 
-        if (!state) {
-            return c.redirect(
-                isLoginFlow ? "/login?error=missing_state" : "/github?error=missing_state"
-            );
-        }
         const { consumeOAuthState } = await import("./utils/oauth-state");
         const flow = isLoginFlow ? "login" : "connect";
         const stateValid = await consumeOAuthState(state, flow);
@@ -1213,35 +1207,6 @@ api.get("/github/callback", async (c) => {
                 isLoginFlow ? "/login?error=invalid_state" : "/github?error=invalid_state"
             );
         }
-
-        const {
-            getGitHubConfig,
-            exchangeCodeForToken,
-            getGitHubUser,
-            saveGitHubConfig,
-            saveGitHubAdminIdentity,
-        } = await import("./commands/github");
-        const config = await getGitHubConfig();
-
-        if (!config.clientId || !config.clientSecret) {
-            return c.redirect(
-                isLoginFlow ? "/login?error=config_missing" : "/github?error=config_missing"
-            );
-        }
-
-        // Exchange code for token
-        const tokenData = await exchangeCodeForToken(config.clientId, config.clientSecret, code);
-
-        if (tokenData.error || !tokenData.accessToken) {
-            return c.redirect(
-                isLoginFlow
-                    ? `/login?error=${encodeURIComponent(tokenData.error || "token_exchange_failed")}`
-                    : `/github?error=${encodeURIComponent(tokenData.error || "token_exchange_failed")}`
-            );
-        }
-
-        // Get user profile
-        const userProfile = await getGitHubUser(tokenData.accessToken);
 
         if (isLoginFlow) {
             const { getSystemConfig } = await import("./config");
@@ -1253,35 +1218,19 @@ api.get("/github/callback", async (c) => {
                 return c.redirect("/login?error=github_admin_not_set");
             }
 
-            if (String(userProfile.id) !== String(githubAdminId)) {
+            if (String(userProfile.githubUserId) !== String(githubAdminId)) {
                 return c.redirect("/login?error=github_not_allowed");
             }
 
-            await saveGitHubConfig({
-                ...config,
-                accessToken: tokenData.accessToken,
-                username: userProfile.login,
-                connectedAt: new Date().toISOString(),
-            });
-
-            const { token } = await generateToken(`github:${userProfile.id}`);
+            const { token } = await generateToken(`github:${userProfile.githubUserId}`);
             const cookieOpts = getCookieOptions(c, 86400);
             c.header("Set-Cookie", `okastr8_session=${token}; ${cookieOpts}`);
 
             return c.redirect("/");
         }
 
-        // Save config with new token
-        await saveGitHubConfig({
-            ...config,
-            accessToken: tokenData.accessToken,
-            username: userProfile.login,
-            connectedAt: new Date().toISOString(),
-        });
-
-        await saveGitHubAdminIdentity(userProfile.id, userProfile.login);
-        console.log(`GitHub connected for user: ${userProfile.login}`);
-        return c.redirect(`/github?connected=true&user=${userProfile.login}`);
+        // Connect flow (already handled by Broker during link)
+        return c.redirect(`/github?connected=true&user=${userProfile.githubUsername}`);
     } catch (error: any) {
         console.error("API: /github/callback error:", error);
         return c.redirect(

@@ -114,9 +114,11 @@ export function addGitHubCommands(program: Command) {
                 // Poll for connection status (faster intervals, check immediately)
                 const maxAttempts = 150; // 5 minutes at 2 second intervals
                 for (let i = 0; i < maxAttempts; i++) {
-                    const newStatus = await getConnectionStatus();
+                    const { pollDeviceCodeStatus } = await import("./github");
+                    const newStatus = await pollDeviceCodeStatus(state);
                     if (newStatus.connected) {
                         console.log(`\n Connected to GitHub as: ${newStatus.username}`);
+                        console.log(" Identity automatically configured in system.yaml");
                         return;
                     }
                     process.stdout.write(".");

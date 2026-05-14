@@ -1199,3 +1199,34 @@ export async function getConnectionStatus(): Promise<{
     }
     return { connected: false };
 }
+
+import { ConvexClient } from "convex/browser";
+const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL || "https://rapid-wolf-687.convex.cloud";
+
+export async function pollDeviceCodeStatus(code: string): Promise<{
+    connected: boolean;
+    username?: string;
+}> {
+    const client = new ConvexClient(CONVEX_URL);
+    try {
+        const result = (await client.query("deviceCodes:poll" as any, { code })) as any;
+        
+        if (result.status === "authorized" && result.githubUserId) {
+            // Push identity to local config
+            await saveSystemConfig({
+                manager: {
+                    auth: {
+                        github_admin_id: String(result.githubUserId),
+                        github_admin_login: result.githubUsername,
+                    },
+                },
+            });
+            return { connected: true, username: result.githubUsername };
+        }
+        
+        return { connected: false };
+    } catch (e) {
+        console.error("Error polling device code:", e);
+        return { connected: false };
+    }
+}

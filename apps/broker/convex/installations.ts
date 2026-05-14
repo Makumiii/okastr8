@@ -53,6 +53,16 @@ export const addRepository = mutation({
     }
 });
 
+export const getByUserId = query({
+    args: { userId: v.id("users") },
+    handler: async (ctx, args) => {
+        return await ctx.db
+            .query("installations")
+            .withIndex("by_user_id", (q) => q.eq("userId", args.userId))
+            .collect();
+    }
+});
+
 export const getByRepoName = query({
     args: { fullName: v.string() },
     handler: async (ctx, args) => {

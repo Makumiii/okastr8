@@ -33,10 +33,14 @@ export const poll = query({
     if (deviceCode.expiresAt < Date.now()) return { status: "expired" };
     
     if (deviceCode.status === "authorized" && deviceCode.userId) {
-        // In a real scenario, we'd generate a server token here
+        const user = await ctx.db.get(deviceCode.userId);
+        if (!user) return { status: "error", message: "User not found" };
+
         return { 
             status: "authorized", 
             userId: deviceCode.userId,
+            githubUserId: user.githubUserId,
+            githubUsername: user.githubUsername,
             serverId: deviceCode.serverId
         };
     }
