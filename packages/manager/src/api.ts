@@ -2100,16 +2100,17 @@ api.post("/auth/token", async (c) => {
             return c.json(apiResponse(false, "Server is not configured for token login. Run okastr8 login."), 400);
         }
 
-        if (body.token !== config.broker.server_token) {
+        if (body.token.trim() !== config.broker.server_token.trim()) {
+            console.error("Token mismatch. Body token:", body.token, "Config token:", config.broker.server_token);
             return c.json(apiResponse(false, "Invalid token."), 401);
         }
 
         // Generate a standard JWT session token via the auth library
         const { generateToken } = await import("./commands/auth");
         // We use "admin" as the generic user ID for the dashboard
-        const { token } = await generateToken("admin", "7d");
+        const { token } = await generateToken("admin", "12h");
         
-        c.header("Set-Cookie", `okastr8_session=${token}; ${getCookieOptions(c, 7 * 24 * 60 * 60)}`);
+        c.header("Set-Cookie", `okastr8_session=${token}; ${getCookieOptions(c, 12 * 60 * 60)}`);
         return c.json(apiResponse(true, "Authentication successful"));
     } catch (e: any) {
         console.error("API /auth/token error:", e);

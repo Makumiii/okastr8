@@ -10,6 +10,7 @@ export default function AuthPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const authorize = useMutation(api.deviceCodes.authorize);
+  const createUser = useMutation(api.users.create);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -18,12 +19,11 @@ export default function AuthPage() {
     setLoading(true);
 
     try {
-      // In a real scenario, we'd first ensure the user is logged in via GitHub
-      // For now, we'll use a mock user ID if we're in dev mode or just mock it.
-      // We need a userId. Let's assume we have one for this brainstorm phase.
-      
-      // MOCK: In real app, this comes from auth context
-      const mockUserId = "jd7...something" as any; 
+      // Create a mock user to satisfy the v.id("users") requirement
+      const mockUserId = await createUser({
+        githubUserId: Math.floor(Math.random() * 1000000),
+        githubUsername: "test-user-" + Math.floor(Math.random() * 1000),
+      });
 
       await authorize({ userCode, userId: mockUserId });
       router.push("/success");
