@@ -43,6 +43,11 @@ export interface SystemConfig {
         server_id?: string;
         server_token?: string;
     };
+    cloudflare?: {
+        apiToken?: string;
+        accountId?: string;
+        zoneId?: string;
+    };
     manager?: {
         port?: number;
         public_url?: string;
@@ -177,6 +182,7 @@ export async function saveSystemConfig(newConfig: Partial<SystemConfig>): Promis
         ...newConfig,
         setup: { ...current.setup, ...newConfig.setup },
         broker: { ...current.broker, ...newConfig.broker },
+        cloudflare: { ...current.cloudflare, ...newConfig.cloudflare },
         manager: { ...current.manager, ...newConfig.manager },
         tunnel: { ...current.tunnel, ...newConfig.tunnel },
     };

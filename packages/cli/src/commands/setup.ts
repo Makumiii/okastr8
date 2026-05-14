@@ -201,4 +201,74 @@ export function addSetupCommands(program: Command) {
                 console.log("\nUser setup cancelled.");
             }
         });
+
+    setup
+        .command("cloudflare")
+        .description("Configure Cloudflare API credentials for automated tunnel routing")
+        .action(async () => {
+            console.log("Cloudflare Zero-Trust Setup\n");
+            console.log("To automate Cloudflare Tunnels, you need an API Token with:");
+            console.log(" - Account: Cloudflare Tunnel (Edit)");
+            console.log(" - Zone: DNS (Edit)\n");
+
+            try {
+                const response = (await prompt([
+                    {
+                        type: "input",
+                        name: "apiToken",
+                        message: "Enter your Cloudflare API Token:",
+                        validate: (val: string) => val.length > 0,
+                    },
+                    {
+                        type: "input",
+                        name: "accountId",
+                        message: "Enter your Cloudflare Account ID:",
+                        validate: (val: string) => val.length > 0,
+                    },
+                    {
+                        type: "input",
+                        name: "zoneId",
+                        message: "Enter your Cloudflare Zone ID (for your domain):",
+                        validate: (val: string) => val.length > 0,
+                    },
+                ])) as any;
+
+                console.log("\nValidating credentials...");
+                
+                // Validate credentials by fetching the zone details
+                const testResult = await runCommand("curl", [
+                    "-s",
+                    "-H", `Authorization: Bearer ${response.apiToken}`,
+                    "-H", "Content-Type: application/json",
+                    `https://api.cloudflare.com/client/v4/zones/${response.zoneId}`
+                ]);
+
+                try {
+                    const data = JSON.parse(testResult.stdout);
+                    if (!data.success) {
+                        console.error("\n❌ Cloudflare API Error:", data.errors[0]?.message || "Unknown error");
+                        process.exit(1);
+                    }
+                } catch(e) {
+                    console.error("\n❌ Failed to validate credentials with Cloudflare.");
+                    process.exit(1);
+                }
+
+                // Import dynamically to avoid circular dependencies if any
+                const { saveSystemConfig } = await import("../config");
+                
+                await saveSystemConfig({
+                    cloudflare: {
+                        apiToken: response.apiToken,
+                        accountId: response.accountId,
+                        zoneId: response.zoneId
+                    }
+                });
+
+                console.log("\n✅ Cloudflare credentials saved successfully!");
+                console.log("   Okastr8 will now automatically provision tunnels and DNS records when deploying apps with --tunnel-routing.");
+            } catch (e) {
+                console.log("\nCloudflare setup cancelled.");
+            }
+        });
 }

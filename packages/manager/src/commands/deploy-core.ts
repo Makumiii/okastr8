@@ -260,37 +260,47 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     // 6. Tunnel Configuration (App-specific Cloudflare Tunnel)
     try {
         step("tunnel", "Configuring application tunnel routing...");
-        const envPath = join(APPS_DIR, appName, ".env.production");
-        let tunnelToken: string | undefined;
-
-        if (existsSync(envPath)) {
-            const content = await readFile(envPath, "utf-8");
-            const lines = content.split("\n");
-            for (const line of lines) {
-                const match = line.match(/^TUNNEL_TOKEN=(.*)$/);
-                if (match && match[1]) {
-                    tunnelToken = match[1].replace(/['"]/g, "").trim();
-                    break;
-                }
-            }
-        }
-
         const { startAppTunnelContainer, stopAppTunnelContainer } = await import("./docker.ts");
+        const { getSystemConfig } = await import("../config.ts");
+        const sysConfig = await getSystemConfig();
 
-        if (config.tunnel_routing && tunnelToken) {
-            log("App has tunnel_routing enabled and a TUNNEL_TOKEN. Starting sidecar tunnel...");
-            const tunnelResult = await startAppTunnelContainer(appName, tunnelToken);
-            if (!tunnelResult.success) {
-                log(`Warning: Failed to start tunnel container: ${tunnelResult.message}`);
+        if (config.tunnel_routing) {
+            log("App has tunnel_routing enabled. Provisioning automated Cloudflare Tunnel...");
+            
+            if (!sysConfig.cloudflare?.apiToken) {
+                log("Warning: Cloudflare credentials not found. Run 'okastr8 setup cloudflare' to enable automated tunnels.");
             } else {
-                log("Cloudflare Tunnel sidecar successfully started.");
+                const { createTunnel, getTunnelToken, routeTunnel, createDnsRecord } = await import("../services/cloudflare.ts");
+                
+                // Ensure a tunnel exists for this app
+                const tunnel = await createTunnel(appName);
+                log(`Created/Ensured Tunnel ID: ${tunnel.id}`);
+                
+                // Route the tunnel to the local docker port
+                await routeTunnel(tunnel.id, config.domain || `${appName}.local`, `http://localhost:${config.port}`);
+                log(`Configured tunnel routing to localhost:${config.port}`);
+                
+                // Set up DNS if domain is provided
+                if (config.domain) {
+                    await createDnsRecord(config.domain, tunnel.id);
+                    log(`Configured CNAME DNS record for ${config.domain}`);
+                }
+
+                const tunnelToken = await getTunnelToken(tunnel.id);
+
+                const tunnelResult = await startAppTunnelContainer(appName, tunnelToken);
+                if (!tunnelResult.success) {
+                    log(`Warning: Failed to start tunnel container: ${tunnelResult.message}`);
+                } else {
+                    log("Cloudflare Tunnel sidecar successfully started.");
+                }
             }
         } else {
             // Ensure no lingering tunnel container if they turned it off
             await stopAppTunnelContainer(appName);
         }
     } catch (e) {
-        log(`Failed to configure tunnel: ${e instanceof Error ? e.message : String(e)}`);
+        log(`Failed to configure automated tunnel: ${e instanceof Error ? e.message : String(e)}`);
     }
 
     // 7. Update Caddy configuration (Reverse Proxy)

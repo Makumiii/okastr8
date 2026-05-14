@@ -268,23 +268,29 @@ export async function updateAppFromImage(
         // Proxy and Cloudflare Tunnel Orchestration
         const { genCaddyFile } = await import("../utils/genCaddyFile");
         const { startAppTunnelContainer, stopAppTunnelContainer } = await import("./docker");
+        const { getSystemConfig } = await import("../config");
+        const sysConfig = await getSystemConfig();
 
-        let tunnelToken: string | undefined = process.env.TUNNEL_TOKEN;
+        if (current.tunnel_routing) {
+            if (!sysConfig.cloudflare?.apiToken) {
+                console.log("Warning: Cloudflare credentials not found. Run 'okastr8 setup cloudflare' to enable automated tunnels.");
+            } else {
+                const { createTunnel, getTunnelToken, routeTunnel, createDnsRecord } = await import("../services/cloudflare");
+                
+                try {
+                    const tunnel = await createTunnel(appName);
+                    await routeTunnel(tunnel.id, current.domain || `${appName}.local`, `http://localhost:${current.port}`);
+                    
+                    if (current.domain) {
+                        await createDnsRecord(current.domain, tunnel.id);
+                    }
 
-        if (envFilePath && existsSync(envFilePath)) {
-            const content = await readFile(envFilePath, "utf-8");
-            const lines = content.split("\n");
-            for (const line of lines) {
-                const match = line.match(/^TUNNEL_TOKEN=(.*)$/);
-                if (match && match[1]) {
-                    tunnelToken = match[1].replace(/['"]/g, "").trim();
-                    break;
+                    const tunnelToken = await getTunnelToken(tunnel.id);
+                    await startAppTunnelContainer(appName, tunnelToken);
+                } catch (e: any) {
+                    console.log(`Failed to configure automated tunnel: ${e.message}`);
                 }
             }
-        }
-
-        if (current.tunnel_routing && tunnelToken) {
-            await startAppTunnelContainer(appName, tunnelToken);
         } else {
             await stopAppTunnelContainer(appName).catch(() => {});
         }

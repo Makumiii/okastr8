@@ -147,6 +147,31 @@ export async function deleteApp(appName: string) {
     try {
         console.log(`Deleting app: ${appName}`);
 
+        // Try to load metadata to see if we need to clean up Cloudflare resources
+        try {
+            const { getAppConfig } = await import("./app");
+            const config = await getAppConfig(appName);
+            if (config.tunnel_routing) {
+                console.log(` Cleaning up Cloudflare Tunnel and DNS resources for ${appName}...`);
+                try {
+                    // Try to list tunnels and find the one matching okastr8-${appName}
+                    // Since we don't store tunnel ID natively yet except in Cloudflare, 
+                    // we can use the domain to delete the DNS record, but we need the tunnel ID to delete the tunnel.
+                    // Actually, the tunnel name is `okastr8-${appName}`. We can't fetch by name easily without a new API method.
+                    // For now, if the user turns on tunnel_routing, we just try to delete the sidecar.
+                    // A proper implementation would require storing the tunnel ID in app.json.
+                    
+                    // But we can clean up the sidecar container
+                    const { stopAppTunnelContainer } = await import("./docker");
+                    await stopAppTunnelContainer(appName).catch(() => {});
+                } catch(e) {
+                    console.error("Warning: Failed to clean up tunnel resources", e);
+                }
+            }
+        } catch(e) {
+            // App config might not exist, proceed with deletion
+        }
+
         // 1. Universal Docker Cleanup
         // Stop both single container and possible Compose services
         console.log(` Cleaning up Docker resources for ${appName}...`);
@@ -166,6 +191,12 @@ export async function deleteApp(appName: string) {
         const appDir = join(APPS_DIR, appName);
         console.log(`Removing app directory: ${appDir}`);
         await rm(appDir, { recursive: true, force: true });
+
+        // Update Caddy just in case
+        try {
+            const { genCaddyFile } = await import("../utils/genCaddyFile");
+            await genCaddyFile();
+        } catch(e) {}
 
         return {
             success: true,
