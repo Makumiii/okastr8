@@ -54,7 +54,9 @@ async function reconcileApp(appName: string): Promise<void> {
     if (!tunnelRouting) {
         if (tunnelStatus.running || tunnelStatus.status === "restarting") {
             const result = await stopAppTunnelContainer(appName);
-            console.log(`[StartupReconcile] ${appName}: disabled tunnel sidecar (${result.message})`);
+            console.log(
+                `[StartupReconcile] ${appName}: disabled tunnel sidecar (${result.message})`
+            );
         }
         return;
     }

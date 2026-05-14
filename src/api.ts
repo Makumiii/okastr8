@@ -68,7 +68,10 @@ function getClientIp(c: any): string {
     return c.req.header("x-real-ip") || "unknown";
 }
 
-async function checkRateLimit(c: any, path: string): Promise<{ limited: boolean; retryAfter?: number }> {
+async function checkRateLimit(
+    c: any,
+    path: string
+): Promise<{ limited: boolean; retryAfter?: number }> {
     const rule = RATE_LIMIT_RULES[path];
     if (!rule) return { limited: false };
 
@@ -1197,13 +1200,17 @@ api.get("/github/callback", async (c) => {
         }
 
         if (!state) {
-            return c.redirect(isLoginFlow ? "/login?error=missing_state" : "/github?error=missing_state");
+            return c.redirect(
+                isLoginFlow ? "/login?error=missing_state" : "/github?error=missing_state"
+            );
         }
         const { consumeOAuthState } = await import("./utils/oauth-state");
         const flow = isLoginFlow ? "login" : "connect";
         const stateValid = await consumeOAuthState(state, flow);
         if (!stateValid) {
-            return c.redirect(isLoginFlow ? "/login?error=invalid_state" : "/github?error=invalid_state");
+            return c.redirect(
+                isLoginFlow ? "/login?error=invalid_state" : "/github?error=invalid_state"
+            );
         }
 
         const {

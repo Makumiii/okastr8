@@ -5,7 +5,9 @@ describe("docker command guards", () => {
     test("allows expected docker subcommands", () => {
         expect(() => assertAllowedDockerArgs(["pull", "nginx:latest"])).not.toThrow();
         expect(() => assertAllowedDockerArgs(["ps", "-a"])).not.toThrow();
-        expect(() => assertAllowedDockerArgs(["run", "-d", "--name", "x", "nginx:latest"])).not.toThrow();
+        expect(() =>
+            assertAllowedDockerArgs(["run", "-d", "--name", "x", "nginx:latest"])
+        ).not.toThrow();
         expect(() => assertAllowedDockerArgs(["start", "myapp"])).not.toThrow();
         expect(() => assertAllowedDockerArgs(["system", "df", "-v"])).not.toThrow();
     });
@@ -16,19 +18,23 @@ describe("docker command guards", () => {
     });
 
     test("blocks dangerous docker run privilege flags", () => {
-        expect(() =>
-            assertAllowedDockerArgs(["run", "--privileged", "alpine", "sh"])
-        ).toThrow();
-        expect(() =>
-            assertAllowedDockerArgs(["run", "-v", "/:/host", "alpine", "sh"])
-        ).toThrow();
+        expect(() => assertAllowedDockerArgs(["run", "--privileged", "alpine", "sh"])).toThrow();
+        expect(() => assertAllowedDockerArgs(["run", "-v", "/:/host", "alpine", "sh"])).toThrow();
     });
 });
 
 describe("compose command guards", () => {
     test("allows compose up/down patterns", () => {
         expect(() =>
-            assertAllowedComposeArgs(["-f", "/tmp/docker-compose.yml", "-p", "app", "up", "-d", "--build"])
+            assertAllowedComposeArgs([
+                "-f",
+                "/tmp/docker-compose.yml",
+                "-p",
+                "app",
+                "up",
+                "-d",
+                "--build",
+            ])
         ).not.toThrow();
         expect(() =>
             assertAllowedComposeArgs(["-f", "/tmp/docker-compose.yml", "-p", "app", "down"])

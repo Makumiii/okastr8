@@ -212,7 +212,12 @@ async function updateOkastr8(options: UpdateSystemOptions) {
         resolvedInstallDir
     );
 
-    await runStep("Installing root dependencies", "bun", ["install", "--frozen-lockfile"], resolvedInstallDir);
+    await runStep(
+        "Installing root dependencies",
+        "bun",
+        ["install", "--frozen-lockfile"],
+        resolvedInstallDir
+    );
 
     if (!options.skipDashboardBuild && existsSync(path.join(dashboardDir, "package.json"))) {
         await runDashboardInstallWithFallback(dashboardDir);
@@ -222,8 +227,14 @@ async function updateOkastr8(options: UpdateSystemOptions) {
     }
 
     try {
-        await runStep("Restarting manager service", "sudo", [systemdRestartScript, "okastr8-manager"]);
-        await runStep("Checking manager service health", "sudo", [systemdStatusScript, "okastr8-manager"]);
+        await runStep("Restarting manager service", "sudo", [
+            systemdRestartScript,
+            "okastr8-manager",
+        ]);
+        await runStep("Checking manager service health", "sudo", [
+            systemdStatusScript,
+            "okastr8-manager",
+        ]);
     } catch (error: any) {
         throw new Error(
             `${error.message}\nIf sudo prompts for a password, configure non-interactive access with: okastr8 setup sudoers`

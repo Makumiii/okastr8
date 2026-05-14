@@ -22,7 +22,9 @@ describe("Docker Tunnel Container Lifecycle", () => {
         const result = await startAppTunnelContainer(testAppName, testToken);
 
         expect(result.success).toBe(true);
-        expect(result.message).toContain(`Tunnel container ${testAppName}-tunnel started successfully`);
+        expect(result.message).toContain(
+            `Tunnel container ${testAppName}-tunnel started successfully`
+        );
 
         // Check if container is actually running
         const status = await containerStatus(`${testAppName}-tunnel`);
@@ -40,7 +42,9 @@ describe("Docker Tunnel Container Lifecycle", () => {
         const result = await stopAppTunnelContainer(testAppName);
 
         expect(result.success).toBe(true);
-        expect(result.message).toContain(`Tunnel container ${testAppName}-tunnel stopped and removed`);
+        expect(result.message).toContain(
+            `Tunnel container ${testAppName}-tunnel stopped and removed`
+        );
 
         // Check it's gone
         const status = await containerStatus(`${testAppName}-tunnel`);

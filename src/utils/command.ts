@@ -39,28 +39,27 @@ export async function runCommand(
             detached: true, // Isolate process tree so cancellation can kill full command group.
         });
         let forceKillTimeout: ReturnType<typeof setTimeout> | undefined;
-        const unregisterCancel =
-            options?.deploymentId
-                ? registerDeploymentCancelHandler(options.deploymentId, () => {
-                    try {
-                        process.kill(-child.pid!, "SIGTERM");
-                    } catch {
-                        try {
-                            child.kill("SIGTERM");
-                        } catch {}
-                    }
-                    forceKillTimeout = setTimeout(() => {
-                        try {
-                            process.kill(-child.pid!, "SIGKILL");
-                        } catch {
-                            try {
-                                child.kill("SIGKILL");
-                            } catch {}
-                        }
-                    }, 2500);
-                    forceKillTimeout.unref?.();
-                })
-                : () => {};
+        const unregisterCancel = options?.deploymentId
+            ? registerDeploymentCancelHandler(options.deploymentId, () => {
+                  try {
+                      process.kill(-child.pid!, "SIGTERM");
+                  } catch {
+                      try {
+                          child.kill("SIGTERM");
+                      } catch {}
+                  }
+                  forceKillTimeout = setTimeout(() => {
+                      try {
+                          process.kill(-child.pid!, "SIGKILL");
+                      } catch {
+                          try {
+                              child.kill("SIGKILL");
+                          } catch {}
+                      }
+                  }, 2500);
+                  forceKillTimeout.unref?.();
+              })
+            : () => {};
 
         let stdout = "";
         let stderr = "";

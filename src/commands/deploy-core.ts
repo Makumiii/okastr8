@@ -9,7 +9,11 @@ import { existsSync } from "fs";
 import { OKASTR8_HOME } from "../config.ts";
 import { runCommand } from "../utils/command.ts";
 import { TaskProgress, cli } from "../utils/cli-logger.ts";
-import { hasDeploymentStream, startDeploymentStream, streamLog } from "../utils/deploymentLogger.ts";
+import {
+    hasDeploymentStream,
+    startDeploymentStream,
+    streamLog,
+} from "../utils/deploymentLogger.ts";
 
 // Helper to get script path
 // Since we are in src/commands, project root is ../..
@@ -104,14 +108,14 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
 
         const normalizedBuildSteps = Array.isArray(rawConfig.build)
             ? rawConfig.build
-                .map((step: unknown) => String(step).trim())
-                .filter((step: string) => step)
+                  .map((step: unknown) => String(step).trim())
+                  .filter((step: string) => step)
             : typeof rawConfig.build === "string"
-                ? rawConfig.build
+              ? rawConfig.build
                     .split("\n")
                     .map((step: string) => step.trim())
                     .filter((step: string) => step)
-                : [];
+              : [];
 
         config = {
             runtime: rawConfig.runtime,
@@ -215,7 +219,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     try {
         const content = await readFile(metadataPath, "utf-8");
         existingMetadata = JSON.parse(content);
-    } catch { }
+    } catch {}
 
     const { writeFile: fsWriteFile } = await import("fs/promises");
     const user = process.env.USER || "root";
@@ -261,20 +265,17 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
 
         if (existsSync(envPath)) {
             const content = await readFile(envPath, "utf-8");
-            const lines = content.split('\n');
+            const lines = content.split("\n");
             for (const line of lines) {
                 const match = line.match(/^TUNNEL_TOKEN=(.*)$/);
                 if (match && match[1]) {
-                    tunnelToken = match[1].replace(/['"]/g, '').trim();
+                    tunnelToken = match[1].replace(/['"]/g, "").trim();
                     break;
                 }
             }
         }
 
-        const {
-            startAppTunnelContainer,
-            stopAppTunnelContainer,
-        } = await import("./docker.ts");
+        const { startAppTunnelContainer, stopAppTunnelContainer } = await import("./docker.ts");
 
         if (config.tunnel_routing && tunnelToken) {
             log("App has tunnel_routing enabled and a TUNNEL_TOKEN. Starting sidecar tunnel...");
@@ -399,7 +400,7 @@ async function checkRegistryConflict(port: number, myAppName: string) {
                 if (metaPort === port) {
                     throw new Error(`Port ${port} is already registered to application '${app}'`);
                 }
-            } catch (e) { }
+            } catch (e) {}
         }
     } catch (e: any) {
         if (e.message.includes("already registered")) throw e;

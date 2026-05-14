@@ -19,18 +19,18 @@ Okastr8 gives you the deployment experience teams expect from managed platforms,
 - [Installation](#installation)
 - [First Login and Admin Binding](#first-login-and-admin-binding)
 - [Configuration Model](#configuration-model)
-  - [`system.yaml` (host-level)](#systemyaml-host-level)
-  - [`okastr8.yaml` (app-level)](#okastr8yaml-app-level)
-  - [App Environment Variables](#app-environment-variables)
+    - [`system.yaml` (host-level)](#systemyaml-host-level)
+    - [`okastr8.yaml` (app-level)](#okastr8yaml-app-level)
+    - [App Environment Variables](#app-environment-variables)
 - [Production Setup (End-to-End)](#production-setup-end-to-end)
-  - [1. Public URL and Tunnel](#1-public-url-and-tunnel)
-  - [2. GitHub OAuth App](#2-github-oauth-app)
-  - [3. Connect GitHub in Okastr8](#3-connect-github-in-okastr8)
-  - [4. GHCR / OCI Registry Setup](#4-ghcr--oci-registry-setup)
+    - [1. Public URL and Tunnel](#1-public-url-and-tunnel)
+    - [2. GitHub OAuth App](#2-github-oauth-app)
+    - [3. Connect GitHub in Okastr8](#3-connect-github-in-okastr8)
+    - [4. GHCR / OCI Registry Setup](#4-ghcr--oci-registry-setup)
 - [Deployment Flows](#deployment-flows)
-  - [Flow A: GitHub Repository Deploy](#flow-a-github-repository-deploy)
-  - [Flow B: Container Registry Image Deploy](#flow-b-container-registry-image-deploy)
-  - [Flow C: Publish Built Git Deploys to Registry](#flow-c-publish-built-git-deploys-to-registry)
+    - [Flow A: GitHub Repository Deploy](#flow-a-github-repository-deploy)
+    - [Flow B: Container Registry Image Deploy](#flow-b-container-registry-image-deploy)
+    - [Flow C: Publish Built Git Deploys to Registry](#flow-c-publish-built-git-deploys-to-registry)
 - [Dashboard Flows](#dashboard-flows)
 - [CLI Flows and Commands](#cli-flows-and-commands)
 - [Routing Modes (Caddy vs Tunnel Routing)](#routing-modes-caddy-vs-tunnel-routing)
@@ -70,8 +70,8 @@ Okastr8 is a deployment and app-operations tool for Linux servers.
 - **CLI**: `okastr8` command for automation and server operations
 - **Runtime**: Docker containers for app workloads
 - **Ingress**:
-  - Caddy-based reverse proxy (domain routing)
-  - Optional Cloudflare tunnel (manager and/or app-specific)
+    - Caddy-based reverse proxy (domain routing)
+    - Optional Cloudflare tunnel (manager and/or app-specific)
 - **State/config location**: `~/.okastr8`
 
 ## Requirements
@@ -132,15 +132,15 @@ Minimal production-oriented example:
 
 ```yaml
 manager:
-  port: 41788
-  github:
-    client_id: "YOUR_GITHUB_OAUTH_CLIENT_ID"
-    client_secret: "YOUR_GITHUB_OAUTH_CLIENT_SECRET"
+    port: 41788
+    github:
+        client_id: "YOUR_GITHUB_OAUTH_CLIENT_ID"
+        client_secret: "YOUR_GITHUB_OAUTH_CLIENT_SECRET"
 
 tunnel:
-  enabled: true
-  auth_token: "YOUR_CLOUDFLARE_TUNNEL_TOKEN"
-  url: "https://okastr8.yourdomain.com"
+    enabled: true
+    auth_token: "YOUR_CLOUDFLARE_TUNNEL_TOKEN"
+    url: "https://okastr8.yourdomain.com"
 ```
 
 Copy-first minimal template: [`examples/system.minimal.yaml`](examples/system.minimal.yaml)  
@@ -159,8 +159,8 @@ runtime: "node:22"
 port: 3000
 start: "npm run start"
 build:
-  - "npm ci"
-  - "npm run build"
+    - "npm ci"
+    - "npm run build"
 domain: "app.yourdomain.com"
 tunnel_routing: false
 
@@ -168,9 +168,9 @@ database: "postgres:15"
 cache: "redis:7"
 
 publish_image:
-  enabled: true
-  image: "ghcr.io/your-org/your-app:latest"
-  registry_credential: "ghcr-main"
+    enabled: true
+    image: "ghcr.io/your-org/your-app:latest"
+    registry_credential: "ghcr-main"
 ```
 
 Full reference: [`OKASTR8_YAML.md`](docs/config/OKASTR8_YAML.md)
@@ -236,9 +236,9 @@ okastr8 github setup-key
 For private image push/pull and publish-image workflows.
 
 1. Create GHCR PAT (GitHub classic token) with at least:
-   - `read:packages`
-   - `write:packages` (if pushing)
-   - `delete:packages` (optional)
+    - `read:packages`
+    - `write:packages` (if pushing)
+    - `delete:packages` (optional)
 
 2. Add credential to Okastr8:
 
@@ -309,9 +309,9 @@ Equivalent persistent config in `okastr8.yaml`:
 
 ```yaml
 publish_image:
-  enabled: true
-  image: "ghcr.io/org/myapp:latest"
-  registry_credential: "ghcr-main"
+    enabled: true
+    image: "ghcr.io/org/myapp:latest"
+    registry_credential: "ghcr-main"
 ```
 
 ## Dashboard Flows
@@ -440,7 +440,7 @@ Extended checklist: [`docs/testing/PROD_READINESS_CHECKLIST.md`](docs/testing/PR
 ### GitHub login fails with redirect/callback errors
 
 - Confirm OAuth callback URL in GitHub exactly equals:
-  - `https://<public-url>/api/github/callback`
+    - `https://<public-url>/api/github/callback`
 - Confirm `client_id` / `client_secret` in `~/.okastr8/system.yaml`.
 
 ### Webhooks not triggering deploys

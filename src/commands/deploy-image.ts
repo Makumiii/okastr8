@@ -170,14 +170,14 @@ export async function updateAppFromImage(
             await saveEnvVars(appName, env);
         }
 
-        await stopContainer(appName).catch(() => { });
-        await removeContainer(appName).catch(() => { });
+        await stopContainer(appName).catch(() => {});
+        await removeContainer(appName).catch(() => {});
 
         const { composeDown, composeUp } = await import("./docker");
         const appCurrentDir = join(APPS_DIR, appName, "current");
         const currentComposePath = join(appCurrentDir, "docker-compose.yml");
         if (existsSync(currentComposePath)) {
-            await composeDown(currentComposePath, appName).catch(() => { });
+            await composeDown(currentComposePath, appName).catch(() => {});
         }
 
         const envPath = join(APPS_DIR, appName, ".env.production");
@@ -196,7 +196,7 @@ export async function updateAppFromImage(
                 database: metadata.database,
                 cache: metadata.cache,
                 deployStrategy: "image",
-                imageRef: normalizedImageRef
+                imageRef: normalizedImageRef,
             };
 
             const composeContent = generateCompose(composeConfig as any, appName, envFilePath);
@@ -273,11 +273,11 @@ export async function updateAppFromImage(
 
         if (envFilePath && existsSync(envFilePath)) {
             const content = await readFile(envFilePath, "utf-8");
-            const lines = content.split('\n');
+            const lines = content.split("\n");
             for (const line of lines) {
                 const match = line.match(/^TUNNEL_TOKEN=(.*)$/);
                 if (match && match[1]) {
-                    tunnelToken = match[1].replace(/['"]/g, '').trim();
+                    tunnelToken = match[1].replace(/['"]/g, "").trim();
                     break;
                 }
             }
@@ -286,13 +286,13 @@ export async function updateAppFromImage(
         if (current.tunnel_routing && tunnelToken) {
             await startAppTunnelContainer(appName, tunnelToken);
         } else {
-            await stopAppTunnelContainer(appName).catch(() => { });
+            await stopAppTunnelContainer(appName).catch(() => {});
         }
 
         await genCaddyFile();
 
         if (loggedIn) {
-            await dockerLogout(registryServer).catch(() => { });
+            await dockerLogout(registryServer).catch(() => {});
         }
 
         await logActivity("deploy", {
@@ -316,7 +316,7 @@ export async function updateAppFromImage(
             metadata.registryServer ||
             (metadata.imageRef ? resolveRegistryServer(metadata.imageRef) : "");
         if (registryServer) {
-            await dockerLogout(registryServer).catch(() => { });
+            await dockerLogout(registryServer).catch(() => {});
         }
 
         await logActivity("deploy", {

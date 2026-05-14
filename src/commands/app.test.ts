@@ -24,7 +24,7 @@ describe("App Configuration with Tunnel Routing", () => {
         // Clean up after test
         try {
             await deleteApp(testAppName);
-        } catch { }
+        } catch {}
     });
 
     test("creates app with tunnel_routing enabled", async () => {

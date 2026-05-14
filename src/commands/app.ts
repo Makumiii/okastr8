@@ -152,14 +152,14 @@ export async function deleteApp(appName: string) {
         console.log(` Cleaning up Docker resources for ${appName}...`);
 
         // Stop single container (container name = app name)
-        await stopDockerContainer(appName).catch(() => { });
-        await removeContainer(appName).catch(() => { });
+        await stopDockerContainer(appName).catch(() => {});
+        await removeContainer(appName).catch(() => {});
 
         // Stop compose services if a compose file exists in the current deployment
         const currentComposePath = join(APPS_DIR, appName, "current", "docker-compose.yml");
         if (existsSync(currentComposePath)) {
             const { composeDown } = await import("./docker");
-            await composeDown(currentComposePath, appName).catch(() => { });
+            await composeDown(currentComposePath, appName).catch(() => {});
         }
 
         // Remove app directory
@@ -175,7 +175,7 @@ export async function deleteApp(appName: string) {
         console.error(`Error deleting app ${appName}:`, error);
         // Even if docker fails (maybe already gone), try to remove files
         const appDir = join(APPS_DIR, appName);
-        await rm(appDir, { recursive: true, force: true }).catch(() => { });
+        await rm(appDir, { recursive: true, force: true }).catch(() => {});
 
         return {
             success: false,
@@ -478,7 +478,7 @@ export async function updateApp(
             try {
                 await rm(releasePath, { recursive: true, force: true });
                 await removeVersion(appName, versionId);
-            } catch { }
+            } catch {}
         }
 
         // Log unexpected error
@@ -860,8 +860,8 @@ export function addAppCommands(program: Command) {
                     containerPort: options.containerPort
                         ? parseInt(options.containerPort, 10)
                         : options.port
-                            ? parseInt(options.port, 10)
-                            : 8080,
+                          ? parseInt(options.port, 10)
+                          : 8080,
                     domain: options.domain,
                     tunnel_routing: options.tunnelRouting,
                     deployStrategy: "image",
@@ -907,10 +907,7 @@ export function addAppCommands(program: Command) {
         .option("--container-port <port>", "Container internal port")
         .option("--pull-policy <policy>", "Image pull policy: always or if-not-present")
         .option("--registry-credential <id>", "Registry credential id from `okastr8 registry add`")
-        .option(
-            "--registry-provider <provider>",
-            "Registry provider: ghcr|dockerhub|ecr|generic"
-        )
+        .option("--registry-provider <provider>", "Registry provider: ghcr|dockerhub|ecr|generic")
         .option("--registry-server <server>", "Registry server override (e.g., ghcr.io)")
         .option("--deploy", "Trigger deployment after update")
         .action(async (name: string, imageRef: string, options: any) => {
@@ -1183,7 +1180,9 @@ export function addAppCommands(program: Command) {
         .option("--version-id <id>", "Version id to rollback to")
         .action(async (name: string, options: { versionId?: string }) => {
             try {
-                let targetVersion = options.versionId ? Number.parseInt(options.versionId, 10) : NaN;
+                let targetVersion = options.versionId
+                    ? Number.parseInt(options.versionId, 10)
+                    : NaN;
                 if (Number.isNaN(targetVersion)) {
                     const { getVersions } = await import("./version");
                     const versions = await getVersions(name);
@@ -1201,7 +1200,8 @@ export function addAppCommands(program: Command) {
                             .sort((a, b) => b.id - a.id)
                             .map((version) => ({
                                 name: String(version.id),
-                                message: `v${version.id} ${version.branch ? `(${version.branch})` : ""} ${version.commit ? version.commit.slice(0, 7) : ""} ${version.status || ""}`.trim(),
+                                message:
+                                    `v${version.id} ${version.branch ? `(${version.branch})` : ""} ${version.commit ? version.commit.slice(0, 7) : ""} ${version.status || ""}`.trim(),
                             })),
                     });
                     targetVersion = Number.parseInt(String(response.versionId), 10);

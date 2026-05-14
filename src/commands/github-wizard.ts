@@ -10,7 +10,11 @@ import {
 } from "./github";
 import { listRegistryCredentialSummaries } from "./registry";
 import { randomBytes } from "crypto";
-import { cancelDeployment, endDeploymentStream, startDeploymentStream } from "../utils/deploymentLogger";
+import {
+    cancelDeployment,
+    endDeploymentStream,
+    startDeploymentStream,
+} from "../utils/deploymentLogger";
 import * as readline from "readline";
 
 type EnquirerLike = {
@@ -56,12 +60,7 @@ async function promptForEnv(enquirer: EnquirerLike, initialEnv: Record<string, s
         type: "select",
         name: "mode",
         message: "Environment variables:",
-        choices: [
-            "Keep current",
-            "Import from .env file",
-            "Manual entry (key=value)",
-            "Clear all",
-        ],
+        choices: ["Keep current", "Import from .env file", "Manual entry (key=value)", "Clear all"],
     });
 
     const mode = String(response.mode || "");
@@ -400,7 +399,12 @@ export async function runGithubImportWizard(options: {
     }
 
     try {
-        const result = await finalizeRepoImport(prep.appName, prep.versionId, deployConfig, deploymentId);
+        const result = await finalizeRepoImport(
+            prep.appName,
+            prep.versionId,
+            deployConfig,
+            deploymentId
+        );
         return {
             ...result,
             appName: prep.appName,

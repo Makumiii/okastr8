@@ -672,7 +672,11 @@ export async function prepareRepoImport(
         } else {
             try {
                 const meta = JSON.parse(await readFile(appMetaPath, "utf-8"));
-                const { nextMeta, dirty } = reconcileImportAppMetadata(meta, repo.clone_url, branch);
+                const { nextMeta, dirty } = reconcileImportAppMetadata(
+                    meta,
+                    repo.clone_url,
+                    branch
+                );
                 if (dirty) {
                     await writeFile(appMetaPath, JSON.stringify(nextMeta, null, 2));
                 }

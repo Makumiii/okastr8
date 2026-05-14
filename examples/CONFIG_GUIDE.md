@@ -49,14 +49,14 @@ tunnel:
 **Location**: Git Root (`okastr8.yaml` or `okastr8.yml`)
 **Purpose**: Defines how to build and run your application.
 
-| Field     | Type     | Description                                              |
-| --------- | -------- | -------------------------------------------------------- |
-| `runtime` | string   | Required runtime: `node`, `python`, `go`, `bun`, `deno`. |
-| `build`   | string[] | List of build commands.                                  |
-| `start`   | string   | Start command (e.g. `npm start`).                        |
-| `port`    | number   | Internal port the app listens on.                        |
-| `domain`         | string   | Public domain name.                                      |
-| `tunnel_routing` | boolean  | Use Cloudflare Tunnel sidecar (bypasses Caddy).          |
+| Field            | Type     | Description                                               |
+| ---------------- | -------- | --------------------------------------------------------- |
+| `runtime`        | string   | Required runtime: `node`, `python`, `go`, `bun`, `deno`.  |
+| `build`          | string[] | List of build commands.                                   |
+| `start`          | string   | Start command (e.g. `npm start`).                         |
+| `port`           | number   | Internal port the app listens on.                         |
+| `domain`         | string   | Public domain name.                                       |
+| `tunnel_routing` | boolean  | Use Cloudflare Tunnel sidecar (bypasses Caddy).           |
 | `publish_image`  | object   | Opt-in publish of built git deployment image to registry. |
 
 **Example:**

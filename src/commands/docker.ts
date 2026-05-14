@@ -159,8 +159,7 @@ async function dockerCommand(args: string[], cwd?: string, options?: DockerComma
     if (args[0] === "run" || args[0] === "build" || args[0] === "login") {
         return {
             stdout: directSafeOutput("", ""),
-            stderr:
-                "Docker permission denied for high-impact operation. Ensure user is in docker group.",
+            stderr: "Docker permission denied for high-impact operation. Ensure user is in docker group.",
             exitCode: 1,
         };
     }
@@ -280,12 +279,28 @@ export async function buildImage(
                 onOutput(trimmed);
             }
         };
-        const buildxCheck = await runCommand(dockerPath, ["buildx", "version"], undefined, undefined, {
-            deploymentId,
-        });
+        const buildxCheck = await runCommand(
+            dockerPath,
+            ["buildx", "version"],
+            undefined,
+            undefined,
+            {
+                deploymentId,
+            }
+        );
         const canUseBuildx = buildxCheck.exitCode === 0;
         const buildArgs = canUseBuildx
-            ? ["buildx", "build", "--progress=plain", "--load", "-t", tag, "-f", dockerfilePath, context]
+            ? [
+                  "buildx",
+                  "build",
+                  "--progress=plain",
+                  "--load",
+                  "-t",
+                  tag,
+                  "-f",
+                  dockerfilePath,
+                  context,
+              ]
             : ["build", "-t", tag, "-f", dockerfilePath, context];
 
         const result = await dockerBuildCommand(buildArgs, undefined, {
@@ -777,7 +792,7 @@ export async function startAppTunnelContainer(
         const containerName = `${appName}-tunnel`;
 
         // Remove existing if any
-        await removeContainer(containerName).catch(() => { });
+        await removeContainer(containerName).catch(() => {});
 
         const result = await dockerCommand([
             "run",

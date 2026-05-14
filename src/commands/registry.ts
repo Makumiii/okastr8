@@ -404,26 +404,31 @@ export function addRegistryCommands(program: Command) {
         .argument("<credential_id>", "Registry credential id")
         .option("--owner-type <type>", "owner scope: user|org", "user")
         .option("--owner <name>", "owner login (optional)")
-        .action(async (credentialId: string, options: { ownerType: "user" | "org"; owner?: string }) => {
-            const result = await listGhcrPackages({
-                credentialId,
-                ownerType: options.ownerType,
-                owner: options.owner,
-            });
-            if (!result.success) {
-                console.error(result.message || "Failed to list GHCR packages");
-                process.exit(1);
+        .action(
+            async (
+                credentialId: string,
+                options: { ownerType: "user" | "org"; owner?: string }
+            ) => {
+                const result = await listGhcrPackages({
+                    credentialId,
+                    ownerType: options.ownerType,
+                    owner: options.owner,
+                });
+                if (!result.success) {
+                    console.error(result.message || "Failed to list GHCR packages");
+                    process.exit(1);
+                }
+                if (!result.packages?.length) {
+                    console.log("No GHCR packages found.");
+                    return;
+                }
+                for (const pkg of result.packages) {
+                    console.log(
+                        `${pkg.name}${pkg.visibility ? ` [${pkg.visibility}]` : ""}${pkg.updatedAt ? ` updated ${pkg.updatedAt}` : ""}`
+                    );
+                }
             }
-            if (!result.packages?.length) {
-                console.log("No GHCR packages found.");
-                return;
-            }
-            for (const pkg of result.packages) {
-                console.log(
-                    `${pkg.name}${pkg.visibility ? ` [${pkg.visibility}]` : ""}${pkg.updatedAt ? ` updated ${pkg.updatedAt}` : ""}`
-                );
-            }
-        });
+        );
 
     ghcr.command("tags")
         .description("List GHCR tags/versions for a package")
