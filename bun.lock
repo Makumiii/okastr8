@@ -8,7 +8,7 @@
         "@types/js-yaml": "^4.0.9",
         "commander": "^14.0.0",
         "enquirer": "^2.4.1",
-        "hono": "^4.8.5",
+        "hono": "^4.12.18",
         "js-yaml": "^4.1.1",
         "ora": "^9.0.0",
         "yaml": "^2.8.2",
@@ -165,7 +165,7 @@
 
     "globals": ["globals@17.3.0", "", {}, "sha512-yMqGUQVVCkD4tqjOJf3TnrvaaHDMYp4VlUSObbkIiuCPe/ofdMBFIAcBbCSRFWOnos6qRiTVStDwqPLUclaxIw=="],
 
-    "hono": ["hono@4.8.5", "", {}, "sha512-Up2cQbtNz1s111qpnnECdTGqSIUIhZJMLikdKkshebQSEBcoUKq6XJayLGqSZWidiH0zfHRCJqFu062Mz5UuRA=="],
+    "hono": ["hono@4.12.18", "", {}, "sha512-RWzP96k/yv0PQfyXnWjs6zot20TqfpfsNXhOnev8d1InAxubW93L11/oNUc3tQqn2G0bSdAOBpX+2uDFHV7kdQ=="],
 
     "ignore": ["ignore@5.3.2", "", {}, "sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g=="],
 
