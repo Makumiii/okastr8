@@ -1,0 +1,6 @@
+
+[2m$ bun build src/main.ts --outdir=build --target=node[22m
+[32mBundled 200 modules in 47ms[0m
+
+  [34mmain.js[33m  1.0 MB  [2m(entry point)[0m
+

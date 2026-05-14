@@ -1,24 +1,14 @@
 {
-    "name": "okastr8",
-    "module": "main.ts",
-    "type": "module",
+    "name": "okastr8-monorepo",
     "private": true,
     "scripts": {
-        "build": "bun build src/main.ts --outdir=build --target=node",
-        "lint": "eslint src scripts test *.ts",
-        "lint:fix": "eslint src scripts test *.ts --fix",
+        "build": "turbo run build",
+        "test": "turbo run test",
+        "lint": "turbo run lint",
+        "typecheck": "turbo run typecheck",
+        "check": "turbo run check",
         "format": "prettier . --write",
-        "format:check": "prettier . --check",
-        "typecheck": "tsc --noEmit -p tsconfig.check.json",
-        "check": "bun run lint && bun run typecheck && bun run format:check",
-        "test": "bun run test:unit && bun run test:smoke",
-        "test:unit": "bun test test/unit",
-        "test:smoke": "bun test test/smoke",
-        "test:integration": "bun test test/integration",
-        "test:e2e": "playwright test",
-        "gate:prod": "bash scripts/dev/prod-gate.sh",
-        "gate:prod:no-e2e": "RUN_E2E=0 bash scripts/dev/prod-gate.sh",
-        "gate:prod:no-scan": "RUN_SCANNERS=0 bash scripts/dev/prod-gate.sh"
+        "format:check": "prettier . --check"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
@@ -28,18 +18,11 @@
         "eslint-config-prettier": "^10.1.8",
         "globals": "^17.3.0",
         "prettier": "^3.8.1",
-        "typescript-eslint": "^8.56.0"
+        "typescript-eslint": "^8.56.0",
+        "turbo": "latest"
     },
-    "peerDependencies": {
-        "typescript": "^5.9.3"
+    "engines": {
+        "node": ">=22"
     },
-    "dependencies": {
-        "@types/js-yaml": "^4.0.9",
-        "commander": "^14.0.0",
-        "enquirer": "^2.4.1",
-        "hono": "^4.12.18",
-        "js-yaml": "^4.1.1",
-        "ora": "^9.0.0",
-        "yaml": "^2.8.2"
-    }
+    "packageManager": "pnpm@11.1.1"
 }

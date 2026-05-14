@@ -1,0 +1,29 @@
+{
+    "name": "@okastr8/manager",
+    "version": "0.1.0",
+    "module": "src/managerServer.ts",
+    "type": "module",
+    "private": true,
+    "scripts": {
+        "build": "bun build src/managerServer.ts --outdir=build --target=node",
+        "lint": "eslint src scripts test *.ts",
+        "typecheck": "tsc --noEmit -p tsconfig.check.json",
+        "test": "bun run test:unit && bun run test:smoke",
+        "test:unit": "bun test test/unit",
+        "test:smoke": "bun test test/smoke",
+        "test:integration": "bun test test/integration"
+    },
+    "dependencies": {
+        "@okastr8/core": "workspace:*",
+        "@types/js-yaml": "^4.0.9",
+        "commander": "^14.0.0",
+        "enquirer": "^2.4.1",
+        "hono": "^4.12.18",
+        "js-yaml": "^4.1.1",
+        "ora": "^9.0.0",
+        "yaml": "^2.8.2"
+    },
+    "devDependencies": {
+        "@types/bun": "latest"
+    }
+}
