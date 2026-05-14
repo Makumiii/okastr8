@@ -19,17 +19,11 @@ export default function AuthPage() {
     setLoading(true);
 
     try {
-      // Create a mock user to satisfy the v.id("users") requirement
-      const mockUserId = await createUser({
-        githubUserId: Math.floor(Math.random() * 1000000),
-        githubUsername: "test-user-" + Math.floor(Math.random() * 1000),
-      });
-
-      await authorize({ userCode, userId: mockUserId });
-      router.push("/success");
+      // Initiate real GitHub OAuth flow
+      // We pass the userCode as 'state' so we can link this session back to the CLI device code
+      window.location.href = `/api/github/login?state=${userCode}`;
     } catch (err: any) {
-      setError(err.message || "Invalid or expired code");
-    } finally {
+      setError(err.message || "Failed to initiate login");
       setLoading(false);
     }
   };

@@ -29,15 +29,27 @@ export async function initBrokerSync() {
 
     console.log(`Connecting to Okastr8 Broker as server ${serverId}...`);
 
-    // In a real implementation, we would subscribe to a query that returns pending deploy events.
-    // For this brainstorm/TDD phase, we just mock the connection and listen.
+    // Subscribe to pending deployment events
     unsubscribe = convexClient.onUpdate(
-        "deployments:getPending", // Mock string since we don't have exact api exported
+        "deployments:getPending",
         { serverId, serverToken },
-        (events: any[]) => {
+        async (events: any[]) => {
             if (events && events.length > 0) {
                 console.log(`Received ${events.length} deployment events from broker.`);
-                // Here we would trigger local deployments based on events
+                for (const event of events) {
+                    // Trigger deployment (this would call your internal deploy logic)
+                    console.log(`Processing event ${event._id} for repo ${event.payload.repository?.full_name}`);
+                    
+                    // After processing, mark as done
+                    try {
+                        await convexClient!.mutation("deployments:markProcessed", {
+                            eventId: event._id,
+                            serverToken
+                        });
+                    } catch (e) {
+                        console.error(`Failed to mark event ${event._id} as processed:`, e);
+                    }
+                }
             }
         },
         (error) => {
@@ -60,10 +72,8 @@ export async function getInstallationTokenFromBroker(repoFullName: string): Prom
     }
 
     try {
-        // Mock asking the broker for a short-lived token
-        const token = await convexClient.mutation("github:getInstallationToken", {
-            serverId,
-            serverToken,
+        // Use the implementation we just added to the Broker
+        const token = await convexClient.action("github:getInstallationTokenForRepo", {
             repoFullName
         });
         return token as string;

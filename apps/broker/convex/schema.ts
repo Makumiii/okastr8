@@ -18,7 +18,21 @@ export default defineSchema({
   installations: defineTable({
     userId: v.id("users"),
     githubInstallationId: v.number(),
+    status: v.string(), // "active", "deleted"
   }).index("by_user_id", ["userId"]).index("by_github_installation_id", ["githubInstallationId"]),
+
+  repositories: defineTable({
+    installationId: v.id("installations"),
+    githubRepoId: v.number(),
+    fullName: v.string(), // e.g. "owner/repo"
+    serverId: v.optional(v.string()), // Link repo to a specific server if needed
+  }).index("by_full_name", ["fullName"]).index("by_installation_id", ["installationId"]),
+
+  deploymentEvents: defineTable({
+    serverId: v.string(),
+    payload: v.any(),
+    status: v.string(),
+  }).index("by_server_id", ["serverId"]),
 
   deviceCodes: defineTable({
     code: v.string(),

@@ -1,0 +1,24 @@
+{
+  "name": "Okastr8-Broker",
+  "description": "Zero-config deployment orchestrator",
+  "url": "https://okastr8.com",
+  "hook_attributes": {
+    "url": "https://rapid-wolf-687.convex.cloud/api/github/webhooks",
+    "active": true
+  },
+  "redirect_url": "https://rapid-wolf-687.convex.cloud/api/github/callback",
+  "callback_urls": [
+    "https://rapid-wolf-687.convex.cloud/api/github/callback"
+  ],
+  "public": false,
+  "default_permissions": {
+    "contents": "write",
+    "metadata": "read",
+    "pull_requests": "write",
+    "workflows": "write"
+  },
+  "default_events": [
+    "push",
+    "pull_request"
+  ]
+}
