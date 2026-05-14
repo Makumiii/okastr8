@@ -39,6 +39,10 @@ export interface SystemConfig {
             allowed_ports?: number[];
         };
     };
+    broker?: {
+        server_id?: string;
+        server_token?: string;
+    };
     manager?: {
         port?: number;
         public_url?: string;
@@ -172,6 +176,7 @@ export async function saveSystemConfig(newConfig: Partial<SystemConfig>): Promis
         ...current,
         ...newConfig,
         setup: { ...current.setup, ...newConfig.setup },
+        broker: { ...current.broker, ...newConfig.broker },
         manager: { ...current.manager, ...newConfig.manager },
         tunnel: { ...current.tunnel, ...newConfig.tunnel },
     };

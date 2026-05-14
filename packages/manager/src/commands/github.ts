@@ -704,9 +704,20 @@ export async function prepareRepoImport(
         await updateVersionStatus(appName, versionId, "pending", "Cloning repository");
         log(`⬇️ Cloning into release v${versionId}...`);
 
-        const cloneUrl = repo.private
-            ? `https://${githubConfig.accessToken}@github.com/${repo.full_name}.git`
-            : repo.clone_url;
+        let cloneUrl = repo.clone_url;
+        if (repo.private) {
+            const { getInstallationTokenFromBroker } = await import("../services/broker");
+            const brokerToken = await getInstallationTokenFromBroker(repo.full_name);
+            if (brokerToken) {
+                log(`🔑 Using short-lived HTTPS token from Central Broker`);
+                cloneUrl = `https://x-access-token:${brokerToken}@github.com/${repo.full_name}.git`;
+            } else if (githubConfig.accessToken) {
+                log(`🔑 Using legacy personal access token`);
+                cloneUrl = `https://${githubConfig.accessToken}@github.com/${repo.full_name}.git`;
+            } else {
+                throw new Error("Private repo requires authentication. Neither broker token nor legacy token found.");
+            }
+        }
 
         const cloneResult = await runCommand("git", [
             "clone",

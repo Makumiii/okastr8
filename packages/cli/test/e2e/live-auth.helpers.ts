@@ -11,7 +11,7 @@ export function createLiveTestToken(userId = "e2e-live-probe"): string {
             "--eval",
             `
       (async () => {
-        const auth = await import('./src/commands/auth.ts');
+        const auth = await import('./packages/manager/src/commands/auth.ts');
         const generated = await auth.generateToken(${JSON.stringify(userId)}, '1h');
         console.log('TOKEN_JSON:' + JSON.stringify({ token: generated.token }));
       })().catch((err) => {

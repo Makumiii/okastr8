@@ -199,6 +199,7 @@ api.use("*", async (c, next) => {
 const PUBLIC_ROUTES = [
     "POST:/auth/logout",
     "GET:/auth/me",
+    "POST:/auth/token",
     "GET:/auth/github",
     "POST:/github/webhook", // Webhook has its own HMAC verification
     "GET:/github/callback", // OAuth callback - no auth yet!
@@ -2087,6 +2088,33 @@ api.get("/auth/me", async (c) => {
 api.post("/auth/logout", async (c) => {
     c.header("Set-Cookie", `okastr8_session=; ${getCookieOptions(c, 0)}`);
     return c.json(apiResponse(true, "Logged out"));
+});
+
+api.post("/auth/token", async (c) => {
+    try {
+        const body = await c.req.json();
+        const { getSystemConfig } = await import("./config");
+        const config = await getSystemConfig();
+        
+        if (!config.broker?.server_token) {
+            return c.json(apiResponse(false, "Server is not configured for token login. Run okastr8 login."), 400);
+        }
+
+        if (body.token !== config.broker.server_token) {
+            return c.json(apiResponse(false, "Invalid token."), 401);
+        }
+
+        // Generate a standard JWT session token via the auth library
+        const { generateToken } = await import("./commands/auth");
+        // We use "admin" as the generic user ID for the dashboard
+        const { token } = await generateToken("admin", "7d");
+        
+        c.header("Set-Cookie", `okastr8_session=${token}; ${getCookieOptions(c, 7 * 24 * 60 * 60)}`);
+        return c.json(apiResponse(true, "Authentication successful"));
+    } catch (e: any) {
+        console.error("API /auth/token error:", e);
+        return c.json(apiResponse(false, "Internal Server Error"), 500);
+    }
 });
 
 // ================ Global Service Controls ================

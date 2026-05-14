@@ -1,6 +1,6 @@
 
 [2m$ bun build src/managerServer.ts --outdir=build --target=node[22m
-[32mBundled 241 modules in 54ms[0m
+[32mBundled 278 modules in 75ms[0m
 
-  [34mmanagerServer.js[33m  0.97 MB  [2m(entry point)[0m
+  [34mmanagerServer.js[33m  1.21 MB  [2m(entry point)[0m
 

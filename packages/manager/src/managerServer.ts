@@ -4,6 +4,7 @@ import api from "./api";
 import { startResourceMonitor } from "./services/monitor";
 import { reconcileRuntimeAfterBoot } from "./services/startup-reconcile";
 import { installConsoleLogger, logPaths } from "./utils/structured-logger";
+import { initBrokerSync } from "./services/broker";
 
 const app = new Hono();
 
@@ -17,6 +18,7 @@ installConsoleLogger({
 
 // Start background services
 startResourceMonitor();
+initBrokerSync();
 // Boot-time reconcile: ensure expected app tunnel sidecars are restored after host reboot.
 const bootReconcileTimer = setTimeout(() => {
     void reconcileRuntimeAfterBoot();

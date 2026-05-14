@@ -11,137 +11,144 @@ test/unit/deploy-rollback-target.test.ts:
 [0m[32m✓[0m [0mresolveGitRollbackTarget[2m >[0m[1m returns null when no fallback exists[0m
 [0m
 test/unit/setup-sudoers-docker-rules.test.ts:
-[0m[32m✓[0m [0msetup-sudoers docker build rules[2m >[0m[1m includes docker build and buildx non-interactive sudo rules[0m [0m[2m[1.00ms[0m[2m][0m
+[0m[32m✓[0m [0msetup-sudoers docker build rules[2m >[0m[1m includes docker build and buildx non-interactive sudo rules[0m
+[0m
+test/unit/broker.test.ts:
+[0m[32m✓[0m[0m[1m broker service > retrieves installation token from broker[0m [0m[2m[6.00ms[0m[2m][0m
+[0m[32m✓[0m[0m[1m broker service > returns null if no broker config[0m [0m[2m[1.00ms[0m[2m][0m
+Connecting to Okastr8 Broker as server srv-123...
+Received 1 deployment events from broker.
+[0m[32m✓[0m[0m[1m broker service > listens for deployment events[0m
 [0m
 test/unit/startup-reconcile.test.ts:
-[0m[32m✓[0m [0mstartup reconcile env parsing[2m >[0m[1m extracts tunnel token from env content[0m [0m[2m[1.00ms[0m[2m][0m
+[0m[32m✓[0m [0mstartup reconcile env parsing[2m >[0m[1m extracts tunnel token from env content[0m [0m[2m[2.00ms[0m[2m][0m
 [0m[32m✓[0m [0mstartup reconcile env parsing[2m >[0m[1m returns undefined when no tunnel token exists[0m
 [0m
 test/unit/dockerfile-generator.test.ts:
-[0m[32m✓[0m [0mgenerateDockerfile[2m >[0m[1m uses node LTS default image when runtime version is omitted[0m [0m[2m[1.00ms[0m[2m][0m
-[0m[32m✓[0m [0mgenerateDockerfile[2m >[0m[1m uses explicit runtime version when provided[0m
+[0m[32m✓[0m [0mgenerateDockerfile[2m >[0m[1m uses node LTS default image when runtime version is omitted[0m [0m[2m[2.00ms[0m[2m][0m
+[0m[32m✓[0m [0mgenerateDockerfile[2m >[0m[1m uses explicit runtime version when provided[0m [0m[2m[1.00ms[0m[2m][0m
 [0m[32m✓[0m [0mgenerateDockerfile[2m >[0m[1m normalizes vite dev command with --host flag[0m
 [0m[32m✓[0m [0mgenerateDockerfile[2m >[0m[1m normalizes next dev command with host binding[0m
 [0m[32m✓[0m [0mgenerateDockerfile[2m >[0m[1m throws on unsupported runtime[0m
 [0m
 test/unit/github-import-metadata.test.ts:
-[0m[32m✓[0m [0mreconcileImportAppMetadata[2m >[0m[1m updates git branch metadata on re-import branch change[0m
-[0m[32m✓[0m [0mreconcileImportAppMetadata[2m >[0m[1m preserves intentionally custom webhook branch[0m [0m[2m[1.00ms[0m[2m][0m
+[0m[32m✓[0m [0mreconcileImportAppMetadata[2m >[0m[1m updates git branch metadata on re-import branch change[0m [0m[2m[2.00ms[0m[2m][0m
+[0m[32m✓[0m [0mreconcileImportAppMetadata[2m >[0m[1m preserves intentionally custom webhook branch[0m
 [0m
 test/unit/compose-generator.test.ts:
 [0m[32m✓[0m [0mgenerateCompose[2m >[0m[1m generates minimal compose for app-only deployment[0m [0m[2m[1.00ms[0m[2m][0m
-[0m[32m✓[0m [0mgenerateCompose[2m >[0m[1m adds database and cache services with connection env vars[0m
+[0m[32m✓[0m [0mgenerateCompose[2m >[0m[1m adds database and cache services with connection env vars[0m [0m[2m[1.00ms[0m[2m][0m
 [0m[32m✓[0m [0mgenerateCompose[2m >[0m[1m throws for unsupported database type[0m
 [0m
 test/unit/command-streaming.test.ts:
-[0m[32m✓[0m [0mrunCommand streaming hooks[2m >[0m[1m forwards stdout/stderr chunks while collecting full output[0m [0m[2m[[1m31.00ms[0m[2m][0m
+[0m[32m✓[0m [0mrunCommand streaming hooks[2m >[0m[1m forwards stdout/stderr chunks while collecting full output[0m [0m[2m[[1m35.00ms[0m[2m][0m
 [0m
 test/unit/rate-limit-store.test.ts:
-[0m[32m✓[0m [0mrate limit store[2m >[0m[1m tracks counts across repeated requests and enforces max[0m [0m[2m[[1m15.00ms[0m[2m][0m
+[0m[32m✓[0m [0mrate limit store[2m >[0m[1m tracks counts across repeated requests and enforces max[0m [0m[2m[5.00ms[0m[2m][0m
 [0m
 test/unit/registry-image.test.ts:
-[0m[32m✓[0m [0mresolveRegistryServer[2m >[0m[1m detects explicit registry host prefixes[0m
-[0m[32m✓[0m [0mresolveRegistryServer[2m >[0m[1m defaults docker hub style refs to docker.io[0m
-[0m[32m✓[0m [0mnormalizeImageRef[2m >[0m[1m lowercases registry and repository path while preserving tag[0m [0m[2m[1.00ms[0m[2m][0m
+[0m[32m✓[0m [0mresolveRegistryServer[2m >[0m[1m detects explicit registry host prefixes[0m [0m[2m[6.00ms[0m[2m][0m
+[0m[32m✓[0m [0mresolveRegistryServer[2m >[0m[1m defaults docker hub style refs to docker.io[0m [0m[2m[1.00ms[0m[2m][0m
+[0m[32m✓[0m [0mnormalizeImageRef[2m >[0m[1m lowercases registry and repository path while preserving tag[0m
 [0m[32m✓[0m [0mnormalizeImageRef[2m >[0m[1m preserves digest suffix while lowercasing repository path[0m
 [0m
 test/unit/deploy-image-rollback.test.ts:
-[0m[32m✓[0m [0mselectImageRollbackTarget[2m >[0m[1m selects previous release when no target is provided[0m [0m[2m[1.00ms[0m[2m][0m
+[0m[32m✓[0m [0mselectImageRollbackTarget[2m >[0m[1m selects previous release when no target is provided[0m [0m[2m[3.00ms[0m[2m][0m
 [0m[32m✓[0m [0mselectImageRollbackTarget[2m >[0m[1m selects by digest[0m
 [0m[32m✓[0m [0mselectImageRollbackTarget[2m >[0m[1m selects by image ref[0m
 [0m[32m✓[0m [0mselectImageRollbackTarget[2m >[0m[1m returns null when no previous release exists[0m
-[0m[32m✓[0m [0mselectImageRollbackTarget[2m >[0m[1m returns null for unknown target[0m
+[0m[32m✓[0m [0mselectImageRollbackTarget[2m >[0m[1m returns null for unknown target[0m [0m[2m[1.00ms[0m[2m][0m
 [0m[32m✓[0m [0mpruneImageReleases[2m >[0m[1m keeps all releases when below retention[0m
 [0m[32m✓[0m [0mpruneImageReleases[2m >[0m[1m prunes oldest releases when exceeding retention[0m
 [0m
 test/unit/oauth-state.test.ts:
-[0m[32m✓[0m [0moauth state store[2m >[0m[1m issues and consumes state exactly once[0m [0m[2m[3.00ms[0m[2m][0m
-[0m[32m✓[0m [0moauth state store[2m >[0m[1m rejects state for wrong flow prefix[0m
+[0m[32m✓[0m [0moauth state store[2m >[0m[1m issues and consumes state exactly once[0m [0m[2m[4.00ms[0m[2m][0m
+[0m[32m✓[0m [0moauth state store[2m >[0m[1m rejects state for wrong flow prefix[0m [0m[2m[1.00ms[0m[2m][0m
 [0m
 test/unit/runtime-detector.test.ts:
 [0m[32m✓[0m [0mdetectRuntime[2m >[0m[1m detects node runtime from package.json[0m [0m[2m[1.00ms[0m[2m][0m
-[0m[32m✓[0m [0mdetectRuntime[2m >[0m[1m detects python runtime from pyproject.toml[0m
+[0m[32m✓[0m [0mdetectRuntime[2m >[0m[1m detects python runtime from pyproject.toml[0m [0m[2m[1.00ms[0m[2m][0m
 [0m[32m✓[0m [0mdetectRuntime[2m >[0m[1m throws for unknown runtimes[0m [0m[2m[1.00ms[0m[2m][0m
 [0m
 test/unit/registry-auth.test.ts:
-[0m[32m✓[0m [0mderiveEcrRegionFromServer[2m >[0m[1m extracts region from private ECR registry hostname[0m [0m[2m[1.00ms[0m[2m][0m
+[0m[32m✓[0m [0mderiveEcrRegionFromServer[2m >[0m[1m extracts region from private ECR registry hostname[0m
 [0m[32m✓[0m [0mderiveEcrRegionFromServer[2m >[0m[1m returns undefined for non-ECR hosts[0m
 [0m
 test/unit/auth-token.test.ts:
-[0m[32m✓[0m [0mauth token policy[2m >[0m[1m generates and validates token for a user[0m [0m[2m[[1m56.00ms[0m[2m][0m
-[0m[32m✓[0m [0mauth token policy[2m >[0m[1m revokes prior token when issuing a new token for the same user[0m [0m[2m[[1m50.00ms[0m[2m][0m
-[0m[32m✓[0m [0mauth token policy[2m >[0m[1m rejects token durations above security limit[0m [0m[2m[[1m39.00ms[0m[2m][0m
+[0m[32m✓[0m [0mauth token policy[2m >[0m[1m generates and validates token for a user[0m [0m[2m[[1m105.00ms[0m[2m][0m
+[0m[32m✓[0m [0mauth token policy[2m >[0m[1m revokes prior token when issuing a new token for the same user[0m [0m[2m[[1m195.00ms[0m[2m][0m
+[0m[32m✓[0m [0mauth token policy[2m >[0m[1m rejects token durations above security limit[0m [0m[2m[[1m96.00ms[0m[2m][0m
 [0m
 test/unit/systemd-script-hardening.test.ts:
-[0m[32m✓[0m [0msystemd manager hardening script[2m >[0m[1m includes manager/webhook hardening directives[0m
+[0m[32m✓[0m [0msystemd manager hardening script[2m >[0m[1m includes manager/webhook hardening directives[0m [0m[2m[2.00ms[0m[2m][0m
 [0m
 test/unit/api-route-uniqueness.test.ts:
 [0m[32m✓[0m [0mapi route uniqueness[2m >[0m[1m does not register duplicate method+path handlers[0m [0m[2m[1.00ms[0m[2m][0m
 [0m
 test/unit/deploy-strategy.test.ts:
-[0m[32m✓[0m [0mresolveDeployStrategy[2m >[0m[1m defaults to git for legacy metadata[0m
+[0m[32m✓[0m [0mresolveDeployStrategy[2m >[0m[1m defaults to git for legacy metadata[0m [0m[2m[1.00ms[0m[2m][0m
 [0m[32m✓[0m [0mresolveDeployStrategy[2m >[0m[1m respects explicit image strategy[0m
 [0m[32m✓[0m [0mresolveDeployStrategy[2m >[0m[1m respects explicit git strategy[0m
-[0m[32m✓[0m [0mresolveDeployStrategy[2m >[0m[1m falls back to git on invalid strategy strings[0m
+[0m[32m✓[0m [0mresolveDeployStrategy[2m >[0m[1m falls back to git on invalid strategy strings[0m [0m[2m[1.00ms[0m[2m][0m
 [0m
 test/unit/docker-command-guards.test.ts:
 [0m[32m✓[0m [0mdocker command guards[2m >[0m[1m allows expected docker subcommands[0m
-[0m[32m✓[0m [0mdocker command guards[2m >[0m[1m blocks unsupported docker subcommands[0m
+[0m[32m✓[0m [0mdocker command guards[2m >[0m[1m blocks unsupported docker subcommands[0m [0m[2m[1.00ms[0m[2m][0m
 [0m[32m✓[0m [0mdocker command guards[2m >[0m[1m blocks dangerous docker run privilege flags[0m
 [0m[32m✓[0m [0mcompose command guards[2m >[0m[1m allows compose up/down patterns[0m
 [0m[32m✓[0m [0mcompose command guards[2m >[0m[1m blocks unsupported compose operations[0m
 [0m
 test/unit/systemd-validation.test.ts:
-[0m[32m✓[0m [0msystemd input validation[2m >[0m[1m accepts a valid service name[0m
+[0m[32m✓[0m [0msystemd input validation[2m >[0m[1m accepts a valid service name[0m [0m[2m[1.00ms[0m[2m][0m
 [0m[32m✓[0m [0msystemd input validation[2m >[0m[1m rejects an invalid service name[0m
-[0m[32m✓[0m [0msystemd input validation[2m >[0m[1m accepts valid create service inputs[0m [0m[2m[1.00ms[0m[2m][0m
-[0m[32m✓[0m [0msystemd input validation[2m >[0m[1m rejects multiline exec_start inputs[0m
+[0m[32m✓[0m [0msystemd input validation[2m >[0m[1m accepts valid create service inputs[0m
+[0m[32m✓[0m [0msystemd input validation[2m >[0m[1m rejects multiline exec_start inputs[0m [0m[2m[1.00ms[0m[2m][0m
 [0m[32m✓[0m [0msystemd input validation[2m >[0m[1m rejects relative working directory[0m
 [0m
 test/unit/deployment-cancel-handlers.test.ts:
-[DeploymentLogger] Started stream: test-cancel-1778759231904
+[DeploymentLogger] Started stream: test-cancel-1778761356117
 Deployment cancelled by user
-[DeploymentLogger] Deployment cancelled: test-cancel-1778759231904
-[DeploymentLogger] Ended stream: test-cancel-1778759231904
-[0m[32m✓[0m [0mdeployment cancellation handlers[2m >[0m[1m invokes registered handlers when deployment is cancelled[0m [0m[2m[1.00ms[0m[2m][0m
-[DeploymentLogger] Started stream: test-unregister-1778759231906
+[DeploymentLogger] Deployment cancelled: test-cancel-1778761356117
+[DeploymentLogger] Ended stream: test-cancel-1778761356117
+[0m[32m✓[0m [0mdeployment cancellation handlers[2m >[0m[1m invokes registered handlers when deployment is cancelled[0m [0m[2m[8.00ms[0m[2m][0m
+[DeploymentLogger] Started stream: test-unregister-1778761356124
 Deployment cancelled by user
-[DeploymentLogger] Deployment cancelled: test-unregister-1778759231906
-[DeploymentLogger] Ended stream: test-unregister-1778759231906
-[0m[32m✓[0m [0mdeployment cancellation handlers[2m >[0m[1m unregistered handler is not invoked[0m [0m[2m[1.00ms[0m[2m][0m
+[DeploymentLogger] Deployment cancelled: test-unregister-1778761356124
+[DeploymentLogger] Ended stream: test-unregister-1778761356124
+[0m[32m✓[0m [0mdeployment cancellation handlers[2m >[0m[1m unregistered handler is not invoked[0m
 
-[0m[32m 59 pass[0m
+[0m[32m 62 pass[0m
 [0m[2m 0 fail[0m
- 120 expect() calls
-Ran 59 tests across 20 files. [0m[2m[[1m304.00ms[0m[2m][0m
+ 125 expect() calls
+Ran 62 tests across 21 files. [0m[2m[[1m805.00ms[0m[2m][0m
 [0m[2m[35m$[0m [2m[1mbun test test/smoke[0m
 [0m[1mbun test [0m[2mv1.3.12 (700fc117)[0m
 [0m
 test/smoke/api-public-route-smoke.test.ts:
-[0m[32m✓[0m [0mAPI public route smoke[2m >[0m[1m exposes auth/github endpoint without requiring prior session[0m [0m[2m[[1m34.00ms[0m[2m][0m
+[0m[32m✓[0m [0mAPI public route smoke[2m >[0m[1m exposes auth/github endpoint without requiring prior session[0m [0m[2m[[1m76.00ms[0m[2m][0m
 [0m
 test/smoke/cli-smoke.test.ts:
-[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m prints help output[0m [0m[2m[[1m171.00ms[0m[2m][0m
-[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m prints version output[0m [0m[2m[[1m167.00ms[0m[2m][0m
-[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m fails on unknown command[0m [0m[2m[[1m161.00ms[0m[2m][0m
-[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m exposes system update command[0m [0m[2m[[1m172.00ms[0m[2m][0m
-[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m does not expose unsupported deploy trigger flags[0m [0m[2m[[1m195.00ms[0m[2m][0m
-[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m does not expose unsupported github import webhook toggle[0m [0m[2m[[1m162.00ms[0m[2m][0m
-[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m exposes dual rollback targeting for git and image strategies[0m [0m[2m[[1m161.00ms[0m[2m][0m
-[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m fails fast when --push-image is missing required companion options[0m [0m[2m[[1m166.00ms[0m[2m][0m
+[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m prints help output[0m [0m[2m[[1m314.00ms[0m[2m][0m
+[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m prints version output[0m [0m[2m[[1m340.00ms[0m[2m][0m
+[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m fails on unknown command[0m [0m[2m[[1m284.00ms[0m[2m][0m
+[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m exposes system update command[0m [0m[2m[[1m194.00ms[0m[2m][0m
+[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m does not expose unsupported deploy trigger flags[0m [0m[2m[[1m186.00ms[0m[2m][0m
+[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m does not expose unsupported github import webhook toggle[0m [0m[2m[[1m229.00ms[0m[2m][0m
+[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m exposes dual rollback targeting for git and image strategies[0m [0m[2m[[1m249.00ms[0m[2m][0m
+[0m[32m✓[0m [0mCLI smoke[2m >[0m[1m fails fast when --push-image is missing required companion options[0m [0m[2m[[1m259.00ms[0m[2m][0m
 [0m
 test/smoke/api-oauth-security-smoke.test.ts:
-[0m[32m✓[0m [0mAPI OAuth/session security smoke[2m >[0m[1m rejects github callback without state parameter[0m [0m[2m[3.00ms[0m[2m][0m
-[0m[32m✓[0m [0mAPI OAuth/session security smoke[2m >[0m[1m rejects github callback with unrecognized state parameter[0m [0m[2m[3.00ms[0m[2m][0m
+[0m[32m✓[0m [0mAPI OAuth/session security smoke[2m >[0m[1m rejects github callback without state parameter[0m [0m[2m[4.00ms[0m[2m][0m
+[0m[32m✓[0m [0mAPI OAuth/session security smoke[2m >[0m[1m rejects github callback with unrecognized state parameter[0m [0m[2m[2.00ms[0m[2m][0m
 [0m[32m✓[0m [0mAPI OAuth/session security smoke[2m >[0m[1m sets secure session cookie attributes on https logout responses[0m [0m[2m[1.00ms[0m[2m][0m
-[0m[32m✓[0m [0mAPI OAuth/session security smoke[2m >[0m[1m rate limits repeated oauth login entry requests per client IP[0m [0m[2m[4.00ms[0m[2m][0m
+[0m[32m✓[0m [0mAPI OAuth/session security smoke[2m >[0m[1m rate limits repeated oauth login entry requests per client IP[0m [0m[2m[[1m50.00ms[0m[2m][0m
 [0m
 test/smoke/api-auth-smoke.test.ts:
 [0m[32m✓[0m [0mAPI auth smoke[2m >[0m[1m rejects protected routes without authentication[0m [0m[2m[1.00ms[0m[2m][0m
 [0m[32m✓[0m [0mAPI auth smoke[2m >[0m[1m returns not-authenticated response for auth/me without session cookie[0m [0m[2m[1.00ms[0m[2m][0m
-[0m[32m✓[0m [0mAPI auth smoke[2m >[0m[1m allows logout without auth and clears session cookie[0m
+[0m[32m✓[0m [0mAPI auth smoke[2m >[0m[1m allows logout without auth and clears session cookie[0m [0m[2m[1.00ms[0m[2m][0m
 
 [0m[32m 16 pass[0m
 [0m[2m 0 fail[0m
  63 expect() calls
-Ran 16 tests across 4 files. [0m[2m[[1m1.51s[0m[2m][0m
+Ran 16 tests across 4 files. [0m[2m[[1m2.38s[0m[2m][0m

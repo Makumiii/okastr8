@@ -10,6 +10,8 @@ import { addGitHubCommands } from "./commands/github-cli";
 import { addMetricsCommands } from "./commands/metrics-cli";
 import { addTunnelCommands } from "./commands/tunnel";
 import { addRegistryCommands } from "./commands/registry";
+import { addLoginCommand } from "./commands/login";
+import { addDashboardCommands } from "./commands/dashboard";
 import { installConsoleLogger, logPaths } from "./utils/structured-logger";
 
 const program = new Command();
@@ -27,6 +29,8 @@ program
     .description("CLI for orchestrating server environments and deployments")
     .version("0.0.1");
 
+addLoginCommand(program);
+addDashboardCommands(program);
 addSystemdCommands(program);
 addUserCommands(program); // Linux user management
 addOrchestrateCommand(program);

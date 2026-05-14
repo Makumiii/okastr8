@@ -3,38 +3,42 @@
     import { Card } from "$lib/components/ui";
     import { onMount } from "svelte";
     import Okastr8Logo from "$lib/components/Okastr8Logo.svelte";
-    import { Github } from "lucide-svelte";
 
     let isLoading = $state(false);
     let error = $state("");
+    let token = $state("");
 
-    const errorMessages: Record<string, string> = {
-        github_admin_not_set:
-            "GitHub admin not set. Run okastr8 github connect on the server first.",
-        github_not_allowed: "Your GitHub account isn't allowed to access this dashboard.",
-        github_not_configured:
-            "GitHub OAuth is not configured. Add client_id/client_secret to system.yaml.",
-        github_auth_failed: "GitHub authentication failed. Try again.",
-        no_code: "GitHub authentication failed. Try again.",
-        config_missing:
-            "GitHub OAuth is missing configuration. Add client_id/client_secret to system.yaml.",
-        token_exchange_failed:
-            "GitHub authentication failed to exchange token. Try again.",
-        oauth_public_url_missing:
-            "Public URL is required for OAuth in production. Set manager.public_url or tunnel.url in system.yaml.",
-    };
-
-    function handleGitHubLogin() {
-        if (isLoading) return;
+    async function handleTokenLogin(e: Event) {
+        e.preventDefault();
+        if (isLoading || !token) return;
         isLoading = true;
-        window.location.href = "/api/auth/github";
+        error = "";
+
+        try {
+            const res = await fetch("/api/auth/token", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token }),
+            });
+
+            if (res.ok) {
+                window.location.href = "/";
+            } else {
+                const data = await res.json();
+                error = data.message || "Invalid token";
+            }
+        } catch (err: any) {
+            error = "Connection failed";
+        } finally {
+            isLoading = false;
+        }
     }
 
     onMount(() => {
         const params = new URLSearchParams(window.location.search);
         const errorParam = params.get("error");
         if (errorParam && !error) {
-            error = errorMessages[errorParam] || "Authentication failed";
+            error = "Authentication failed. Please try again.";
         }
     });
 </script>
@@ -47,16 +51,24 @@
                 <Okastr8Logo />
             </div>
 
-            <div class="w-full space-y-4">
-                <Button onclick={handleGitHubLogin} class="w-full">
+            <form class="w-full space-y-4" onsubmit={handleTokenLogin}>
+                <p class="text-sm text-[var(--text-muted)] text-center">
+                    Run <code class="bg-[var(--bg-card-hover)] px-1 rounded">okastr8 dashboard token</code> on your server to get your login token.
+                </p>
+                <input
+                    type="password"
+                    placeholder="Paste your server token here"
+                    class="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text)] focus:border-[var(--primary)] focus:outline-none"
+                    bind:value={token}
+                />
+                <Button type="submit" class="w-full" disabled={isLoading || !token}>
                     {#if isLoading}
                         <div
-                            class="h-4 w-4 animate-spin rounded-full border-2 border-[var(--primary-ink)] border-t-transparent"
+                            class="h-4 w-4 animate-spin rounded-full border-2 border-[var(--primary-ink)] border-t-transparent mr-2"
                         ></div>
-                        Redirecting...
+                        Verifying...
                     {:else}
-                        <Github size={16} />
-                        Sign in with GitHub
+                        Sign in
                     {/if}
                 </Button>
 
@@ -67,7 +79,8 @@
                         {error}
                     </div>
                 {/if}
-            </div>
+            </form>
         </div>
     </Card>
 </div>
+
