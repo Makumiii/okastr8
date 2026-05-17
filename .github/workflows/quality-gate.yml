@@ -32,7 +32,7 @@ jobs:
               run: bun run gate:prod:no-e2e
 
             - name: Bun Audit
-              run: bun pm audit --audit-level=high
+              run: bun audit --audit-level=high
 
             - name: NPM Audit (production deps)
               run: |
