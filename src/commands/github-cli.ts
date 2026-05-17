@@ -14,8 +14,17 @@ import {
 } from "./github";
 import { isCurrentUserAdmin, getAdminUser } from "./auth";
 import { runGithubImportWizard } from "./github-wizard";
+import type { SystemConfig } from "../config";
 
 const SSH_KEY_PATH = join(homedir(), ".ssh", "okastr8_deploy_key");
+
+export function getCliGitHubCallbackUrl(config: Partial<SystemConfig>): string {
+    const baseUrl =
+        config.manager?.public_url?.replace(/\/+$/, "") ||
+        config.tunnel?.url?.replace(/\/+$/, "") ||
+        "http://localhost:41788";
+    return `${baseUrl}/api/github/callback`;
+}
 
 async function requireAdminCli(): Promise<void> {
     const isAdmin = await isCurrentUserAdmin();
@@ -84,8 +93,9 @@ export function addGitHubCommands(program: Command) {
                     return;
                 }
 
-                // Use manager's callback (requires manager to be running)
-                const callbackUrl = `http://localhost:41788/api/github/callback`;
+                const { getSystemConfig } = await import("../config");
+                const systemConfig = await getSystemConfig();
+                const callbackUrl = getCliGitHubCallbackUrl(systemConfig);
 
                 const { getAuthUrlWithState } = await import("./github");
                 const { issueOAuthState } = await import("../utils/oauth-state");
