@@ -57,7 +57,7 @@ RestrictRealtime=true
 SystemCallArchitectures=native
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=/home/$USER/.okastr8 /tmp /var/tmp
+ReadWritePaths=/home/$USER/.okastr8 /tmp /var/tmp /etc/caddy
 EOB
 )
 fi

@@ -10,7 +10,7 @@ describe("systemd manager hardening script", () => {
         expect(script).toContain("UMask=0077");
         expect(script).toContain("PrivateTmp=true");
         expect(script).toContain("ProtectSystem=full");
-        expect(script).toContain("ReadWritePaths=/home/$USER/.okastr8 /tmp /var/tmp");
+        expect(script).toContain("ReadWritePaths=/home/$USER/.okastr8 /tmp /var/tmp /etc/caddy");
         expect(script).toContain(
             "Wants=network-online.target docker.service caddy.service cloudflared.service"
         );
