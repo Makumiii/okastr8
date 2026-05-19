@@ -26,6 +26,79 @@ import { importEnvFile } from "./env-manager";
 
 const APPS_DIR = join(OKASTR8_HOME, "apps");
 
+type PreparedComposeFiles = {
+    composePath: string;
+    composeFiles: string[];
+    overridePath?: string;
+};
+
+export async function resolveDockerEnvFile(
+    envFilePath: string,
+    required: boolean
+): Promise<string | undefined> {
+    if (!existsSync(envFilePath)) {
+        if (required) {
+            throw new Error(`Expected ${envFilePath} to exist after env persistence`);
+        }
+        return undefined;
+    }
+
+    const content = await readFile(envFilePath, "utf-8");
+    if (content.trim().length === 0) {
+        throw new Error(`${envFilePath} is empty`);
+    }
+
+    return envFilePath;
+}
+
+export async function prepareUserComposeFiles(
+    releasePath: string,
+    envFilePath: string | undefined,
+    log: (msg: string) => void
+): Promise<PreparedComposeFiles> {
+    const composePath = join(releasePath, "docker-compose.yml");
+    const composeFiles = [composePath];
+
+    if (!envFilePath) {
+        return { composePath, composeFiles };
+    }
+
+    await resolveDockerEnvFile(envFilePath, true);
+
+    log("   Injecting environment variables via override file...");
+    const composeContent = await readFile(composePath, "utf-8");
+    const composeYaml = yaml.load(composeContent) as any;
+    const services = composeYaml?.services;
+
+    if (!services || typeof services !== "object" || Array.isArray(services)) {
+        throw new Error(`${composePath} must define services before env_file can be injected`);
+    }
+
+    const override = {
+        services: {} as Record<string, { env_file: string[] }>,
+    };
+
+    for (const service of Object.keys(services)) {
+        override.services[service] = {
+            env_file: [envFilePath],
+        };
+    }
+
+    if (Object.keys(override.services).length === 0) {
+        throw new Error(`${composePath} does not define any services`);
+    }
+
+    const overridePath = join(releasePath, "docker-compose.override.yml");
+    await writeFile(overridePath, yaml.dump(override));
+    log(`   Created override: ${overridePath}`);
+
+    return {
+        composePath,
+        composeFiles: [...composeFiles, overridePath],
+        overridePath,
+    };
+}
+
 /**
  * Detect deployment strategy
  */
@@ -104,26 +177,44 @@ export async function deployWithDocker(
     const { appName, releasePath, versionId, onProgress, deploymentId } = options;
     const log = onProgress || ((msg: string) => console.log(msg));
 
-    // 1. Handle Environment Variables
-    const { saveEnvVars } = await import("./env-manager");
+    let envFilePath: string | undefined;
 
-    // A. Env file from repository (cloned code) - Loaded FIRST
-    const repoEnvPath = join(releasePath, ".env");
-    if (existsSync(repoEnvPath)) {
-        log("Importing .env from repository...");
-        await importEnvFile(appName, repoEnvPath);
+    try {
+        // 1. Handle Environment Variables
+        const { saveEnvVars } = await import("./env-manager");
+
+        // A. Env file from repository (cloned code) - Loaded FIRST
+        const repoEnvPath = join(releasePath, ".env");
+        const hasRepoEnv = existsSync(repoEnvPath);
+        if (hasRepoEnv) {
+            log("Importing .env from repository...");
+            await importEnvFile(appName, repoEnvPath);
+        }
+
+        // B. Manual env vars from options (UI/Manual trigger) - Loaded SECOND (overwrites)
+        const manualEnvCount = options.env ? Object.keys(options.env).length : 0;
+        if (options.env && manualEnvCount > 0) {
+            log(`Applying ${manualEnvCount} manual environment variables...`);
+            await saveEnvVars(appName, options.env);
+        }
+
+        // C. Determine final env file to use for Docker
+        // We always prefer the persistent okastr8 one if it exists.
+        const persistentEnvPath = join(APPS_DIR, appName, ".env.production");
+        envFilePath = await resolveDockerEnvFile(
+            persistentEnvPath,
+            hasRepoEnv || manualEnvCount > 0
+        );
+        if (envFilePath) {
+            log(`   Environment file: ${envFilePath}`);
+        }
+    } catch (error: any) {
+        return {
+            success: false,
+            message: `Failed to prepare Docker environment file: ${error.message}`,
+            config,
+        };
     }
-
-    // B. Manual env vars from options (UI/Manual trigger) - Loaded SECOND (overwrites)
-    if (options.env && Object.keys(options.env).length > 0) {
-        log(`Applying ${Object.keys(options.env).length} manual environment variables...`);
-        await saveEnvVars(appName, options.env);
-    }
-
-    // C. Determine final env file to use for Docker
-    // We always prefer the persistent okastr8 one if it exists
-    const persistentEnvPath = join(APPS_DIR, appName, ".env.production");
-    const envFilePath = existsSync(persistentEnvPath) ? persistentEnvPath : undefined;
 
     // 2. Universal Cleanup: Stop both possible strategies to ensure a clean slate
     // This handles cases where a user switches from Dockerfile to Compose or vice-versa,
@@ -205,45 +296,26 @@ async function deployWithCompose(
     deploymentId?: string
 ): Promise<DeployResult> {
     let composePath: string;
-    let overridePath: string | undefined;
+    let composeFiles: string[];
 
     if (strategy === "auto-compose") {
         log("Generating docker-compose.yml...");
         const files = await saveGeneratedFiles(releasePath, config, appName, envFilePath);
         composePath = files.compose!;
+        composeFiles = [composePath];
         log(`   Generated: ${composePath}`);
     } else {
-        composePath = join(releasePath, "docker-compose.yml");
-        log(`   Using existing: ${composePath}`);
-
-        // Inject env vars via override for user-provided compose
-        if (envFilePath) {
-            try {
-                log("   Injecting environment variables via override file...");
-                const composeContent = await readFile(composePath, "utf-8");
-                const composeYaml = yaml.load(composeContent) as any;
-
-                if (composeYaml && composeYaml.services) {
-                    const services = Object.keys(composeYaml.services);
-                    const override = {
-                        version: composeYaml.version || "3.8",
-                        services: {} as any,
-                    };
-
-                    // Inject env_file into all services
-                    for (const service of services) {
-                        override.services[service] = {
-                            env_file: [envFilePath],
-                        };
-                    }
-
-                    overridePath = join(releasePath, "docker-compose.override.yml");
-                    await writeFile(overridePath, yaml.dump(override));
-                    log(`   Created override: ${overridePath}`);
-                }
-            } catch (e: any) {
-                log(`Failed to generate env override: ${e.message}`);
-            }
+        try {
+            const prepared = await prepareUserComposeFiles(releasePath, envFilePath, log);
+            composePath = prepared.composePath;
+            composeFiles = prepared.composeFiles;
+            log(`   Using existing: ${composePath}`);
+        } catch (e: any) {
+            return {
+                success: false,
+                message: `Failed to prepare user Compose env injection: ${e.message}`,
+                config,
+            };
         }
     }
 
@@ -260,21 +332,12 @@ async function deployWithCompose(
 
     // Start services
     log("Starting services...");
+    log(`   Compose files: ${composeFiles.join(", ")}`);
+    if (envFilePath) {
+        log(`   Compose env file: ${envFilePath}`);
+    }
 
-    // If we have an override, we need to handle it.
-    // Ideally update composeUp to support multiple files, but for now we'll stick to single file or manual merge.
-    // Since we can't easily change composeUp signature without risking other breaks, let's rely on standard compose behavior if possible,
-    // or just accept that the override might be ignored if we strictly pass `-f composePath`.
-    // However, for this fix, we will just proceed with the primary compose path.
-
-    // Note: To properly support overrides, we should update `composeUp` in future to accept string[].
-
-    // For now, proceed with single file deployment
-    const upResult = await composeUp(
-        overridePath ? [composePath, overridePath] : composePath,
-        appName,
-        deploymentId
-    );
+    const upResult = await composeUp(composeFiles, appName, deploymentId, envFilePath);
 
     if (!upResult.success) {
         return {

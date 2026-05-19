@@ -563,17 +563,27 @@ export async function startContainer(
 /**
  * Run docker-compose up
  */
+export function buildComposeUpArgs(
+    composePaths: string | string[],
+    projectName: string,
+    envFilePath?: string
+): string[] {
+    const paths = Array.isArray(composePaths) ? composePaths : [composePaths];
+    const envArgs = envFilePath ? ["--env-file", envFilePath] : [];
+    const fileArgs = paths.flatMap((p) => ["-f", p]);
+
+    return [...envArgs, ...fileArgs, "-p", projectName, "up", "-d", "--build"];
+}
+
 export async function composeUp(
     composePaths: string | string[],
     projectName: string,
-    deploymentId?: string
+    deploymentId?: string,
+    envFilePath?: string
 ): Promise<{ success: boolean; message: string }> {
     try {
-        const paths = Array.isArray(composePaths) ? composePaths : [composePaths];
-        const fileArgs = paths.flatMap((p) => ["-f", p]);
-
         const result = await composeCommand(
-            [...fileArgs, "-p", projectName, "up", "-d", "--build"],
+            buildComposeUpArgs(composePaths, projectName, envFilePath),
             process.cwd(),
             { deploymentId }
         );

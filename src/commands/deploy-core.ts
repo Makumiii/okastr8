@@ -294,12 +294,24 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     }
 
     // 7. Update Caddy configuration (Reverse Proxy)
-    try {
-        step("proxy", "Updating reverse proxy configuration...");
-        const { genCaddyFile } = await import("../utils/genCaddyFile.ts");
-        await genCaddyFile(log);
-    } catch (e) {
-        log(`Failed to update Caddy: ${e instanceof Error ? e.message : String(e)}`);
+    if (config.domain && !config.tunnel_routing) {
+        try {
+            step("proxy", "Updating reverse proxy configuration...");
+            const { genCaddyFile } = await import("../utils/genCaddyFile.ts");
+            await genCaddyFile(log);
+        } catch (e) {
+            const message = `Failed to update Caddy: ${e instanceof Error ? e.message : String(e)}`;
+            fail(message);
+            return {
+                success: false,
+                message,
+                config,
+            };
+        }
+    } else if (config.tunnel_routing) {
+        step("proxy", "Skipping Caddy route generation for Cloudflare Tunnel routing...");
+    } else {
+        step("proxy", "Skipping reverse proxy configuration (no domain configured)...");
     }
 
     success(`Successfully deployed ${appName} (v${versionId})`);
