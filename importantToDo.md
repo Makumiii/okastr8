@@ -16,25 +16,25 @@ Required patch:
 1. Add webhook provisioning to the GitHub import/redeploy flow and/or `okastr8 app webhook <app> on`.
 2. Generate a strong `manager.github.webhook_secret` when missing and persist it in `system.yaml`.
 3. Create or update the GitHub repository webhook via the GitHub API:
-   - URL: `${manager.public_url || tunnel.url}/api/github/webhook`
-   - Content type: `json`
-   - Secret: `manager.github.webhook_secret`
-   - Events: `push`
-   - Active: `true`
+    - URL: `${manager.public_url || tunnel.url}/api/github/webhook`
+    - Content type: `json`
+    - Secret: `manager.github.webhook_secret`
+    - Events: `push`
+    - Active: `true`
 4. Make provisioning idempotent:
-   - Reuse an existing hook pointing at the same callback URL.
-   - Update URL, secret, events, and active flag when stale.
-   - Avoid creating duplicate hooks.
+    - Reuse an existing hook pointing at the same callback URL.
+    - Update URL, secret, events, and active flag when stale.
+    - Avoid creating duplicate hooks.
 5. Surface webhook health in CLI/dashboard:
-   - Show whether the repo hook exists.
-   - Show whether the app has auto-deploy enabled and which branch is tracked.
-   - Show the last GitHub hook delivery status when available.
+    - Show whether the repo hook exists.
+    - Show whether the app has auto-deploy enabled and which branch is tracked.
+    - Show the last GitHub hook delivery status when available.
 6. Add tests for:
-   - Missing webhook secret generation.
-   - Existing hook update.
-   - Duplicate hook avoidance.
-   - `app webhook on` provisioning behavior.
-   - Failure messaging when the GitHub token lacks hook permissions.
+    - Missing webhook secret generation.
+    - Existing hook update.
+    - Duplicate hook avoidance.
+    - `app webhook on` provisioning behavior.
+    - Failure messaging when the GitHub token lacks hook permissions.
 
 Relevant code paths:
 

@@ -105,9 +105,7 @@ export function planGitHubWebhookOperation(
 
     const events = hook.events || [];
     const isCurrent =
-        hook.active === true &&
-        events.includes("push") &&
-        hook.config?.content_type === "json";
+        hook.active === true && events.includes("push") && hook.config?.content_type === "json";
 
     return isCurrent ? { action: "exists", hook } : { action: "update", hook };
 }
