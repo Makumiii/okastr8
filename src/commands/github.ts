@@ -4,7 +4,8 @@ import { homedir } from "os";
 import { readFile, writeFile, mkdir, rm } from "fs/promises";
 import { existsSync } from "fs";
 import { runCommand } from "../utils/command";
-import { randomUUID } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
+import type { SystemConfig } from "../config";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,6 +24,36 @@ export interface GitHubConfig {
     username?: string;
     connectedAt?: string;
 }
+
+export interface GitHubWebhook {
+    id: number;
+    active?: boolean;
+    events?: string[];
+    config?: {
+        url?: string;
+        content_type?: string;
+    };
+    last_response?: {
+        code?: number | null;
+        status?: string | null;
+        message?: string | null;
+    };
+}
+
+export type GitHubWebhookProvisionAction = "exists" | "created" | "updated";
+
+export interface GitHubWebhookProvisionResult {
+    action: GitHubWebhookProvisionAction;
+    hook: GitHubWebhook;
+    callbackUrl: string;
+}
+
+type WebhookPlan =
+    | { action: "exists"; hook: GitHubWebhook }
+    | { action: "update"; hook: GitHubWebhook }
+    | { action: "create"; hook?: undefined };
+
+type FetchLike = typeof fetch;
 
 export interface GitHubRepo {
     id: number;
@@ -49,6 +80,247 @@ export interface ImportOptions {
     startCommand?: string;
     autoDetect?: boolean;
     env?: Record<string, string>;
+}
+
+export function getGitHubWebhookCallbackUrl(config: Partial<SystemConfig>): string {
+    const baseUrl =
+        config.manager?.public_url?.replace(/\/+$/, "") ||
+        config.tunnel?.url?.replace(/\/+$/, "") ||
+        "http://localhost:41788";
+    return `${baseUrl}/api/github/webhook`;
+}
+
+export function planGitHubWebhookOperation(
+    hooks: GitHubWebhook[],
+    callbackUrl: string
+): WebhookPlan {
+    const normalizedCallbackUrl = callbackUrl.replace(/\/+$/, "");
+    const hook = hooks.find(
+        (candidate) => candidate.config?.url?.replace(/\/+$/, "") === normalizedCallbackUrl
+    );
+
+    if (!hook) {
+        return { action: "create" };
+    }
+
+    const events = hook.events || [];
+    const isCurrent =
+        hook.active === true &&
+        events.includes("push") &&
+        hook.config?.content_type === "json";
+
+    return isCurrent ? { action: "exists", hook } : { action: "update", hook };
+}
+
+export async function resolveGitHubWebhookSecret(
+    config: Partial<SystemConfig>,
+    persistSecret: (secret: string) => Promise<void>,
+    generateSecret: () => string = () => randomBytes(32).toString("hex")
+): Promise<string> {
+    const existing = config.manager?.github?.webhook_secret;
+    if (existing) {
+        return existing;
+    }
+
+    const secret = generateSecret();
+    await persistSecret(secret);
+    return secret;
+}
+
+async function parseGitHubJson(response: Response): Promise<any> {
+    const text = await response.text();
+    if (!text) {
+        return {};
+    }
+    try {
+        return JSON.parse(text);
+    } catch {
+        return { message: text };
+    }
+}
+
+async function assertGitHubResponse(response: Response): Promise<any> {
+    const body = await parseGitHubJson(response);
+    if (!response.ok) {
+        const message = body?.message || response.statusText || "Unknown GitHub API error";
+        throw new Error(`GitHub webhook API failed: ${response.status} ${message}`);
+    }
+    return body;
+}
+
+function githubWebhookPayload(callbackUrl: string, secret: string) {
+    return {
+        name: "web",
+        active: true,
+        events: ["push"],
+        config: {
+            url: callbackUrl,
+            content_type: "json",
+            secret,
+        },
+    };
+}
+
+export async function provisionGitHubRepositoryWebhook(options: {
+    accessToken: string;
+    repoFullName: string;
+    callbackUrl: string;
+    secret: string;
+    fetchImpl?: FetchLike;
+}): Promise<GitHubWebhookProvisionResult> {
+    const fetchImpl = options.fetchImpl || fetch;
+    const headers = {
+        Authorization: `Bearer ${options.accessToken}`,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "User-Agent": "okastr8",
+    };
+
+    const listResponse = await fetchImpl(`${GITHUB_API}/repos/${options.repoFullName}/hooks`, {
+        headers,
+    });
+    const hooks = (await assertGitHubResponse(listResponse)) as GitHubWebhook[];
+    const plan = planGitHubWebhookOperation(hooks, options.callbackUrl);
+
+    if (plan.action === "exists") {
+        return { action: "exists", hook: plan.hook, callbackUrl: options.callbackUrl };
+    }
+
+    const payload = githubWebhookPayload(options.callbackUrl, options.secret);
+    if (plan.action === "update") {
+        const updateResponse = await fetchImpl(
+            `${GITHUB_API}/repos/${options.repoFullName}/hooks/${plan.hook.id}`,
+            {
+                method: "PATCH",
+                headers,
+                body: JSON.stringify(payload),
+            }
+        );
+        const hook = (await assertGitHubResponse(updateResponse)) as GitHubWebhook;
+        return { action: "updated", hook, callbackUrl: options.callbackUrl };
+    }
+
+    const createResponse = await fetchImpl(`${GITHUB_API}/repos/${options.repoFullName}/hooks`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+    });
+    const hook = (await assertGitHubResponse(createResponse)) as GitHubWebhook;
+    return { action: "created", hook, callbackUrl: options.callbackUrl };
+}
+
+export function getGitHubRepoFullNameFromUrl(repoUrl: string): string | null {
+    const match = repoUrl.match(/github\.com[/:]([^/]+\/[^/.]+)(?:\.git)?$/i);
+    return match?.[1] || null;
+}
+
+export async function provisionAppGitHubWebhook(appName: string): Promise<{
+    success: boolean;
+    message: string;
+    result?: GitHubWebhookProvisionResult;
+}> {
+    const appMetaPath = join(APPS_DIR, appName, "app.json");
+    if (!existsSync(appMetaPath)) {
+        throw new Error(`App ${appName} not found or corrupted`);
+    }
+
+    const metadata = JSON.parse(await readFile(appMetaPath, "utf-8"));
+    const repoUrl = String(metadata.gitRepo || "");
+    const repoFullName = getGitHubRepoFullNameFromUrl(repoUrl);
+    if (!repoFullName) {
+        return {
+            success: false,
+            message: `App ${appName} is not linked to a GitHub repository`,
+        };
+    }
+
+    const config = await getSystemConfig();
+    const accessToken = config.manager?.github?.access_token;
+    if (!accessToken) {
+        return {
+            success: false,
+            message: "GitHub is not connected; connect GitHub before enabling webhook auto-deploy",
+        };
+    }
+
+    const callbackUrl = getGitHubWebhookCallbackUrl(config);
+    const secret = await resolveGitHubWebhookSecret(config, async (webhookSecret) => {
+        await saveSystemConfig({
+            manager: {
+                github: {
+                    webhook_secret: webhookSecret,
+                },
+            },
+        });
+    });
+
+    const result = await provisionGitHubRepositoryWebhook({
+        accessToken,
+        repoFullName,
+        callbackUrl,
+        secret,
+    });
+
+    return {
+        success: true,
+        message: `GitHub webhook ${result.action} for ${repoFullName}: ${callbackUrl}`,
+        result,
+    };
+}
+
+export async function getAppGitHubWebhookStatus(appName: string): Promise<{
+    success: boolean;
+    message: string;
+    callbackUrl?: string;
+    hook?: GitHubWebhook;
+}> {
+    const appMetaPath = join(APPS_DIR, appName, "app.json");
+    if (!existsSync(appMetaPath)) {
+        throw new Error(`App ${appName} not found or corrupted`);
+    }
+
+    const metadata = JSON.parse(await readFile(appMetaPath, "utf-8"));
+    const repoUrl = String(metadata.gitRepo || "");
+    const repoFullName = getGitHubRepoFullNameFromUrl(repoUrl);
+    if (!repoFullName) {
+        return { success: false, message: "Not a GitHub-backed app" };
+    }
+
+    const config = await getSystemConfig();
+    const accessToken = config.manager?.github?.access_token;
+    const callbackUrl = getGitHubWebhookCallbackUrl(config);
+    if (!accessToken) {
+        return { success: false, message: "GitHub is not connected", callbackUrl };
+    }
+
+    const response = await fetch(`${GITHUB_API}/repos/${repoFullName}/hooks`, {
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: "application/vnd.github+json",
+            "User-Agent": "okastr8",
+        },
+    });
+    const hooks = (await assertGitHubResponse(response)) as GitHubWebhook[];
+    const plan = planGitHubWebhookOperation(hooks, callbackUrl);
+    const hook = plan.hook;
+
+    if (!hook) {
+        return {
+            success: false,
+            message: `No GitHub webhook configured for ${repoFullName}`,
+            callbackUrl,
+        };
+    }
+
+    return {
+        success: plan.action === "exists",
+        message:
+            plan.action === "exists"
+                ? `GitHub webhook active for ${repoFullName}`
+                : `GitHub webhook exists but needs update for ${repoFullName}`,
+        callbackUrl,
+        hook,
+    };
 }
 
 type AppMetadataReconcileResult = {
@@ -1084,7 +1356,18 @@ export async function finalizeRepoImport(
         // 6. Cleanup old versions
         await cleanOldVersions(appName);
 
-        // 7. Setup Webhook (skipped for now for brevity, or can be added back if needed)
+        // 7. Setup webhook for future push-based deployments. Do not roll back a successful
+        // deployment if GitHub hook provisioning fails; surface the problem for the operator.
+        try {
+            const webhookResult = await provisionAppGitHubWebhook(appName);
+            if (webhookResult.success) {
+                log(webhookResult.message);
+            } else {
+                log(`Webhook setup skipped: ${webhookResult.message}`);
+            }
+        } catch (error: any) {
+            log(`Webhook setup failed: ${error.message}`);
+        }
 
         await logActivity("deploy", {
             id: activityId,

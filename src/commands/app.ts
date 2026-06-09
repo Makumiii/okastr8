@@ -330,7 +330,10 @@ export async function getAppMetadata(appName: string): Promise<AppConfig & { rep
     try {
         const content = await readFile(metadataPath, "utf-8");
         return JSON.parse(content);
-    } catch {
+    } catch (error: any) {
+        if (error instanceof Error && !error.message.includes("ENOENT")) {
+            throw error;
+        }
         throw new Error(`App ${appName} not found or corrupted`);
     }
 }
@@ -527,11 +530,20 @@ export async function setAppWebhookAutoDeploy(appName: string, enabled: boolean)
     try {
         const content = await readFile(metadataPath, "utf-8");
         const metadata = JSON.parse(content);
+        let provisionMessage = "";
+        if (enabled && metadata.gitRepo && String(metadata.gitRepo).includes("github.com")) {
+            const { provisionAppGitHubWebhook } = await import("./github");
+            const provisionResult = await provisionAppGitHubWebhook(appName);
+            if (!provisionResult.success) {
+                throw new Error(provisionResult.message);
+            }
+            provisionMessage = `. ${provisionResult.message}`;
+        }
         metadata.webhookAutoDeploy = enabled;
         await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
         return {
             success: true,
-            message: `Webhook auto-deploy ${enabled ? "enabled" : "disabled"} for ${appName}`,
+            message: `Webhook auto-deploy ${enabled ? "enabled" : "disabled"} for ${appName}${provisionMessage}`,
         };
     } catch {
         throw new Error(`App ${appName} not found or corrupted`);
@@ -1157,6 +1169,23 @@ export function addAppCommands(program: Command) {
                         `Webhook auto-deploy for ${name}: ${enabled ? "ENABLED" : "DISABLED"}`
                     );
                     console.log(`Webhook branch for ${name}: ${branch}`);
+                    if (config?.gitRepo && String(config.gitRepo).includes("github.com")) {
+                        try {
+                            const { getAppGitHubWebhookStatus } = await import("./github");
+                            const status = await getAppGitHubWebhookStatus(name);
+                            console.log(`Webhook callback: ${status.callbackUrl || "-"}`);
+                            console.log(`GitHub hook: ${status.success ? "OK" : "NOT READY"}`);
+                            console.log(`GitHub hook status: ${status.message}`);
+                            if (status.hook?.last_response) {
+                                const response = status.hook.last_response;
+                                console.log(
+                                    `Last delivery: ${response.code ?? "-"} ${response.status ?? "-"} ${response.message ?? ""}`.trim()
+                                );
+                            }
+                        } catch (error: any) {
+                            console.log(`GitHub hook status: unavailable (${error.message})`);
+                        }
+                    }
                 } else {
                     // Set status
                     const enabled = ["enable", "on", "true", "1"].includes(state.toLowerCase());
