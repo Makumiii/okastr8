@@ -6,6 +6,7 @@ import { existsSync } from "fs";
 import { runCommand } from "../utils/command";
 import { randomBytes, randomUUID } from "crypto";
 import type { SystemConfig } from "../config";
+import { normalizeSourceDir, resolveSourcePath } from "../utils/source-path";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -80,6 +81,7 @@ export interface ImportOptions {
     startCommand?: string;
     autoDetect?: boolean;
     env?: Record<string, string>;
+    sourceDir?: string;
 }
 
 export function getGitHubWebhookCallbackUrl(config: Partial<SystemConfig>): string {
@@ -660,13 +662,16 @@ export async function listBranches(accessToken: string, fullName: string): Promi
 export async function checkRepoConfig(
     accessToken: string,
     fullName: string,
-    ref: string
+    ref: string,
+    sourceDir?: string
 ): Promise<boolean> {
     // Check for okastr8.yaml or okastr8.yml
     const files = ["okastr8.yaml", "okastr8.yml"];
 
     for (const file of files) {
-        const exists = await checkFileExists(accessToken, fullName, file, ref);
+        const normalizedSourceDir = normalizeSourceDir(sourceDir);
+        const repoPath = [normalizedSourceDir, file].filter(Boolean).join("/");
+        const exists = await checkFileExists(accessToken, fullName, repoPath, ref);
         if (exists) return true;
     }
     return false;
@@ -703,7 +708,8 @@ async function getRepoFileContent(
 async function detectRuntimeFromRepo(
     accessToken: string,
     fullName: string,
-    ref: string
+    ref: string,
+    sourceDir?: string
 ): Promise<string | null> {
     const checks: Array<[string, string[]]> = [
         ["node", ["package.json", "package-lock.json"]],
@@ -718,7 +724,9 @@ async function detectRuntimeFromRepo(
     for (const [runtime, files] of checks) {
         for (const file of files) {
             // eslint-disable-next-line no-await-in-loop
-            const exists = await checkFileExists(accessToken, fullName, file, ref);
+            const normalizedSourceDir = normalizeSourceDir(sourceDir);
+            const repoPath = [normalizedSourceDir, file].filter(Boolean).join("/");
+            const exists = await checkFileExists(accessToken, fullName, repoPath, ref);
             if (exists) return runtime;
         }
     }
@@ -729,7 +737,8 @@ async function detectRuntimeFromRepo(
 export async function inspectRepoConfig(
     accessToken: string,
     fullName: string,
-    ref: string
+    ref: string,
+    sourceDir?: string
 ): Promise<{
     hasConfig: boolean;
     config: DetectedConfig;
@@ -737,7 +746,9 @@ export async function inspectRepoConfig(
     hasUserDocker: boolean;
     hasUserCompose: boolean;
 }> {
-    const configFiles = ["okastr8.yaml", "okastr8.yml"];
+    const normalizedSourceDir = normalizeSourceDir(sourceDir);
+    const repoFile = (file: string) => [normalizedSourceDir, file].filter(Boolean).join("/");
+    const configFiles = ["okastr8.yaml", "okastr8.yml"].map(repoFile);
     let configContent: string | null = null;
     let hasConfig = false;
 
@@ -751,12 +762,23 @@ export async function inspectRepoConfig(
         }
     }
 
-    const hasDockerfile = await checkFileExists(accessToken, fullName, "Dockerfile", ref);
-    const hasCompose = await checkFileExists(accessToken, fullName, "docker-compose.yml", ref);
+    const hasDockerfile = await checkFileExists(
+        accessToken,
+        fullName,
+        repoFile("Dockerfile"),
+        ref
+    );
+    const hasCompose = await checkFileExists(
+        accessToken,
+        fullName,
+        repoFile("docker-compose.yml"),
+        ref
+    );
 
     let detectedRuntime: string | undefined;
 
     let config: DetectedConfig = {
+        sourceDir: normalizedSourceDir,
         runtime: "node",
         buildSteps: [],
         startCommand: "",
@@ -770,6 +792,7 @@ export async function inspectRepoConfig(
             const parsed = load(configContent) as any;
             config = {
                 runtime: parsed.runtime || "custom",
+                sourceDir: normalizedSourceDir,
                 buildSteps: normalizeBuildSteps(parsed.build),
                 startCommand: parsed.start || "",
                 port: parsed.port || 3000,
@@ -784,14 +807,19 @@ export async function inspectRepoConfig(
             // keep defaults if parse fails
         }
     } else {
-        const runtime = await detectRuntimeFromRepo(accessToken, fullName, ref);
+        const runtime = await detectRuntimeFromRepo(accessToken, fullName, ref, normalizedSourceDir);
         if (runtime) {
             detectedRuntime = runtime;
             config.runtime = runtime;
         }
 
         if (runtime === "node") {
-            const pkgContent = await getRepoFileContent(accessToken, fullName, "package.json", ref);
+            const pkgContent = await getRepoFileContent(
+                accessToken,
+                fullName,
+                repoFile("package.json"),
+                ref
+            );
             if (pkgContent) {
                 try {
                     const pkg = JSON.parse(pkgContent);
@@ -807,7 +835,7 @@ export async function inspectRepoConfig(
     }
 
     if (!config.runtime || config.runtime === "custom") {
-        const runtime = await detectRuntimeFromRepo(accessToken, fullName, ref);
+        const runtime = await detectRuntimeFromRepo(accessToken, fullName, ref, normalizedSourceDir);
         if (runtime) {
             detectedRuntime = runtime;
             config.runtime = runtime;
@@ -825,6 +853,7 @@ export async function inspectRepoConfig(
 
 // Auto-detection for build configs
 export interface DetectedConfig {
+    sourceDir?: string;
     buildSteps: string[];
     startCommand: string;
     runtime: string;
@@ -912,6 +941,7 @@ export async function prepareRepoImport(
         const repo = await getRepo(githubConfig.accessToken, options.repoFullName);
         const appName = options.appName || repo.name.toLowerCase().replace(/[^a-z0-9-]/g, "-");
         const branch = options.branch || repo.default_branch;
+        const sourceDir = normalizeSourceDir(options.sourceDir);
 
         // Initialize directories
         const appDir = join(APPS_DIR, appName);
@@ -933,6 +963,7 @@ export async function prepareRepoImport(
                         branch: branch,
                         gitBranch: branch,
                         webhookBranch: branch,
+                        sourceDir,
                         created_at: new Date().toISOString(),
                     },
                     null,
@@ -948,6 +979,10 @@ export async function prepareRepoImport(
                     branch
                 );
                 if (dirty) {
+                    await writeFile(appMetaPath, JSON.stringify(nextMeta, null, 2));
+                }
+                if (nextMeta.sourceDir !== sourceDir) {
+                    nextMeta.sourceDir = sourceDir;
                     await writeFile(appMetaPath, JSON.stringify(nextMeta, null, 2));
                 }
             } catch {
@@ -997,12 +1032,14 @@ export async function prepareRepoImport(
 
         // Detect Config
         log("Detecting configuration...");
+        const sourcePath = resolveSourcePath(releasePath, sourceDir);
         const configPathCandidates = [
-            join(releasePath, "okastr8.yaml"),
-            join(releasePath, "okastr8.yml"),
+            join(sourcePath, "okastr8.yaml"),
+            join(sourcePath, "okastr8.yml"),
         ];
         const configPath = configPathCandidates.find((path) => existsSync(path));
         let detectedConfig: DetectedConfig = {
+            sourceDir,
             runtime: "node", // Default
             buildSteps: [],
             startCommand: "",
@@ -1018,6 +1055,7 @@ export async function prepareRepoImport(
                 const configContent = await readFile(configPath, "utf-8");
                 const config = load(configContent) as any;
                 detectedConfig = {
+                    sourceDir,
                     runtime: config.runtime || "custom",
                     buildSteps: normalizeBuildSteps(config.build),
                     startCommand: config.start || "",
@@ -1036,14 +1074,14 @@ export async function prepareRepoImport(
             log("ℹ️ No okastr8.yaml found - attempting auto-detection");
             try {
                 const { detectRuntime } = await import("../utils/runtime-detector");
-                const runtime = await detectRuntime(releasePath);
+                const runtime = await detectRuntime(sourcePath);
                 detectedRuntime = runtime;
                 detectedConfig.runtime = runtime;
                 log(`   Detected runtime: ${runtime}`);
 
                 // Basic heuristic defaults based on runtime
                 if (runtime === "node") {
-                    const pkgJsonPath = join(releasePath, "package.json");
+                    const pkgJsonPath = join(sourcePath, "package.json");
                     if (existsSync(pkgJsonPath)) {
                         const pkg = JSON.parse(await readFile(pkgJsonPath, "utf-8"));
                         detectedConfig.buildSteps = pkg.scripts?.build
@@ -1062,8 +1100,8 @@ export async function prepareRepoImport(
         // Merge with options if provided (e.g. from previous context)
         if (options.env) detectedConfig.env = { ...detectedConfig.env, ...options.env };
 
-        const hasDockerfile = existsSync(join(releasePath, "Dockerfile"));
-        const hasCompose = existsSync(join(releasePath, "docker-compose.yml"));
+        const hasDockerfile = existsSync(join(sourcePath, "Dockerfile"));
+        const hasCompose = existsSync(join(sourcePath, "docker-compose.yml"));
         const hasUserDocker = hasDockerfile || hasCompose;
 
         await updateVersionStatus(appName, versionId, "pending", "Waiting for configuration");
@@ -1117,6 +1155,7 @@ export async function finalizeRepoImport(
     const appDir = join(APPS_DIR, appName);
     const appMetaPath = join(appDir, "app.json");
     const releasePath = join(appDir, "releases", `v${versionId}`);
+    const sourcePath = resolveSourcePath(releasePath, config.sourceDir);
     const activityId = deploymentId ?? randomUUID();
     const startTime = Date.now();
 
@@ -1147,8 +1186,8 @@ export async function finalizeRepoImport(
 
             // Check for compose files to clean up
             const composeFiles = [
-                join(releasePath, "docker-compose.yml"),
-                join(releasePath, "docker-compose.generated.yml"),
+                join(sourcePath, "docker-compose.yml"),
+                join(sourcePath, "docker-compose.generated.yml"),
             ];
             for (const f of composeFiles) {
                 if (existsSync(f)) {
@@ -1189,6 +1228,7 @@ export async function finalizeRepoImport(
         try {
             const { dump } = await import("js-yaml");
             const yamlContent = dump({
+                source_dir: config.sourceDir,
                 runtime: config.runtime,
                 build: config.buildSteps,
                 start: config.startCommand,
@@ -1205,7 +1245,7 @@ export async function finalizeRepoImport(
                       }
                     : undefined,
             });
-            await writeFile(join(releasePath, "okastr8.yaml"), yamlContent);
+            await writeFile(join(sourcePath, "okastr8.yaml"), yamlContent);
             log(" Configuration saved to release");
         } catch (e: any) {
             await logActivity("deploy", {
@@ -1226,11 +1266,11 @@ export async function finalizeRepoImport(
 
         // 2. Validate Runtime (skip when deployment is Dockerfile/Compose driven)
         const hasDockerManagedBuild =
-            existsSync(join(releasePath, "Dockerfile")) ||
-            existsSync(join(releasePath, "docker-compose.yml")) ||
-            existsSync(join(releasePath, "docker-compose.yaml")) ||
-            existsSync(join(releasePath, "compose.yml")) ||
-            existsSync(join(releasePath, "compose.yaml"));
+            existsSync(join(sourcePath, "Dockerfile")) ||
+            existsSync(join(sourcePath, "docker-compose.yml")) ||
+            existsSync(join(sourcePath, "docker-compose.yaml")) ||
+            existsSync(join(sourcePath, "compose.yml")) ||
+            existsSync(join(sourcePath, "compose.yaml"));
 
         const supportedRuntimes = ["node", "python", "go", "bun", "deno"];
         if (!hasDockerManagedBuild && supportedRuntimes.includes(config.runtime)) {
@@ -1272,7 +1312,7 @@ export async function finalizeRepoImport(
                 const buildResult = await runCommand(
                     "bash",
                     ["-c", step],
-                    releasePath,
+                    sourcePath,
                     undefined,
                     deploymentId ? { deploymentId } : undefined
                 );
@@ -1304,6 +1344,7 @@ export async function finalizeRepoImport(
         const deployResult = await deployFromPath({
             appName,
             releasePath,
+            sourceDir: config.sourceDir,
             versionId,
             env: config.env,
             onProgress: log,

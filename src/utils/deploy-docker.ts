@@ -23,6 +23,7 @@ import {
 } from "../commands/docker";
 import { OKASTR8_HOME } from "../config";
 import { importEnvFile } from "./env-manager";
+import { resolveSourcePath } from "./source-path";
 
 const APPS_DIR = join(OKASTR8_HOME, "apps");
 
@@ -176,6 +177,7 @@ export async function deployWithDocker(
 ): Promise<DeployResult> {
     const { appName, releasePath, versionId, onProgress, deploymentId } = options;
     const log = onProgress || ((msg: string) => console.log(msg));
+    const sourcePath = options.sourcePath || resolveSourcePath(releasePath, config.sourceDir);
 
     let envFilePath: string | undefined;
 
@@ -184,7 +186,7 @@ export async function deployWithDocker(
         const { saveEnvVars } = await import("./env-manager");
 
         // A. Env file from repository (cloned code) - Loaded FIRST
-        const repoEnvPath = join(releasePath, ".env");
+        const repoEnvPath = join(sourcePath, ".env");
         const hasRepoEnv = existsSync(repoEnvPath);
         if (hasRepoEnv) {
             log("Importing .env from repository...");
@@ -226,7 +228,7 @@ export async function deployWithDocker(
     await removeContainer(appName).catch(() => {});
 
     // B. Clean up Compose services - check multiple possible locations/names
-    const currentDir = join(APPS_DIR, appName, "current");
+    const currentDir = resolveSourcePath(join(APPS_DIR, appName, "current"), config.sourceDir);
     const composeFiles = [
         join(currentDir, "docker-compose.yml"),
         join(currentDir, "docker-compose.generated.yml"),
@@ -256,13 +258,13 @@ export async function deployWithDocker(
     // which is a clear enough error message.
 
     // 3. Detect strategy
-    const strategy = await detectDockerStrategy(releasePath, config);
+    const strategy = await detectDockerStrategy(sourcePath, config);
     log(`Docker strategy: ${strategy}`);
 
     if (strategy === "user-compose" || strategy === "auto-compose") {
         return await deployWithCompose(
             appName,
-            releasePath,
+            sourcePath,
             config,
             strategy,
             envFilePath,
@@ -272,7 +274,7 @@ export async function deployWithDocker(
     } else {
         return await deployWithDockerfile(
             appName,
-            releasePath,
+            sourcePath,
             config,
             versionId,
             strategy,

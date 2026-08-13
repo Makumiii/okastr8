@@ -402,6 +402,7 @@ export function addGitHubCommands(program: Command) {
         .description("Import and deploy a GitHub repository")
         .argument("[repo]", "Repository full name (e.g., owner/repo)")
         .option("-b, --branch <branch>", "Branch to deploy")
+        .option("--source-dir <path>", "Repository subdirectory containing the app")
         .option("--env <vars...>", "Environment variables (KEY=VALUE)")
         .option("--env-file <path>", "Path to .env file")
         .option("--no-interactive", "Disable guided wizard prompts")
@@ -414,6 +415,7 @@ export function addGitHubCommands(program: Command) {
                     env: options.env,
                     envFile: options.envFile,
                     interactive: options.interactive !== false,
+                    sourceDir: options.sourceDir,
                 });
 
                 if (result.success) {

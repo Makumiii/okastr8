@@ -52,6 +52,7 @@ export type OrchestrateEnvironment = {
 };
 
 export interface DeployConfig {
+    sourceDir?: string; // Relative repository subdirectory containing the app
     runtime?: string; // Optional - will be auto-detected if not provided
     buildSteps: string[];
     startCommand: string;
@@ -68,6 +69,8 @@ export interface DeployConfig {
 export interface DeployFromPathOptions {
     appName: string;
     releasePath: string; // Path to version folder containing okastr8.yaml
+    sourceDir?: string; // Optional app subdirectory inside releasePath
+    sourcePath?: string; // Resolved source directory used internally by Docker
     versionId: number;
     gitRepo?: string; // Optional: for app.json metadata
     gitBranch?: string;

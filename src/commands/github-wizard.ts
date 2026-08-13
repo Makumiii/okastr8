@@ -272,6 +272,7 @@ export async function runGithubImportWizard(options: {
     env?: string[];
     envFile?: string;
     interactive?: boolean;
+    sourceDir?: string;
 }) {
     const config = await getGitHubConfig();
     if (!config.accessToken) {
@@ -319,6 +320,7 @@ export async function runGithubImportWizard(options: {
         repoFullName,
         appName,
         branch,
+        sourceDir: options.sourceDir,
     });
 
     if (!prep.success || !prep.config || !prep.appName || !prep.versionId) {
@@ -344,6 +346,7 @@ export async function runGithubImportWizard(options: {
         console.log(`  Repo: ${repoFullName}`);
         console.log(`  Branch: ${branch}`);
         console.log(`  App: ${prep.appName}`);
+        console.log(`  Source directory: ${deployConfig.sourceDir || "."}`);
         console.log(`  Runtime: ${deployConfig.runtime}`);
         console.log(`  Port: ${deployConfig.port}`);
         console.log(`  Routing: ${deployConfig.tunnel_routing ? "tunnel" : "caddy"}`);

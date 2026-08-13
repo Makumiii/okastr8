@@ -62,6 +62,7 @@ export interface AppConfig {
     registryProvider?: "ghcr" | "dockerhub" | "ecr" | "generic";
     imageReleaseRetention?: number;
     tunnel_routing?: boolean;
+    sourceDir?: string;
 }
 
 export interface PublishImageOptions {
@@ -420,6 +421,7 @@ export async function updateApp(
         const deployResult = await deployFromPath({
             appName,
             releasePath,
+            sourceDir: metadata.sourceDir,
             versionId,
             gitRepo: metadata.gitRepo,
             gitBranch: branch,

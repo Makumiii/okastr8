@@ -21,6 +21,7 @@ const APPS_DIR = join(OKASTR8_HOME, "apps");
 
 import type { DeployConfig, DeployFromPathOptions, DeployResult } from "../types";
 import { resolveDeployStrategy } from "../utils/deploy-strategy";
+import { normalizeSourceDir, resolveSourcePath } from "../utils/source-path";
 
 /**
  * Deploy from an existing path (used for both fresh deploys and rollbacks)
@@ -90,7 +91,21 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
     const currentPath = join(appDir, "current");
 
     step("config", "Loading application configuration...");
-    const configPath = join(releasePath, "okastr8.yaml");
+    let sourceDir: string | undefined;
+    let sourcePath: string;
+
+    try {
+        sourceDir = normalizeSourceDir(options.sourceDir);
+        sourcePath = resolveSourcePath(releasePath, sourceDir);
+    } catch (error: any) {
+        fail(`Invalid source directory: ${error.message}`);
+        return {
+            success: false,
+            message: `Invalid source directory: ${error.message}`,
+        };
+    }
+
+    const configPath = join(sourcePath, "okastr8.yaml");
 
     if (!existsSync(configPath)) {
         fail(`okastr8.yaml not found at ${configPath}`);
@@ -118,6 +133,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
               : [];
 
         config = {
+            sourceDir,
             runtime: rawConfig.runtime,
             buildSteps: normalizedBuildSteps,
             startCommand: rawConfig.start || "",
@@ -139,8 +155,8 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
 
     // Check if user provides their own Docker files
     // If so, startCommand is not required (it's defined in their Dockerfile/compose)
-    const hasUserDockerfile = existsSync(join(releasePath, "Dockerfile"));
-    const hasUserCompose = existsSync(join(releasePath, "docker-compose.yml"));
+    const hasUserDockerfile = existsSync(join(sourcePath, "Dockerfile"));
+    const hasUserCompose = existsSync(join(sourcePath, "docker-compose.yml"));
     const hasUserDocker = hasUserDockerfile || hasUserCompose;
 
     if (!config.startCommand && !hasUserDocker) {
@@ -200,7 +216,10 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
         "Tip: Apps must bind to 0.0.0.0 (not localhost) to be accessible. We inject HOST=0.0.0.0 automatically."
     );
     const { deployWithDocker } = await import("../utils/deploy-docker.ts");
-    const deployResult = await deployWithDocker(options, config);
+    const deployResult = await deployWithDocker(
+        { ...options, sourceDir, sourcePath },
+        config
+    );
 
     if (!deployResult.success) {
         fail(deployResult.message);
@@ -234,10 +253,11 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
                 name: appName,
                 runtime: config.runtime,
                 execStart: config.startCommand,
-                workingDirectory: currentPath,
+                workingDirectory: config.sourceDir ? join(currentPath, config.sourceDir) : currentPath,
                 user: user,
                 port: config.port,
                 domain: config.domain,
+                sourceDir: config.sourceDir,
                 tunnel_routing: config.tunnel_routing ?? false,
                 gitRepo: gitRepoFinal,
                 gitBranch: gitBranchFinal,

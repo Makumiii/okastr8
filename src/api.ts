@@ -1417,8 +1417,8 @@ api.post("/github/check-config", async (c) => {
         const config = await getGitHubConfig();
         if (!config.accessToken) return c.json(apiResponse(false, "Not connected"));
 
-        const { repoFullName, ref } = await c.req.json();
-        const hasConfig = await checkRepoConfig(config.accessToken, repoFullName, ref);
+        const { repoFullName, ref, sourceDir } = await c.req.json();
+        const hasConfig = await checkRepoConfig(config.accessToken, repoFullName, ref, sourceDir);
         return c.json(apiResponse(true, "Check complete", { hasConfig }));
     } catch (error: any) {
         console.error("API /github/check-config Error:", error);
@@ -1434,8 +1434,8 @@ api.post("/github/inspect-config", async (c) => {
         const config = await getGitHubConfig();
         if (!config.accessToken) return c.json(apiResponse(false, "Not connected"));
 
-        const { repoFullName, ref } = await c.req.json();
-        const result = await inspectRepoConfig(config.accessToken, repoFullName, ref);
+        const { repoFullName, ref, sourceDir } = await c.req.json();
+        const result = await inspectRepoConfig(config.accessToken, repoFullName, ref, sourceDir);
         return c.json(apiResponse(true, "Config inspected", result));
     } catch (error: any) {
         console.error("API /github/inspect-config Error:", error);
