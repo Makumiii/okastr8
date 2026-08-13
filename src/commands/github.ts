@@ -762,12 +762,7 @@ export async function inspectRepoConfig(
         }
     }
 
-    const hasDockerfile = await checkFileExists(
-        accessToken,
-        fullName,
-        repoFile("Dockerfile"),
-        ref
-    );
+    const hasDockerfile = await checkFileExists(accessToken, fullName, repoFile("Dockerfile"), ref);
     const hasCompose = await checkFileExists(
         accessToken,
         fullName,
@@ -807,7 +802,12 @@ export async function inspectRepoConfig(
             // keep defaults if parse fails
         }
     } else {
-        const runtime = await detectRuntimeFromRepo(accessToken, fullName, ref, normalizedSourceDir);
+        const runtime = await detectRuntimeFromRepo(
+            accessToken,
+            fullName,
+            ref,
+            normalizedSourceDir
+        );
         if (runtime) {
             detectedRuntime = runtime;
             config.runtime = runtime;
@@ -835,7 +835,12 @@ export async function inspectRepoConfig(
     }
 
     if (!config.runtime || config.runtime === "custom") {
-        const runtime = await detectRuntimeFromRepo(accessToken, fullName, ref, normalizedSourceDir);
+        const runtime = await detectRuntimeFromRepo(
+            accessToken,
+            fullName,
+            ref,
+            normalizedSourceDir
+        );
         if (runtime) {
             detectedRuntime = runtime;
             config.runtime = runtime;

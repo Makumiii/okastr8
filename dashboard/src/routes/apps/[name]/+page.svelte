@@ -168,7 +168,9 @@
         isControlling = true;
         const result = await post(`/app/${action}`, { name: appName });
         if (result.success) {
-            toasts.success(`App ${action}ed successfully`);
+            const actionLabel =
+                action === "restart" ? "restarted" : action === "stop" ? "stopped" : "started";
+            toasts.success(`App ${actionLabel} successfully`);
             await loadData();
         } else {
             toasts.error(result.message || `Failed to ${action} app`);

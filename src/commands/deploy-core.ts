@@ -216,10 +216,7 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
         "Tip: Apps must bind to 0.0.0.0 (not localhost) to be accessible. We inject HOST=0.0.0.0 automatically."
     );
     const { deployWithDocker } = await import("../utils/deploy-docker.ts");
-    const deployResult = await deployWithDocker(
-        { ...options, sourceDir, sourcePath },
-        config
-    );
+    const deployResult = await deployWithDocker({ ...options, sourceDir, sourcePath }, config);
 
     if (!deployResult.success) {
         fail(deployResult.message);
@@ -253,7 +250,9 @@ export async function deployFromPath(options: DeployFromPathOptions): Promise<De
                 name: appName,
                 runtime: config.runtime,
                 execStart: config.startCommand,
-                workingDirectory: config.sourceDir ? join(currentPath, config.sourceDir) : currentPath,
+                workingDirectory: config.sourceDir
+                    ? join(currentPath, config.sourceDir)
+                    : currentPath,
                 user: user,
                 port: config.port,
                 domain: config.domain,

@@ -10,6 +10,7 @@ import {
     containerStatus,
     containerLogs,
     runContainer,
+    startContainer,
     stopContainer as stopDockerContainer,
     restartContainer as restartDockerContainer,
     removeContainer,
@@ -291,37 +292,117 @@ export async function exportAppLogs(appName: string) {
     }
 }
 
-export async function startApp(appName: string) {
-    // For Docker, "starting" a stopped container is easy
-    // But if it was never built, we can't just "start" it without deployment info.
-    // Assuming the container exists but is stopped:
-    try {
-        const { startContainer } = await import("./docker");
-        const result = await startContainer(appName);
+type ManagedContainer = {
+    name: string;
+    status: string;
+};
+
+function isRunningContainer(status: string): boolean {
+    return status === "running" || status === "restarting";
+}
+
+async function getManagedAppContainers(appName: string): Promise<ManagedContainer[]> {
+    const containers = new Map<string, ManagedContainer>();
+    const directStatus = await containerStatus(appName);
+
+    if (directStatus.status !== "not found") {
+        containers.set(appName, { name: appName, status: directStatus.status });
+    }
+
+    const projectContainers = await getProjectContainers(appName);
+    for (const container of projectContainers) {
+        containers.set(container.name, { name: container.name, status: container.status });
+    }
+
+    // A tunnel is an app-managed sidecar rather than a Compose service, but it
+    // must follow the app lifecycle or a stopped app can remain publicly routed.
+    const tunnelName = `${appName}-tunnel`;
+    const tunnelStatus = await containerStatus(tunnelName);
+    if (tunnelStatus.status !== "not found") {
+        containers.set(tunnelName, { name: tunnelName, status: tunnelStatus.status });
+    }
+
+    return [...containers.values()];
+}
+
+async function controlManagedAppContainers(
+    appName: string,
+    action: "start" | "stop" | "restart"
+): Promise<{ success: boolean; message: string }> {
+    const containers = await getManagedAppContainers(appName);
+
+    if (containers.length === 0) {
         return {
-            success: result.success,
-            message: result.message,
+            success: false,
+            message: `No container found for app '${appName}'`,
         };
+    }
+
+    const failures: string[] = [];
+    let changed = 0;
+
+    for (const container of containers) {
+        const running = isRunningContainer(container.status);
+        let result: { success: boolean; message: string } | undefined;
+
+        if (action === "stop") {
+            if (!running) continue;
+            result = await stopDockerContainer(container.name);
+        } else if (action === "start") {
+            if (running) continue;
+            result = await startContainer(container.name);
+        } else if (running) {
+            result = await restartDockerContainer(container.name);
+        } else {
+            result = await startContainer(container.name);
+        }
+
+        if (result.success) {
+            changed += 1;
+        } else {
+            failures.push(`${container.name}: ${result.message}`);
+        }
+    }
+
+    if (failures.length > 0) {
+        return {
+            success: false,
+            message: `Failed to ${action} app: ${failures.join("; ")}`,
+        };
+    }
+
+    const actionLabel =
+        action === "restart" ? "restarted" : action === "stop" ? "stopped" : "started";
+    return {
+        success: true,
+        message:
+            changed > 0
+                ? `App ${actionLabel} (${changed} container${changed === 1 ? "" : "s"})`
+                : `App already ${action === "stop" ? "stopped" : "running"}`,
+    };
+}
+
+export async function startApp(appName: string) {
+    try {
+        return await controlManagedAppContainers(appName, "start");
     } catch (e) {
-        return { success: false, message: "Failed to start container: " + e };
+        return { success: false, message: "Failed to start app: " + e };
     }
 }
 
 export async function stopApp(appName: string) {
     try {
-        await stopDockerContainer(appName);
-        return { success: true, message: "App stopped" };
+        return await controlManagedAppContainers(appName, "stop");
     } catch (e) {
-        return { success: false, message: "Failed to stop: " + e };
+        return { success: false, message: "Failed to stop app: " + e };
     }
 }
 
 export async function restartApp(appName: string) {
     try {
-        await restartDockerContainer(appName);
-        return { success: true, message: "App restarted" };
+        return await controlManagedAppContainers(appName, "restart");
     } catch (e) {
-        return { success: false, message: "Failed to restart: " + e };
+        return { success: false, message: "Failed to restart app: " + e };
     }
 }
 

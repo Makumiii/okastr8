@@ -3,9 +3,7 @@ import { normalizeSourceDir, resolveSourcePath } from "../../src/utils/source-pa
 
 describe("repository source directory handling", () => {
     test("normalizes a relative app directory", () => {
-        expect(normalizeSourceDir("apps\\field-service-demo/")).toBe(
-            "apps/field-service-demo"
-        );
+        expect(normalizeSourceDir("apps\\field-service-demo/")).toBe("apps/field-service-demo");
         expect(resolveSourcePath("/srv/releases/v1", "apps/field-service-demo")).toBe(
             "/srv/releases/v1/apps/field-service-demo"
         );
@@ -16,7 +14,7 @@ describe("repository source directory handling", () => {
         expect(resolveSourcePath("/srv/releases/v1")).toBe("/srv/releases/v1");
     });
 
-    test.each(["/etc", "../outside", "apps/../outside", "C:/outside"]) (
+    test.each(["/etc", "../outside", "apps/../outside", "C:/outside"])(
         "rejects an escaping source directory: %s",
         (sourceDir) => {
             expect(() => normalizeSourceDir(sourceDir)).toThrow();
