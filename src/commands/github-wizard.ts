@@ -16,6 +16,7 @@ import {
     startDeploymentStream,
 } from "../utils/deploymentLogger";
 import * as readline from "readline";
+import type { Readable } from "stream";
 
 type EnquirerLike = {
     prompt: (question: any) => Promise<any>;
@@ -45,6 +46,49 @@ function parseEnvContent(content: string): Record<string, string> {
         }
     });
     return env;
+}
+
+type Keypress = { name?: string; ctrl?: boolean };
+
+export type DeploymentCancellationInput = Readable & {
+    isTTY?: boolean;
+    isRaw?: boolean;
+    setRawMode(enabled: boolean): unknown;
+};
+
+export function attachDeploymentCancellationInput(
+    deploymentId: string,
+    input: DeploymentCancellationInput = process.stdin
+): (() => void) | undefined {
+    if (!input.isTTY) return undefined;
+
+    const wasPaused = input.isPaused();
+    readline.emitKeypressEvents(input);
+    const hadRawMode = Boolean(input.isRaw);
+    if (!hadRawMode) {
+        input.setRawMode(true);
+    }
+
+    const onKeypress = (_str: string, key: Keypress) => {
+        if (key?.name?.toLowerCase() === "c") {
+            cancelDeployment(deploymentId);
+        }
+    };
+
+    input.on("keypress", onKeypress);
+    console.log("Streaming deployment logs. Press 'c' to cancel.");
+
+    return () => {
+        input.off("keypress", onKeypress);
+        if (!hadRawMode) {
+            input.setRawMode(false);
+        }
+        // emitKeypressEvents() resumes a previously paused stdin stream. Restore
+        // that state so a completed non-interactive import can exit normally.
+        if (wasPaused) {
+            input.pause();
+        }
+    };
 }
 
 async function parseEnvFile(filePath: string): Promise<Record<string, string>> {
@@ -375,31 +419,7 @@ export async function runGithubImportWizard(options: {
     const deploymentId = randomBytes(16).toString("hex");
     startDeploymentStream(deploymentId);
 
-    let cleanupInput: (() => void) | undefined;
-    if (process.stdin.isTTY) {
-        readline.emitKeypressEvents(process.stdin);
-        const hadRawMode = Boolean((process.stdin as any).isRaw);
-        if (!hadRawMode && typeof process.stdin.setRawMode === "function") {
-            process.stdin.setRawMode(true);
-        }
-        const onKeypress = (_str: string, key: { name?: string; ctrl?: boolean }) => {
-            if (key?.name?.toLowerCase() === "c") {
-                cancelDeployment(deploymentId);
-                return;
-            }
-            if (key?.ctrl && key?.name === "c") {
-                cancelDeployment(deploymentId);
-            }
-        };
-        process.stdin.on("keypress", onKeypress);
-        console.log("Streaming deployment logs. Press 'c' to cancel.");
-        cleanupInput = () => {
-            process.stdin.off("keypress", onKeypress);
-            if (!hadRawMode && typeof process.stdin.setRawMode === "function") {
-                process.stdin.setRawMode(false);
-            }
-        };
-    }
+    const cleanupInput = attachDeploymentCancellationInput(deploymentId);
 
     try {
         const result = await finalizeRepoImport(
