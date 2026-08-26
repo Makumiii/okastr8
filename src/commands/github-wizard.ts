@@ -62,7 +62,6 @@ export function attachDeploymentCancellationInput(
 ): (() => void) | undefined {
     if (!input.isTTY) return undefined;
 
-    const wasPaused = input.isPaused();
     readline.emitKeypressEvents(input);
     const hadRawMode = Boolean(input.isRaw);
     if (!hadRawMode) {
@@ -83,11 +82,10 @@ export function attachDeploymentCancellationInput(
         if (!hadRawMode) {
             input.setRawMode(false);
         }
-        // emitKeypressEvents() resumes a previously paused stdin stream. Restore
-        // that state so a completed non-interactive import can exit normally.
-        if (wasPaused) {
-            input.pause();
-        }
+        // emitKeypressEvents() adds a data listener and leaves stdin referenced.
+        // Nothing reads input after this deployment flow, so pause it to let the
+        // CLI process exit normally regardless of its state before Enquirer ran.
+        input.pause();
     };
 }
 
