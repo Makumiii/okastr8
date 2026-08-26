@@ -43,6 +43,21 @@ describe("GitHub deployment cancellation input", () => {
         endDeploymentStream(deploymentId);
     });
 
+    test("pauses an initially flowing TTY after cleanup", () => {
+        const deploymentId = `test-flowing-input-${Date.now()}`;
+        startDeploymentStream(deploymentId);
+        const input = new FakeTTYInput();
+        input.resume();
+        expect(input.isPaused()).toBe(false);
+
+        const cleanup = attachDeploymentCancellationInput(deploymentId, input);
+        cleanup?.();
+
+        expect(input.isPaused()).toBe(true);
+        expect(input.listenerCount("keypress")).toBe(0);
+        endDeploymentStream(deploymentId);
+    });
+
     test("does not attach handlers to non-TTY input", () => {
         const input = new FakeTTYInput();
         input.isTTY = false;
